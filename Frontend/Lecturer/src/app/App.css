@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import '../shared/styles/variables.css';
+@import '../shared/styles/global.css';
+@import '../shared/styles/premium.css';
+@import '../shared/styles/animations.css';
+@import '../shared/styles/responsive.css';
+@import '../shared/styles/print.css';

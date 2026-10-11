@@ -1,0 +1,236 @@
+@media (max-width: 720px) {
+  .main-content:has(.role-dashboard) {
+    padding: 0;
+  }
+
+  .role-dashboard {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .role-dashboard.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    height: auto;
+    position: static;
+    overflow-y: visible;
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 12px;
+  }
+
+  .sidebar-heading {
+    align-items: flex-start;
+    flex-direction: row;
+    padding: 3px 6px 11px;
+  }
+
+  .sidebar-title {
+    display: grid;
+    gap: 7px;
+  }
+
+  .sidebar-collapsed .sidebar-title {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+  }
+
+  .sidebar-heading strong,
+  .sidebar-heading .eyebrow {
+    display: block;
+  }
+
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .dashboard-menu {
+    display: flex;
+    overflow-x: auto;
+    gap: 5px;
+  }
+
+  .sidebar-collapsed .dashboard-menu-item {
+    justify-content: flex-start;
+    padding-inline: 10px;
+  }
+
+  .sidebar-collapsed .menu-label,
+  .sidebar-collapsed .sidebar-bottom-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    clip-path: none;
+  }
+
+  .sidebar-collapsed .sidebar-bottom {
+    justify-items: stretch;
+    padding-inline: 8px;
+  }
+
+  .sidebar-collapsed .sidebar-logout-icon {
+    display: none;
+  }
+
+  .dashboard-menu-item {
+    min-height: 36px;
+    flex: 0 0 auto;
+    font-size: 11px;
+  }
+
+  .sidebar-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .dashboard-topline {
+    display: none;
+  }
+
+  .dashboard-main {
+    padding: 18px 12px 28px;
+  }
+
+  .dashboard-page-heading,
+  .student-greeting,
+  .student-topic-top,
+  .term-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-form,
+  .student-topic-form,
+  .term-form {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .dashboard-form h2 {
+    grid-column: auto;
+  }
+
+  .process-grid,
+  .document-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-edit-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .student-demo-switcher {
+    width: 100%;
+  }
+
+  .profile-card dl {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .profile-data-grid {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .profile-data-grid dd {
+    margin-bottom: 10px;
+  }
+
+  .topbar {
+    min-height: 86px;
+    padding-left: 4px;
+    padding-right: 0;
+  }
+
+  .brand-logo {
+    width: 146px;
+    height: 82px;
+  }
+
+  .brand small {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .main-nav {
+    margin-right: 12px;
+  }
+
+  .main-nav a {
+    font-size: 12px;
+  }
+
+  .role-switcher {
+    gap: 5px;
+  }
+
+  .role-switcher > span {
+    display: none;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-heading,
+  .table-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .demo-summary {
+    gap: 8px;
+  }
+
+  .summary-card {
+    min-height: 80px;
+    align-items: flex-start;
+    flex-direction: column-reverse;
+    gap: 5px;
+    padding: 12px;
+  }
+
+  .summary-card strong {
+    font-size: 22px;
+  }
+
+  .demo-form {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .demo-form h2 {
+    grid-column: auto;
+  }
+
+  .search-label {
+    width: 100%;
+  }
+
+  .footer {
+    gap: 8px;
+    flex-direction: column;
+  }
+}

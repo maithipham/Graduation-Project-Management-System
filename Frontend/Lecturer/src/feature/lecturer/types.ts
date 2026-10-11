@@ -1,0 +1,6 @@
+export type * from './topic-manage/types'
+export type * from './review-outline/types'
+export type * from './report-eval/types'
+export type * from './council/types'
+export type * from './dashboard/types'
+export type * from './department/types'

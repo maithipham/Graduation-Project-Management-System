@@ -1,0 +1,36 @@
+@media print {
+  body {
+    min-width: 0;
+    background: #fff;
+  }
+
+  .topbar,
+  .footer,
+  .demo-form,
+  .demo-heading > button,
+  .delete-button,
+  .demo-notice {
+    display: none !important;
+  }
+
+  .main-content {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+
+  .table-wrap {
+    overflow: visible;
+    border-color: #999;
+  }
+
+  .table-wrap tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 15mm;
+  }
+}
