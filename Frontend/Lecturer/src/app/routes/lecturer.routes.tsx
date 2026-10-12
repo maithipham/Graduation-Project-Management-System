@@ -1,15 +1,15 @@
 import { lazy, Suspense } from 'react'
 import type { RouteObject } from 'react-router-dom'
-import { LecturerLayout } from '@/feature/lecturer/layouts/LecturerLayout'
+import { LecturerLayout } from '@/features/lecturer/layouts/LecturerLayout'
 import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/feature/auth/components/ProtectedRoute'
+import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 
-const LecturerDashboardPage = lazy(() => import('@/feature/lecturer/dashboard/pages/LecturerDashboardPage'))
-const TopicManagePage = lazy(() => import('@/feature/lecturer/topic-manage/pages/TopicManagePage'))
-const ReviewOutlinePage = lazy(() => import('@/feature/lecturer/review-outline/pages/ReviewOutlinePage'))
-const ReportEvalPage = lazy(() => import('@/feature/lecturer/report-eval/pages/ReportEvalPage'))
-const CouncilPage = lazy(() => import('@/feature/lecturer/council/pages/CouncilPage'))
-const DepartmentPage = lazy(() => import('@/feature/lecturer/department/pages/DepartmentPage'))
+const LecturerDashboardPage = lazy(() => import('@/features/lecturer/dashboard/pages/LecturerDashboardPage'))
+const TopicManagePage = lazy(() => import('@/features/lecturer/topic-manage/pages/TopicManagePage'))
+const ReviewOutlinePage = lazy(() => import('@/features/lecturer/review-outline/pages/ReviewOutlinePage'))
+const ReportEvalPage = lazy(() => import('@/features/lecturer/report-eval/pages/ReportEvalPage'))
+const CouncilPage = lazy(() => import('@/features/lecturer/council/pages/CouncilPage'))
+const DepartmentPage = lazy(() => import('@/features/lecturer/department/pages/DepartmentPage'))
 
 export const lecturerRoutes: RouteObject = {
   path: 'lecturer',

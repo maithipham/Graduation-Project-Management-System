@@ -1,5 +1,0 @@
-export * from './account.service'
-export * from './semester.service'
-export * from './major.service'
-export * from './system.service'
-export * from './admin.service'

@@ -1,7 +1,0 @@
-export * from './dashboard'
-export * from './topic-manage'
-export * from './review-outline'
-export * from './report-eval'
-export * from './council'
-export * from './department'
-export * from './layouts/LecturerLayout'

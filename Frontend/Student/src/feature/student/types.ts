@@ -1,8 +1,0 @@
-export type * from './overview/types'
-export type * from './registration/types'
-export type * from './outline/types'
-export type * from './report/types'
-export type * from './documents/types'
-export type * from './schedule/types'
-export type * from './results/types'
-export type * from './lecturer-list/types'

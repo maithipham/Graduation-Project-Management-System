@@ -1,14 +1,14 @@
 import { lazy, Suspense } from 'react'
 import type { RouteObject } from 'react-router-dom'
-import { DepartmentLayout } from '@/feature/department/layouts/DepartmentLayout'
+import { DepartmentLayout } from '@/features/department/layouts/DepartmentLayout'
 import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/feature/auth/components/ProtectedRoute'
+import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 
-const DepartmentDashboardPage = lazy(() => import('@/feature/department/pages/DepartmentDashboardPage'))
-const UserImportPage = lazy(() => import('@/feature/department/pages/UserImportPage'))
-const SupervisorAssignmentPage = lazy(() => import('@/feature/department/pages/SupervisorAssignmentPage'))
-const CouncilManagementPage = lazy(() => import('@/feature/department/pages/CouncilManagementPage'))
-const RemindersPage = lazy(() => import('@/feature/department/pages/RemindersPage'))
+const DepartmentDashboardPage = lazy(() => import('@/features/department/pages/DepartmentDashboardPage'))
+const UserImportPage = lazy(() => import('@/features/department/pages/UserImportPage'))
+const SupervisorAssignmentPage = lazy(() => import('@/features/department/pages/SupervisorAssignmentPage'))
+const CouncilManagementPage = lazy(() => import('@/features/department/pages/CouncilManagementPage'))
+const RemindersPage = lazy(() => import('@/features/department/pages/RemindersPage'))
 
 export const departmentRoutes: RouteObject = {
   path: 'department',

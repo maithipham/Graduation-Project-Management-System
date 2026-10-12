@@ -7,7 +7,7 @@ import { adminRoutes } from './admin.routes'
 import { departmentRoutes } from './department.routes'
 import { lecturerRoutes } from './lecturer.routes'
 
-const LoginPage = lazy(() => import('@/feature/auth/pages/LoginPage'))
+const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
 
 
 const routes: RouteObject[] = [

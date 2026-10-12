@@ -1,13 +1,13 @@
 import { lazy, Suspense } from 'react'
 import type { RouteObject } from 'react-router-dom'
-import { AdminLayout } from '@/feature/admin/layouts/AdminLayout'
+import { AdminLayout } from '@/features/admin/layouts/AdminLayout'
 import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/feature/auth/components/ProtectedRoute'
+import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 
-const AdminDashboardPage = lazy(() => import('@/feature/admin/pages/AdminDashboardPage'))
-const AccountManagementPage = lazy(() => import('@/feature/admin/pages/AccountManagementPage'))
-const SemesterManagementPage = lazy(() => import('@/feature/admin/pages/SemesterManagementPage'))
-const MajorManagementPage = lazy(() => import('@/feature/admin/pages/MajorManagementPage'))
+const AdminDashboardPage = lazy(() => import('@/features/admin/pages/AdminDashboardPage'))
+const AccountManagementPage = lazy(() => import('@/features/admin/pages/AccountManagementPage'))
+const SemesterManagementPage = lazy(() => import('@/features/admin/pages/SemesterManagementPage'))
+const MajorManagementPage = lazy(() => import('@/features/admin/pages/MajorManagementPage'))
 
 export const adminRoutes: RouteObject = {
   path: 'admin',
