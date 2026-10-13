@@ -1,19 +1,11 @@
 import { lazy, Suspense } from 'react'
-import type { RouteObject } from 'react-router-dom'
-import { StudentLayout } from '@/feature/student/layouts/StudentLayout'
+import { Navigate, type RouteObject } from 'react-router-dom'
+import { StudentLayout } from '@/features/student/layouts/StudentLayout'
 import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/feature/auth/components/ProtectedRoute'
+import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 
-
-const StudentOverviewPage = lazy(() => import('@/feature/student/overview/pages/StudentOverviewPage'))
-const StudentRegistrationPage = lazy(() => import('@/feature/student/registration/pages/StudentRegistrationPage'))
-const StudentLecturerListPage = lazy(() => import('@/feature/student/lecturer-list/pages/StudentLecturerListPage'))
-const StudentOutlinePage = lazy(() => import('@/feature/student/outline/pages/StudentOutlinePage'))
-const StudentReportPage = lazy(() => import('@/feature/student/report/pages/StudentReportPage'))
-const StudentSchedulePage = lazy(() => import('@/feature/student/schedule/pages/StudentSchedulePage'))
-const StudentResultsPage = lazy(() => import('@/feature/student/results/pages/StudentResultsPage'))
-const StudentDocumentsPage = lazy(() => import('@/feature/student/documents/pages/StudentDocumentsPage'))
-
+const Feature1Page = lazy(() => import('@/features/student/feature_1/pages/Feature1Page'))
+const Feature2Page = lazy(() => import('@/features/student/feature_2/pages/Feature2Page'))
 
 export const studentRoutes: RouteObject = {
   path: 'student',
@@ -24,69 +16,29 @@ export const studentRoutes: RouteObject = {
       children: [
         {
           index: true,
+          element: <Navigate to="feature-1" replace />,
+        },
+        {
+          path: 'feature-1',
           element: (
             <Suspense fallback={<LoadingFallback />}>
-              <StudentOverviewPage />
+              <Feature1Page />
             </Suspense>
           ),
         },
         {
-          path: 'registration',
+          path: 'feature-2',
           element: (
             <Suspense fallback={<LoadingFallback />}>
-              <StudentRegistrationPage />
+              <Feature2Page />
             </Suspense>
           ),
         },
-        {
-          path: 'lecturer-list',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentLecturerListPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'outline',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentOutlinePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'report',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentReportPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'schedule',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentSchedulePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'results',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentResultsPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'documents',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentDocumentsPage />
-            </Suspense>
-          ),
-        },
+        // Lưu ý: Chỉ thêm các route mới vào đây sau khi đã tạo sub-feature tương ứng
+        // trong src/features/student/<sub-feature-name>/pages/<PageName>.tsx
       ],
     },
   ],
 }
+
+export default studentRoutes

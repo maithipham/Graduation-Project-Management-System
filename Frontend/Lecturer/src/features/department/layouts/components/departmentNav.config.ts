@@ -1,17 +1,83 @@
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, UserPlus2, UserCheck2, GraduationCap, BellRing } from 'lucide-react'
+import {
+  LayoutDashboard,
+  GraduationCap,
+  Users,
+  UserCheck,
+  UserPlus,
+  MessageSquareText,
+  Award,
+  CalendarRange,
+  SlidersHorizontal,
+  FolderArchive,
+} from 'lucide-react'
+
+export interface DepartmentSubNavItem {
+  to: string
+  label: string
+  icon: LucideIcon
+}
 
 export interface DepartmentNavItem {
   to: string
   label: string
   icon: LucideIcon
   end?: boolean
+  children?: DepartmentSubNavItem[]
 }
 
 export const departmentNavItems: DepartmentNavItem[] = [
-  { to: '/department', label: 'Tổng quan Bộ môn', icon: LayoutDashboard, end: true },
-  { to: '/department/users-import', label: 'Import SV & GVHD', icon: UserPlus2 },
-  { to: '/department/assignments', label: 'Phân công GVHD', icon: UserCheck2 },
-  { to: '/department/councils', label: 'Thành lập Hội đồng', icon: GraduationCap },
-  { to: '/department/reminders', label: 'Nhắc nhở tiến độ', icon: BellRing },
+  {
+    to: '/department',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    end: true,
+  },
+  {
+    to: '/department/students',
+    label: 'Quản lý sinh viên',
+    icon: GraduationCap,
+  },
+  {
+    to: '/department/teachers',
+    label: 'Quản lý giáo viên',
+    icon: Users,
+    children: [
+      {
+        to: '/department/lecturers',
+        label: 'Giảng viên',
+        icon: UserCheck,
+      },
+      {
+        to: '/department/supervisors',
+        label: 'Hướng dẫn',
+        icon: UserPlus,
+      },
+      {
+        to: '/department/reviewers',
+        label: 'Nhận xét',
+        icon: MessageSquareText,
+      },
+    ],
+  },
+  {
+    to: '/department/councils',
+    label: 'Hội đồng bảo vệ',
+    icon: Award,
+  },
+  {
+    to: '/department/schedule',
+    label: 'Kế hoạch & Tiến độ',
+    icon: CalendarRange,
+  },
+  {
+    to: '/department/grading-config',
+    label: 'Cấu hình điểm',
+    icon: SlidersHorizontal,
+  },
+  {
+    to: '/department/documents',
+    label: 'Tài liệu & Biểu mẫu',
+    icon: FolderArchive,
+  },
 ]

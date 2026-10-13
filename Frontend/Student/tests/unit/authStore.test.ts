@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { useAuthStore } from '@/feature/auth/store/authStore'
+import { useAuthStore } from '@/features/auth/store/authStore'
 
 
 describe('Auth Store', () => {

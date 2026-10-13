@@ -13,19 +13,19 @@ const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
 const routes: RouteObject[] = [
   {
     path: '/',
-    element: <Navigate to="/lecturer" replace />,
+    element: <Navigate to="/department" replace />,
+  },
+  {
+    path: 'login',
+    element: (
+      <Suspense fallback={<LoadingFallback />}>
+        <LoginPage />
+      </Suspense>
+    ),
   },
   {
     element: <PublicLayout />,
     children: [
-      {
-        path: 'login',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <LoginPage />
-          </Suspense>
-        ),
-      },
       {
         path: '404',
         element: <NotFound />,

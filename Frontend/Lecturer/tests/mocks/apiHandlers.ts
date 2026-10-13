@@ -14,10 +14,9 @@ export async function mockSuccessResponse<T>(
     await new Promise((resolve) => setTimeout(resolve, delayMs))
   }
   return {
-    success: true,
+    code: 1000,
     data,
     message: 'Thao tác thành công',
-    timestamp: new Date().toISOString(),
   }
 }
 
@@ -33,9 +32,9 @@ export async function mockErrorResponse(
   error.response = {
     status,
     data: {
-      success: false,
+      code: status,
       message,
-      timestamp: new Date().toISOString(),
+      data: null,
     },
   }
   throw error

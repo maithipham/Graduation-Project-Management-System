@@ -1,54 +1,80 @@
-import { lazy, Suspense } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import { AdminLayout } from '@/features/admin/layouts/AdminLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
-
-const AdminDashboardPage = lazy(() => import('@/features/admin/pages/AdminDashboardPage'))
-const AccountManagementPage = lazy(() => import('@/features/admin/pages/AccountManagementPage'))
-const SemesterManagementPage = lazy(() => import('@/features/admin/pages/SemesterManagementPage'))
-const MajorManagementPage = lazy(() => import('@/features/admin/pages/MajorManagementPage'))
+import { FeaturePlaceholder } from '@/shared/components/feedback/FeaturePlaceholder'
 
 export const adminRoutes: RouteObject = {
   path: 'admin',
-  element: <ProtectedRoute allowedRoles={['admin']} />,
+  element: <AdminLayout />,
   children: [
     {
-      element: <AdminLayout />,
-      children: [
-        {
-          index: true,
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <AdminDashboardPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'accounts',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <AccountManagementPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'semesters',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <SemesterManagementPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'majors',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <MajorManagementPage />
-            </Suspense>
-          ),
-        },
-      ],
+      index: true,
+      element: (
+        <FeaturePlaceholder
+          title="Bảng điều khiển Quản trị viên (Dashboard)"
+          subtitle="Tổng quan trạng thái hệ thống, phân quyền và giám sát hoạt động."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
+    },
+    {
+      path: 'feature-1',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 1"
+          subtitle="Không gian tính năng Feature 1 dành cho Quản trị viên."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
+    },
+    {
+      path: 'feature-2',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 2"
+          subtitle="Không gian tính năng Feature 2 dành cho Quản trị viên."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
+    },
+    {
+      path: 'feature-2/sub-1',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 2.1"
+          subtitle="Tính năng con cấp 2 (Feature 2.1) thuộc nhóm Feature 2."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
+    },
+    {
+      path: 'feature-2/sub-2',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 2.2"
+          subtitle="Tính năng con cấp 2 (Feature 2.2) thuộc nhóm Feature 2."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
+    },
+    {
+      path: 'feature-3',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 3"
+          subtitle="Không gian tính năng Feature 3 dành cho Quản trị viên."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
+    },
+    {
+      path: 'feature-4',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 4"
+          subtitle="Không gian tính năng Feature 4 dành cho Quản trị viên."
+          role="Quản trị viên Hệ thống"
+        />
+      ),
     },
   ],
 }

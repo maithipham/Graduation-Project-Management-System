@@ -5,9 +5,9 @@ import { mockTopics } from '../mocks/fixtures'
 describe('Mock API Handlers', () => {
   it('mockSuccessResponse returns valid ApiResponse format', async () => {
     const res = await mockSuccessResponse({ message: 'OK' })
-    expect(res.success).toBe(true)
+    expect(res.code).toBe(1000)
     expect(res.data.message).toBe('OK')
-    expect(res.timestamp).toBeDefined()
+    expect(res.message).toBe('Thao tác thành công')
   })
 
   it('mockErrorResponse throws error with status', async () => {

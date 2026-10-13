@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRouter } from '@/app/routes'
 import { queryClient } from '@/shared/api/queryClient'
 import { ErrorFallback } from '@/shared/components/feedback/ErrorFallback'
+import { ToastContainer } from '@/shared/components/feedback/ToastContainer'
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AppRouter />
+          <ToastContainer />
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

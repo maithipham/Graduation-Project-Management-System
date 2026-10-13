@@ -1,73 +1,82 @@
-import { lazy, Suspense } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import { LecturerLayout } from '@/features/lecturer/layouts/LecturerLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
-
-const LecturerDashboardPage = lazy(() => import('@/features/lecturer/dashboard/pages/LecturerDashboardPage'))
-const TopicManagePage = lazy(() => import('@/features/lecturer/topic-manage/pages/TopicManagePage'))
-const ReviewOutlinePage = lazy(() => import('@/features/lecturer/review-outline/pages/ReviewOutlinePage'))
-const ReportEvalPage = lazy(() => import('@/features/lecturer/report-eval/pages/ReportEvalPage'))
-const CouncilPage = lazy(() => import('@/features/lecturer/council/pages/CouncilPage'))
-const DepartmentPage = lazy(() => import('@/features/lecturer/department/pages/DepartmentPage'))
+import { FeaturePlaceholder } from '@/shared/components/feedback/FeaturePlaceholder'
 
 export const lecturerRoutes: RouteObject = {
   path: 'lecturer',
-  element: <ProtectedRoute allowedRoles={['lecturer', 'department-head', 'secretary', 'council', 'admin']} />,
-
+  element: <LecturerLayout />,
   children: [
     {
-      element: <LecturerLayout />,
-      children: [
-        {
-          index: true,
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <LecturerDashboardPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'topic-manage',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <TopicManagePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'review-outline',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <ReviewOutlinePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'report-eval',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <ReportEvalPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'council',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <CouncilPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'department',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <DepartmentPage />
-            </Suspense>
-          ),
-        },
-      ],
+      index: true,
+      element: (
+        <FeaturePlaceholder
+          title="Bảng điều khiển Giảng viên (Dashboard)"
+          subtitle="Tổng quan tiến độ hướng dẫn, nhận xét và hội đồng bảo vệ đồ án tốt nghiệp."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
+    },
+    {
+      path: 'feature-1',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 1"
+          subtitle="Không gian tính năng Feature 1 dành cho Giảng viên."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
+    },
+    {
+      path: 'feature-2',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 2"
+          subtitle="Không gian tính năng Feature 2 dành cho Giảng viên."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
+    },
+    {
+      path: 'feature-2/sub-1',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 2.1"
+          subtitle="Tính năng con cấp 2 (Feature 2.1) thuộc nhóm Feature 2."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
+    },
+    {
+      path: 'feature-2/sub-2',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 2.2"
+          subtitle="Tính năng con cấp 2 (Feature 2.2) thuộc nhóm Feature 2."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
+    },
+    {
+      path: 'feature-3',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 3"
+          subtitle="Không gian tính năng Feature 3 dành cho Giảng viên."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
+    },
+    {
+      path: 'feature-4',
+      element: (
+        <FeaturePlaceholder
+          title="Feature 4"
+          subtitle="Không gian tính năng Feature 4 dành cho Giảng viên."
+          role="Giảng viên Khoa CNTT"
+        />
+      ),
     },
   ],
 }
+
+export default lecturerRoutes
