@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import { AdminLayout } from '@/features/admin/layouts/AdminLayout'
+import { AdminLayout } from '@/features/admin'
 import { FeaturePlaceholder } from '@/shared/components/feedback/FeaturePlaceholder'
 
 export const adminRoutes: RouteObject = {

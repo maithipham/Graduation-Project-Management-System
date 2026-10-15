@@ -14,7 +14,7 @@ import {
   Settings,
   LogOut,
 } from 'lucide-react'
-import { useAuthStore } from '@/features/auth/store/authStore'
+import { useAuthStore } from '@/features/auth'
 
 interface LecturerHeaderProps {
   onToggleSidebar?: () => void

@@ -1,4 +1,4 @@
-export function LecturerDashboardPage() {
+export default function LecturerDashboardPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -25,5 +25,3 @@ export function LecturerDashboardPage() {
     </div>
   )
 }
-
-export default LecturerDashboardPage

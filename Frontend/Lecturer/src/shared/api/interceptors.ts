@@ -1,20 +1,66 @@
-import type { AxiosInstance } from 'axios'
-import { API_SUCCESS_CODE, ApiError, type ApiResponse } from '@/shared/types'
+import axios, { type AxiosError, type AxiosInstance } from 'axios'
+import { API_SUCCESS_CODE, ApiError, NETWORK_ERROR_CODE, type ApiResponse } from '@/shared/types'
 import { toast } from '@/shared/components/feedback/toast.store'
+import { API_ENDPOINTS } from './endpoints'
+import { notifyUnauthorized } from './session'
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * true: interceptor không tự hiện toast lỗi (component tự hiển thị lỗi, ví dụ lỗi validate ngay trên form).
+     * Dùng: apiClient.post(url, body, { skipErrorToast: true })
+     */
+    skipErrorToast?: boolean
+    /** Đánh dấu nội bộ: request đã được gửi lại 1 lần sau khi refresh token */
+    _retry?: boolean
+    /** Đánh dấu nội bộ: đây là chính request gọi refresh token */
+    _isRefreshRequest?: boolean
+  }
+}
+
+/**
+ * Chuyển lỗi axios (HTTP khác 2xx, mất mạng, timeout) thành ApiError thống nhất.
+ */
+export function toApiError(error: AxiosError): ApiError {
+  const status = error.response?.status
+  const body = error.response?.data
+
+  // BE trả body có message: APIResponse { code, message, data } hoặc body lỗi mặc định của Spring
+  if (body && typeof body === 'object' && 'message' in body) {
+    const apiRes = body as Partial<ApiResponse>
+    const code = typeof apiRes.code === 'number' ? apiRes.code : (status ?? NETWORK_ERROR_CODE)
+    return new ApiError(apiRes.message || 'Có lỗi xảy ra từ máy chủ', code, apiRes.data, status)
+  }
+
+  if (status) {
+    return new ApiError(`Có lỗi xảy ra từ máy chủ (HTTP ${status})`, status, body, status)
+  }
+
+  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+    return new ApiError('Máy chủ phản hồi quá lâu. Vui lòng thử lại.', NETWORK_ERROR_CODE)
+  }
+
+  return new ApiError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.', NETWORK_ERROR_CODE)
+}
+
+// Nhiều request cùng bị 401 thì chỉ gọi refresh 1 lần, các request còn lại chờ chung kết quả
+let refreshPromise: Promise<void> | null = null
+
+/**
+ * Gọi BE cấp token mới. Token nằm trong cookie HttpOnly nên frontend không cần đọc/lưu gì:
+ * BE trả Set-Cookie, trình duyệt tự gửi cookie mới ở các request sau.
+ */
+function refreshSession(axiosInstance: AxiosInstance): Promise<void> {
+  refreshPromise ??= axiosInstance
+    .post(API_ENDPOINTS.auth.refreshToken, undefined, { _isRefreshRequest: true })
+    .then(() => undefined)
+    .finally(() => {
+      refreshPromise = null
+    })
+  return refreshPromise
+}
 
 export function setupInterceptors(axiosInstance: AxiosInstance): void {
-  // Request Interceptor: Gắn Bearer Token nếu có
-  axiosInstance.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem('access_token')
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
-      return config
-    },
-    (error) => Promise.reject(error),
-  )
-
   // Response Interceptor: Chuẩn hóa phản hồi APIResponse (code 1000 = thành công, khác 1000 = thất bại)
   axiosInstance.interceptors.response.use(
     (response) => {
@@ -26,45 +72,57 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
       ) {
         const apiRes = response.data as ApiResponse
         if (apiRes.code !== API_SUCCESS_CODE) {
-          const errorMessage = apiRes.message || 'Thao tác không thành công'
-          // Tự động hiển thị thông báo lỗi trong 3 giây
-          toast.error(errorMessage, 3000)
-          return Promise.reject(new ApiError(errorMessage, apiRes.code, apiRes.data))
+          const apiError = new ApiError(
+            apiRes.message || 'Thao tác không thành công',
+            apiRes.code,
+            apiRes.data,
+            response.status,
+          )
+          const { skipErrorToast, _isRefreshRequest } = response.config
+          if (!skipErrorToast && !_isRefreshRequest) {
+            toast.error(apiError.message, 3000)
+          }
+          return Promise.reject(apiError)
         }
       }
       return response
     },
-    async (error) => {
-      const originalRequest = error.config
+    async (error: unknown) => {
+      // Request bị hủy (rời trang, TanStack Query hủy query cũ) không phải lỗi → không toast
+      if (axios.isCancel(error) || !axios.isAxiosError(error)) {
+        return Promise.reject(error)
+      }
 
-      // Xử lý 401 Silent Token Refresh
-      if (error.response?.status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true
-        try {
-          const refreshToken = localStorage.getItem('refresh_token')
-          if (refreshToken) {
-            // Placeholder: gọi endpoint làm mới token
+      const config = error.config
+      const apiError = toApiError(error)
+
+      // Lỗi của chính request refresh: không toast, để refreshSession() báo thất bại cho request gốc
+      if (config?._isRefreshRequest) {
+        return Promise.reject(apiError)
+      }
+
+      // 401 (chưa đăng nhập / token hết hạn): thử refresh 1 lần rồi gửi lại request.
+      // Refresh thất bại, hoặc gửi lại vẫn 401 → về trang đăng nhập. Không hiện thông báo.
+      if (apiError.status === 401) {
+        if (config && !config._retry) {
+          config._retry = true
+          try {
+            await refreshSession(axiosInstance)
+          } catch {
+            notifyUnauthorized()
+            return Promise.reject(apiError)
           }
-        } catch (refreshError) {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 3000)
-          window.location.href = '/login'
-          return Promise.reject(refreshError)
+          return axiosInstance(config)
         }
+        notifyUnauthorized()
+        return Promise.reject(apiError)
       }
 
-      // Xử lý message lỗi khi HTTP Status khác 2xx (400, 403, 404, 500...)
-      const errorData = error.response?.data
-      if (errorData && typeof errorData === 'object' && 'message' in errorData) {
-        const errorMessage = (errorData as ApiResponse).message || 'Có lỗi xảy ra từ máy chủ'
-        toast.error(errorMessage, 3000)
-      } else if (error.message && !error.response) {
-        toast.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.', 3000)
+      // 400, 403, 404, 500, mất mạng, timeout → toast
+      if (!config?.skipErrorToast) {
+        toast.error(apiError.message, 3000)
       }
-
-      return Promise.reject(error)
+      return Promise.reject(apiError)
     },
   )
 }
-

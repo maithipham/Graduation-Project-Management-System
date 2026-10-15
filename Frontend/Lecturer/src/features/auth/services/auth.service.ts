@@ -1,5 +1,5 @@
-import { apiClient } from '../../../shared/api/client'
-import { API_ENDPOINTS } from '../../../shared/api/endpoints'
+import { apiClient } from '@/shared/api/client'
+import { API_ENDPOINTS } from '@/shared/api/endpoints'
 import type { ApiResponse, UserProfile, UserRole } from '@/shared/types'
 
 export interface LoginCredentials {

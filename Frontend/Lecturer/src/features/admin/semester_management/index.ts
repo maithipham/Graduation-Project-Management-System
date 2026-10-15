@@ -1,7 +1,5 @@
-﻿// Public API cho sub-feature: semester_management
-export * from './types'
-export * from './services'
-export * from './store'
-export * from './hooks'
-export * from './components'
-export * from './pages'
+// Public API của sub-feature: semester_management
+// Chưa có nội dung. Khi bắt đầu code, tạo các thư mục types/ services/ hooks/ components/ pages/
+// và chỉ export ra đây những gì feature khác cần dùng (types, hooks, component dùng chung).
+// Không export pages: page được nạp bằng lazy() trong app/routes.
+export {}

@@ -2,7 +2,7 @@ export const API_ENDPOINTS = {
   auth: {
     login: '/auth/login',
     logout: '/auth/logout',
-    refreshToken: '/auth/refresh',
+    refreshToken: '/refresh-token',
     me: '/auth/me',
   },
   student: {

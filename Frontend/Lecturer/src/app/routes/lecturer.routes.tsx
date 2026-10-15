@@ -1,6 +1,13 @@
+import { lazy } from 'react'
 import type { RouteObject } from 'react-router-dom'
-import { LecturerLayout } from '@/features/lecturer/layouts/LecturerLayout'
+import { LecturerLayout } from '@/features/lecturer'
 import { FeaturePlaceholder } from '@/shared/components/feedback/FeaturePlaceholder'
+import { withSuspense } from './withSuspense'
+
+// Page nạp bằng lazy() → mỗi page là một chunk riêng, chỉ tải khi vào URL đó
+const LecturerDashboardPage = lazy(
+  () => import('@/features/lecturer/dashboard/pages/LecturerDashboardPage'),
+)
 
 export const lecturerRoutes: RouteObject = {
   path: 'lecturer',
@@ -8,13 +15,7 @@ export const lecturerRoutes: RouteObject = {
   children: [
     {
       index: true,
-      element: (
-        <FeaturePlaceholder
-          title="Bảng điều khiển Giảng viên (Dashboard)"
-          subtitle="Tổng quan tiến độ hướng dẫn, nhận xét và hội đồng bảo vệ đồ án tốt nghiệp."
-          role="Giảng viên Khoa CNTT"
-        />
-      ),
+      element: withSuspense(<LecturerDashboardPage />),
     },
     {
       path: 'feature-1',

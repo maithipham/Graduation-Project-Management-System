@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
-import { DepartmentLayout } from '@/features/department/layouts/DepartmentLayout'
+import { DepartmentLayout } from '@/features/department'
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
