@@ -1,8 +1,9 @@
 # AGENTS.md — Portal Lecturer (Frontend)
 
-> File này được **Claude Code** (qua `CLAUDE.md`) và **Antigravity / Gemini** tự động đọc ở mọi phiên.
-> Đây là quy tắc luôn áp dụng. Các quy trình nhiều bước nằm trong skill ở `.agents/skills/`.
-> Ưu tiên khi mâu thuẫn: **file này + skill** > `Folder_Architecture.md` > code mẫu cũ.
+> File này được **Claude Code** (qua `CLAUDE.md`) và **Antigravity / Gemini** tự động đọc ở mọi phiên
+> (Antigravity phải mở đúng folder `Frontend/Lecturer`, không mở `Frontend`).
+> Đây là quy tắc luôn áp dụng. Các quy trình nhiều bước nằm trong skill ở `.agents/skills/` (xem mục 6).
+> Ưu tiên khi mâu thuẫn: **file này + skill** > code đang có.
 
 ## 1. Dự án
 
@@ -24,6 +25,7 @@
 | Lint | `npm run lint` |
 | Test | `npm test` |
 | Build | `npm run build` |
+| Đồng bộ skill sang Claude | `npm run sync-skills` |
 
 Trước khi báo "xong" một thay đổi code: làm theo skill **`verify-changes`**.
 
@@ -76,7 +78,7 @@ Quy tắc:
 - Mọi lỗi từ `apiClient` đều là `ApiError` (`code` = mã nghiệp vụ BE, `status` = HTTP status; mất mạng → `NETWORK_ERROR_CODE`).
   Kiểm tra bằng `isApiError(error)`. Query chỉ tự thử lại khi mất mạng hoặc lỗi 5xx; `staleTime` mặc định 30 giây.
 - Gọi API trong component **chỉ qua TanStack Query** (`useQuery` / `useMutation`) trong `hooks/`.
-  Không dùng `useEffect + useState` để fetch (code mẫu cũ trong `Folder_Architecture.md` dùng cách này — đừng làm theo).
+  Không dùng `useEffect + useState` để fetch.
 - Danh sách phân trang: backend trả **Spring Data `Page<T>`** (trang bắt đầu từ **0**). Dùng type `SpringPage<T>`
   và `PageParams` từ `@/shared/types` (file `shared/types/pagination.ts`).
 - Xác thực: **JWT trong HttpOnly cookie** + Google OAuth2, có refresh token. Frontend **không đọc/ghi token**;
@@ -91,15 +93,22 @@ Quy tắc:
 - Styling bằng Tailwind class, tông `slate` + `blue` như các component trong `shared/components/ui`.
 - Trạng thái tải: dùng `Skeleton`; nút submit phải `disabled={isPending}` và đổi chữ (ví dụ "Đang lưu...").
 - Icon: chỉ dùng `lucide-react`.
+- Form: `<form noValidate>` (tắt popup của trình duyệt), kiểm tra dữ liệu bằng schema zod, lỗi hiện bằng dòng chữ
+  đỏ đậm `#DC2626` ngay dưới ô qua `FormField` (`@/shared/components/ui`). Chi tiết ở skill `build-form`.
 
-## 6. Skill có sẵn (`.agents/skills/` — Claude Code dùng bản trỏ ở `.claude/skills/`)
+## 6. Skill có sẵn
 
 | Skill | Khi nào dùng |
 | --- | --- |
 | `create-feature` | Tạo màn hình / tính năng mới cho một role (thư mục, route, menu) |
-| `connect-api` | Nối API Spring Boot vào frontend (type, service, query hook, phân trang, auth) |
-| `build-form` | Làm form tạo/sửa có validate (react-hook-form + zod) |
-| `verify-changes` | Kiểm tra lint, kiểu, test, build trước khi báo xong |
+| `connect-api` | Nối API Spring Boot vào frontend (type, service, query hook, phân trang, xử lý lỗi) |
+| `build-form` | Làm form tạo/sửa có validate (react-hook-form + zod), lỗi đỏ dưới ô input |
+| `verify-changes` | Kiểm tra kiểu, lint, test, build trước khi báo xong |
+
+- **Bản gốc: `.agents/skills/<tên>/SKILL.md`** (Antigravity đọc ở đây). Chỉ sửa skill ở bản gốc.
+- **Bản sao: `.claude/skills/`** (Claude Code đọc ở đây) do `npm run sync-skills` sinh ra — **không sửa tay**.
+  Sửa bản gốc xong phải chạy `npm run sync-skills`; `npm test` báo lỗi nếu hai bản lệch nhau.
+- Code mẫu dài của skill nằm trong `templates/` cạnh `SKILL.md`, chỉ đọc khi cần.
 
 ## 7. Vấn đề đã biết trong code hiện tại (đừng sao chép, sửa khi được yêu cầu)
 

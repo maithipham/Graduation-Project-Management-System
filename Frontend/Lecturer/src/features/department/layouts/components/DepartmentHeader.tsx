@@ -1,61 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { Fragment, useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Menu,
   PanelLeft,
   ChevronRight,
   Bell,
-  Clock,
-  FileText,
-  AlertTriangle,
-  CheckCheck,
+  BellOff,
   ChevronDown,
   User,
   Settings,
   LogOut,
 } from 'lucide-react'
 import { useAuthStore } from '@/features/auth'
+import { getNavBreadcrumbs } from '@/shared/utils'
+import { departmentNavItems } from './departmentNav.config'
 
 interface DepartmentHeaderProps {
   onToggleSidebar?: () => void
   onMobileToggle?: () => void
 }
-
-interface NotificationItem {
-  id: string
-  title: string
-  description: string
-  time: string
-  type: 'warning' | 'info' | 'danger'
-  unread: boolean
-}
-
-const mockNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'Sắp đến hạn nộp đề cương đồ án',
-    description: 'Hạn chót ngày 15/10/2025 cho sinh viên K62.',
-    time: '10 phút trước',
-    type: 'warning',
-    unread: true,
-  },
-  {
-    id: '2',
-    title: '5 đề tài mới chờ duyệt',
-    description: 'Giảng viên bộ môn CNPM đã gửi danh sách đề tài mới.',
-    time: '1 giờ trước',
-    type: 'info',
-    unread: true,
-  },
-  {
-    id: '3',
-    title: 'Yêu cầu đổi giảng viên hướng dẫn',
-    description: 'Sinh viên Nguyễn Văn A (K62) gửi đơn kiến nghị.',
-    time: 'Hôm qua',
-    type: 'danger',
-    unread: false,
-  },
-]
 
 export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
   onToggleSidebar,
@@ -69,7 +32,6 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
   // Dropdown states
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
-  const [notifications, setNotifications] = useState(mockNotifications)
 
   const profileRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
@@ -94,27 +56,8 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
     navigate('/login')
   }
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
-  }
-
-  const unreadCount = notifications.filter((n) => n.unread).length
-
-  // Xác định tiêu đề Breadcrumb theo pathname
-  const getBreadcrumbTitle = (path: string) => {
-    if (path.includes('/students')) return 'Quản lý sinh viên'
-    if (path.includes('/lecturers')) return 'Giảng viên'
-    if (path.includes('/supervisors')) return 'Hướng dẫn'
-    if (path.includes('/reviewers')) return 'Nhận xét'
-    if (path.includes('/teachers')) return 'Quản lý giáo viên'
-    if (path.includes('/councils')) return 'Hội đồng bảo vệ'
-    if (path.includes('/schedule')) return 'Kế hoạch & Tiến độ'
-    if (path.includes('/grading-config')) return 'Cấu hình điểm'
-    if (path.includes('/documents')) return 'Tài liệu & Biểu mẫu'
-    return 'Dashboard'
-  }
-
-  const currentTitle = getBreadcrumbTitle(location.pathname)
+  // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
+  const crumbs = getNavBreadcrumbs(departmentNavItems, location.pathname)
   const displayName = user?.name || 'TS. Phạm Hoàng'
   const displayTitle = 'Trưởng Bộ Môn CNPM'
   const displayEmail = user?.email || 'phamhoang@tlu.edu.vn'
@@ -159,8 +102,18 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
           >
             Trang chủ
           </Link>
-          <ChevronRight size={13} className="text-slate-400 shrink-0" />
-          <span className="text-[#1E293B] font-semibold">{currentTitle}</span>
+          {crumbs.map((label, index) => (
+            <Fragment key={label}>
+              <ChevronRight size={13} className="text-slate-400 shrink-0" />
+              <span
+                className={
+                  index === crumbs.length - 1 ? 'text-[#1E293B] font-semibold' : 'text-[#596D83]'
+                }
+              >
+                {label}
+              </span>
+            </Fragment>
+          ))}
         </nav>
       </div>
 
@@ -168,7 +121,7 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
           B. CỤM TIỆN ÍCH BÊN PHẢI
           ======================================================== */}
       <div className="flex items-center gap-2.5 sm:gap-3.5">
-        {/* 1. Thông báo (Notification Bell) */}
+        {/* 1. Thông báo — chưa nối API nên chỉ hiện trạng thái trống, không dùng dữ liệu giả */}
         <div className="relative" ref={notifRef}>
           <button
             type="button"
@@ -177,91 +130,20 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
               setProfileOpen(false)
             }}
             className="relative p-2 rounded-xl text-[#596D83] hover:text-[#1E293B] hover:bg-slate-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0288D1]/40"
-            aria-label={`Thông báo (${unreadCount} chưa đọc)`}
+            aria-label="Thông báo"
             aria-expanded={notifOpen}
           >
             <Bell size={19} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-[17px] h-[17px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center leading-none">
-                {unreadCount}
-              </span>
-            )}
           </button>
 
-          {/* Dropdown thông báo */}
           {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white border border-slate-200/90 shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-[#1E293B]">Thông báo</span>
-                  {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10.5px] font-semibold">
-                      {unreadCount} mới
-                    </span>
-                  )}
-                </div>
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={markAllAsRead}
-                    className="text-[11.5px] text-[#0288D1] hover:text-[#01579B] font-medium flex items-center gap-1 hover:underline cursor-pointer"
-                  >
-                    <CheckCheck size={14} /> Đánh dấu đã đọc
-                  </button>
-                )}
+            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white border border-slate-200/90 shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                <span className="text-xs font-bold text-[#1E293B]">Thông báo</span>
               </div>
-
-              <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                {notifications.map((item) => {
-                  let iconBg = 'bg-amber-100 text-amber-600'
-                  let Icon = Clock
-                  if (item.type === 'info') {
-                    iconBg = 'bg-sky-100 text-[#0288D1]'
-                    Icon = FileText
-                  } else if (item.type === 'danger') {
-                    iconBg = 'bg-rose-100 text-rose-600'
-                    Icon = AlertTriangle
-                  }
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`p-3.5 flex gap-3 items-start transition-colors hover:bg-slate-50 cursor-pointer ${
-                        item.unread ? 'bg-sky-50/30' : ''
-                      }`}
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center shrink-0 mt-0.5`}
-                      >
-                        <Icon size={16} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-[#1E293B] leading-snug">
-                          {item.title}
-                        </p>
-                        <p className="text-[11.5px] text-[#596D83] mt-0.5 leading-snug line-clamp-2">
-                          {item.description}
-                        </p>
-                        <span className="text-[10px] text-slate-400 font-medium block mt-1">
-                          {item.time}
-                        </span>
-                      </div>
-                      {item.unread && (
-                        <span className="w-2 h-2 rounded-full bg-[#0288D1] shrink-0 mt-1.5" />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="p-2 border-t border-slate-100 bg-slate-50/50 text-center">
-                <button
-                  type="button"
-                  onClick={() => setNotifOpen(false)}
-                  className="text-xs text-[#0288D1] hover:text-[#01579B] font-semibold transition-colors py-1 cursor-pointer"
-                >
-                  Xem tất cả thông báo
-                </button>
+              <div className="px-4 py-8 flex flex-col items-center gap-2 text-center">
+                <BellOff size={22} className="text-slate-300" />
+                <p className="text-xs text-[#596D83]">Chưa có thông báo nào.</p>
               </div>
             </div>
           )}

@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cấu hình Claude Code riêng từng máy (skill trong .claude/skills vẫn được commit)
+.claude/settings.local.json

@@ -1,12 +1,12 @@
-import { describe, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
+import StudentOverviewPage from '@/features/student/overview/pages/StudentOverviewPage'
 
-// File test này đã được chuẩn hóa. Sau khi bạn tạo xong src/features/student/overview,
-// chỉ cần import StudentOverviewPage và bỏ .skip để chạy test!
-describe.skip('StudentOverviewPage', () => {
-  it.skip('renders student greeting and progress bar correctly', () => {
-    // expect(screen.getByText(/Chào An, đồ án của bạn đang tiến triển tốt/i)).toBeInTheDocument()
-    // expect(screen.getByText(/Tiến độ đồ án/i)).toBeInTheDocument()
-    // expect(screen.getByText(/Giai đoạn 3 \/ 6/i)).toBeInTheDocument()
-    // expect(screen.getAllByText(/Nộp đề cương/i).length).toBeGreaterThan(0)
+describe('StudentOverviewPage', () => {
+  it('hiển thị tiêu đề trang Tổng quan', () => {
+    render(<StudentOverviewPage />)
+
+    expect(screen.getByRole('heading', { name: 'Tổng quan' })).toBeInTheDocument()
   })
 })

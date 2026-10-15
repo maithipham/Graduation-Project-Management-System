@@ -1,4 +1,4 @@
-import type { ApiResponse, PaginatedResponse } from '@/shared/types'
+import type { ApiResponse, SpringPage } from '@/shared/types'
 import { mockTopics } from './fixtures/mockTopics'
 import { mockStudents } from './fixtures/mockStudents'
 import { mockScores } from './fixtures/mockScores'
@@ -41,24 +41,28 @@ export async function mockErrorResponse(
 }
 
 /**
- * Trình giả lập phân trang (Pagination)
+ * Trình giả lập phân trang theo dạng Spring Data Page<T> (page bắt đầu từ 0)
  */
-export function mockPaginatedResponse<T>(
+export function mockSpringPage<T>(
   items: T[],
-  page: number = 1,
-  pageSize: number = 10,
-): PaginatedResponse<T> {
-  const total = items.length
-  const totalPages = Math.ceil(total / pageSize)
-  const start = (page - 1) * pageSize
-  const paginatedItems = items.slice(start, start + pageSize)
+  page: number = 0,
+  size: number = 10,
+): SpringPage<T> {
+  const totalElements = items.length
+  const totalPages = Math.ceil(totalElements / size)
+  const start = page * size
+  const content = items.slice(start, start + size)
 
   return {
-    items: paginatedItems,
-    total,
-    page,
-    pageSize,
+    content,
+    totalElements,
     totalPages,
+    number: page,
+    size,
+    numberOfElements: content.length,
+    first: page === 0,
+    last: page >= totalPages - 1,
+    empty: content.length === 0,
   }
 }
 
@@ -73,8 +77,8 @@ export const mockApiHandlers = {
       latestScore: mockScores[0],
     }),
 
-  getTopicsList: (page: number = 1, pageSize: number = 10) =>
-    mockSuccessResponse(mockPaginatedResponse(mockTopics, page, pageSize)),
+  getTopicsList: (page: number = 0, size: number = 10) =>
+    mockSuccessResponse(mockSpringPage(mockTopics, page, size)),
 
   getStudentsByLecturer: () =>
     mockSuccessResponse(mockStudents),

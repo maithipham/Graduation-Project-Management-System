@@ -1,5 +1,5 @@
 // Public API của sub-feature: student_management
-// Chưa có nội dung. Khi bắt đầu code, tạo các thư mục types/ services/ hooks/ components/ pages/
-// và chỉ export ra đây những gì feature khác cần dùng (types, hooks, component dùng chung).
+// Chưa có nội dung. Khi bắt đầu code, chỉ tạo thư mục con (types/ services/ hooks/ components/ pages/ store/)
+// khi có file thật đặt vào, và chỉ export thứ feature khác cần dùng (types, hooks, component dùng chung).
 // Không export pages: page được nạp bằng lazy() trong app/routes.
 export {}

@@ -1,11 +1,13 @@
-import { lazy, Suspense } from 'react'
-import { Navigate, type RouteObject } from 'react-router-dom'
-import { StudentLayout } from '@/features/student/layouts/StudentLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
+import { lazy } from 'react'
+import type { RouteObject } from 'react-router-dom'
+import { StudentLayout } from '@/features/student'
+import { ProtectedRoute } from '@/features/auth'
+import { withSuspense } from './withSuspense'
 
-const Feature1Page = lazy(() => import('@/features/student/feature_1/pages/Feature1Page'))
-const Feature2Page = lazy(() => import('@/features/student/feature_2/pages/Feature2Page'))
+// Page nạp bằng lazy() → mỗi page là một chunk riêng, chỉ tải khi vào URL đó
+const StudentOverviewPage = lazy(
+  () => import('@/features/student/overview/pages/StudentOverviewPage'),
+)
 
 export const studentRoutes: RouteObject = {
   path: 'student',
@@ -16,26 +18,10 @@ export const studentRoutes: RouteObject = {
       children: [
         {
           index: true,
-          element: <Navigate to="feature-1" replace />,
+          element: withSuspense(<StudentOverviewPage />),
         },
-        {
-          path: 'feature-1',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <Feature1Page />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'feature-2',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <Feature2Page />
-            </Suspense>
-          ),
-        },
-        // Lưu ý: Chỉ thêm các route mới vào đây sau khi đã tạo sub-feature tương ứng
-        // trong src/features/student/<sub-feature-name>/pages/<PageName>.tsx
+        // Thêm route mới ở đây sau khi đã tạo sub-feature tương ứng:
+        // src/features/student/<sub_feature>/pages/<XxxPage>.tsx
       ],
     },
   ],

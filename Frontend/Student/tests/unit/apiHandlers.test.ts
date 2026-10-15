@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mockSuccessResponse, mockErrorResponse, mockPaginatedResponse, mockApiHandlers } from '../mocks'
+import { mockSuccessResponse, mockErrorResponse, mockSpringPage, mockApiHandlers } from '../mocks'
 import { mockTopics } from '../mocks/fixtures'
 
 describe('Mock API Handlers', () => {
@@ -14,13 +14,20 @@ describe('Mock API Handlers', () => {
     await expect(mockErrorResponse(401, 'Unauthorized')).rejects.toThrow('Unauthorized')
   })
 
-  it('mockPaginatedResponse calculates pages correctly', () => {
-    const res = mockPaginatedResponse(mockTopics, 1, 2)
-    expect(res.items.length).toBe(2)
-    expect(res.page).toBe(1)
-    expect(res.pageSize).toBe(2)
-    expect(res.total).toBe(3)
-    expect(res.totalPages).toBe(2)
+  it('mockSpringPage returns Spring Page shape with 0-based page', () => {
+    const first = mockSpringPage(mockTopics, 0, 2)
+    expect(first.content.length).toBe(2)
+    expect(first.number).toBe(0)
+    expect(first.size).toBe(2)
+    expect(first.totalElements).toBe(3)
+    expect(first.totalPages).toBe(2)
+    expect(first.first).toBe(true)
+    expect(first.last).toBe(false)
+
+    const second = mockSpringPage(mockTopics, 1, 2)
+    expect(second.content.length).toBe(1)
+    expect(second.numberOfElements).toBe(1)
+    expect(second.last).toBe(true)
   })
 
   it('mockApiHandlers returns student overview data', async () => {

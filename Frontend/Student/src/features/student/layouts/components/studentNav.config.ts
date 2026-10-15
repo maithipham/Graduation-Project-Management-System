@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Layers, FolderGit2 } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 
 export interface StudentNavItem {
   title: string
@@ -15,15 +15,8 @@ export interface StudentNavItem {
  */
 export const studentNavItems: StudentNavItem[] = [
   {
-    title: 'Tính năng mẫu 1',
-    path: '/student/feature-1',
-    icon: Layers,
-    badge: 'Mẫu 1',
-  },
-  {
-    title: 'Tính năng mẫu 2',
-    path: '/student/feature-2',
-    icon: FolderGit2,
-    badge: 'Mẫu 2',
+    title: 'Tổng quan',
+    path: '/student',
+    icon: LayoutDashboard,
   },
 ]

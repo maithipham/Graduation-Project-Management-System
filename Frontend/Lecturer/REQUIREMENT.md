@@ -772,17 +772,7 @@ chưa đạt. Lưu trạng thái, phiên bản tài liệu, nhận xét, ngườ
   dụng localStorage hoặc fixtures demo làm nơi lưu dữ liệu vận hành thật.
 
 ## 8. Cấu trúc thư mục Frontend (Dành cho Backend Dev)
-
-Dự án Frontend được viết bằng **React + TypeScript + Vite** và tổ chức theo kiến trúc **Feature-based** (chia theo từng nghiệp vụ). Dưới đây là giải thích các thư mục chính trong `Frontend/src/` để Backend Dev dễ dàng đối chiếu mã nguồn và tích hợp API:
-
-- **`features/`**: Đây là nơi quan trọng nhất, chứa các module nghiệp vụ độc lập (vd: `auth`, `dashboard`, `topics`, `council`). Trong mỗi feature sẽ chia nhỏ thành `components`, `pages`, và `services`. **Backend Dev cần xem thư mục `services`** tại đây để biết Frontend định nghĩa Payload gửi đi và Response mong đợi từ API như thế nào.
-- **`types/`**: Chứa các file định nghĩa Interface/Type TypeScript dùng chung. Backend Dev có thể tham khảo để biết schema JSON mà UI đang sử dụng.
-- **`services/`**: Nơi cấu hình Network chung (vd: Axios, base URL, bắt lỗi HTTP 4xx/5xx).
-- **`routes/`**: Chứa danh sách URL của Frontend và logic phân quyền (Route Guard). Giúp Backend biết luồng chuyển trang và các role được cấp phép.
-- **`components/`**: Chứa các UI component dùng chung toàn hệ thống (như Layout, Table, Button, Dialog). Không chứa logic API.
-- **`store/`**: Quản lý State toàn cục bằng `zustand` (vd: `authStore.ts` lưu role hiện tại).
-- **`lib/`**: Chứa file khởi tạo và config cho các thư viện bên thứ 3 (vd: `queryClient.ts` cấu hình TanStack Query).
-- **`pages/`**: Chứa các trang UI chung, tĩnh (LoginPage, HomePage, NotFound).
+Xem AGENTS.md mục 3
 
 ## 9. Tình trạng triển khai hiện tại
 
