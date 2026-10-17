@@ -184,6 +184,17 @@ describe('interceptors: 401 → refresh token → gửi lại / về trang đăn
     expect(calls.filter((url) => url === API_ENDPOINTS.auth.refreshToken)).toHaveLength(1)
   })
 
+  it('skipAuthRefresh (ví dụ POST /login) → 401 trả lỗi luôn, không refresh, không chuyển trang', async () => {
+    const handler = vi.fn()
+    unsubscribe = onUnauthorized(handler)
+    const { client, calls } = createServer(ok)
+
+    const error = await client.post('/login', {}, { skipAuthRefresh: true }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 401, code: 2000 })
+    expect(calls).toEqual(['/login'])
+    expect(handler).not.toHaveBeenCalled()
+  })
+
   it('nhiều request cùng thất bại → chỉ chuyển trang 1 lần', async () => {
     const handler = vi.fn()
     unsubscribe = onUnauthorized(handler)

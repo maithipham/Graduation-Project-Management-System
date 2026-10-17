@@ -1,45 +1,33 @@
-import { useNavigate } from 'react-router-dom'
-import {
-  isUserRole,
-  roleHomePaths,
-  roleLabels,
-  userRoles,
-} from '../types'
-import { useAuthStore } from '../store/authStore'
-import { Select } from '@/shared/components/ui/select'
+import { ArrowLeftRight } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { roleHomePaths, roleLabels } from '../types'
+import { useMyInfo } from '../hooks/useAuth'
 
 /**
- * Role Switcher cho phép chuyển đổi nhanh vai trò để test giao diện (#16)
+ * Nút chuyển qua lại giữa portal Trưởng bộ môn và Giảng viên.
+ * Chỉ hiện với trưởng bộ môn (người duy nhất có 2 role). Chỉ đổi URL, không gọi API.
  */
 export function RoleSwitcher() {
   const navigate = useNavigate()
-  const activeRole = useAuthStore((state) => state.activeRole)
-  const setActiveRole = useAuthStore((state) => state.setActiveRole)
+  const { pathname } = useLocation()
+  const { data: user } = useMyInfo()
 
-  if (!activeRole) return null
+  if (!user?.roles.includes('HEAD_OF_DEPARTMENT')) return null
+
+  const isOnDepartment = pathname.startsWith(roleHomePaths.HEAD_OF_DEPARTMENT)
+  const target = isOnDepartment ? 'LECTURER' : 'HEAD_OF_DEPARTMENT'
+  const label = `Chuyển sang ${roleLabels[target]}`
 
   return (
-    <div className="inline-flex items-center gap-2 text-xs">
-      <span className="text-slate-500 font-medium hidden sm:inline">Vai trò:</span>
-      <div className="w-40">
-        <Select
-          aria-label="Chuyển vai trò"
-          value={activeRole}
-          onChange={(event) => {
-            const role = event.target.value
-            if (!isUserRole(role)) return
-            setActiveRole(role)
-            navigate(roleHomePaths[role])
-          }}
-          className="h-8 text-xs bg-slate-50/80 border-slate-300"
-        >
-          {userRoles.map((role) => (
-            <option key={role} value={role}>
-              {roleLabels[role]}
-            </option>
-          ))}
-        </Select>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={() => navigate(roleHomePaths[target])}
+      className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-[#1565C0] hover:border-blue-200 hover:bg-blue-50/80 transition-colors cursor-pointer"
+      title={label}
+      aria-label={label}
+    >
+      <ArrowLeftRight size={14} className="shrink-0" />
+      <span className="hidden md:inline">{roleLabels[target]}</span>
+    </button>
   )
 }

@@ -25,3 +25,6 @@ dist-ssr
 
 # Cấu hình Claude Code riêng từng máy (skill trong .claude/skills vẫn được commit)
 .claude/settings.local.json
+
+# Cấu hình Google OAuth2 gốc (giá trị đã chuyển sang file env riêng của máy)
+oauth2GpmsConfig.json

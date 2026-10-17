@@ -1,14 +1,30 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
-import { useAuthStore } from '../store/authStore'
-import { roleHomePaths } from '../types'
+import { useMyInfo } from '../hooks/useAuth'
+import { buildGoogleAuthUrl } from '../utils/googleOAuth'
+import { getHomePath } from '../utils/homePath'
+import type { LoginLocationState } from '../utils/loginState'
 
 export default function LoginPage() {
+  const location = useLocation()
   const navigate = useNavigate()
-  const setActiveRole = useAuthStore((state) => state.setActiveRole)
-  const setUser = useAuthStore((state) => state.setUser)
-  const setToken = useAuthStore((state) => state.setToken)
+  const queryClient = useQueryClient()
+  const loginState = location.state as LoginLocationState
+  const loginError = loginState?.error
+  const signedOut = loginState?.signedOut === true
+  // Chỉ đọc cache (không gọi API): vừa đăng nhập xong mà quay lại /login thì về luôn trang chủ.
+  // Vừa đăng xuất thì bỏ qua cache cũ (sắp bị xóa), không đưa ngược vào dashboard
+  const { data: user } = useMyInfo({ enabled: false })
+  const homePath = user && !signedOut ? getHomePath(user.roles) : null
+
+  useEffect(() => {
+    if (!signedOut) return
+    // Layout cũ đã gỡ (SSE đã đóng, không còn query nào đang hiển thị) → giờ mới xóa cache, kể cả thông tin đăng nhập
+    queryClient.clear()
+    navigate(location.pathname, { replace: true, state: null })
+  }, [signedOut, queryClient, navigate, location.pathname])
 
   const [isLoading, setIsLoading] = useState(false)
   const [scale, setScale] = useState(1)
@@ -37,29 +53,23 @@ export default function LoginPage() {
     }
   }, [])
 
+  useEffect(() => {
+    // Bấm "Back" từ trang Google: trình duyệt có thể khôi phục trang cũ từ cache → mở lại nút đăng nhập
+    const resetLoading = (event: PageTransitionEvent) => {
+      if (event.persisted) setIsLoading(false)
+    }
+    window.addEventListener('pageshow', resetLoading)
+    return () => window.removeEventListener('pageshow', resetLoading)
+  }, [])
+
   const handleGoogleLogin = () => {
     if (isLoading) return
     setIsLoading(true)
-
-    // Demo xác thực 1.5 giây
-    setTimeout(() => {
-      // Mock tài khoản cán bộ
-      const mockUser = {
-        id: 'tbm-01',
-        name: 'TS. Phạm Hoàng',
-        email: 'phamhoang@tlu.edu.vn',
-        code: 'TBM-CNPM',
-        role: 'department-head' as const,
-      }
-
-      setActiveRole('department-head')
-      setUser(mockUser)
-      setToken('demo-tlu-google-token-department-head')
-
-      // Chuyển hướng tới trang chính theo role
-      navigate(roleHomePaths['department-head'] || '/department', { replace: true })
-    }, 1500)
+    // Rời app sang trang chọn tài khoản Google; Google xong sẽ quay về /authenticate?code&state
+    window.location.assign(buildGoogleAuthUrl())
   }
+
+  if (homePath) return <Navigate to={homePath} replace />
 
   return (
     <div className="relative w-full min-h-screen min-h-[100dvh] overflow-hidden font-sans text-[#202428] bg-white select-none">
@@ -133,7 +143,7 @@ export default function LoginPage() {
               </svg>
 
               <span className="truncate">
-                {isLoading ? 'Đang xác thực tài khoản...' : 'Đăng nhập với Google'}
+                {isLoading ? 'Đang chuyển tới Google...' : 'Đăng nhập với Google'}
               </span>
 
               {isLoading ? (
@@ -142,6 +152,12 @@ export default function LoginPage() {
                 <div className="w-4 h-4 shrink-0" aria-hidden="true" />
               )}
             </button>
+
+            {loginError && (
+              <p role="alert" className="m-0 mt-3 text-sm font-semibold text-[#DC2626]">
+                {loginError}
+              </p>
+            )}
 
             {/* Chân card hỗ trợ */}
             <div className="mt-5 pt-5 border-t border-[#f1f5f9]">

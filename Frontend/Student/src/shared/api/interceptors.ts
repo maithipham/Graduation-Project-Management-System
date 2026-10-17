@@ -11,6 +11,11 @@ declare module 'axios' {
      * Dùng: apiClient.post(url, body, { skipErrorToast: true })
      */
     skipErrorToast?: boolean
+    /**
+     * true: gặp 401 thì trả lỗi luôn, không gọi refresh token và không chuyển về /login.
+     * Dùng cho chính các API đăng nhập / đăng xuất (401 ở đây không phải "token hết hạn").
+     */
+    skipAuthRefresh?: boolean
     /** Đánh dấu nội bộ: request đã được gửi lại 1 lần sau khi refresh token */
     _retry?: boolean
     /** Đánh dấu nội bộ: đây là chính request gọi refresh token */
@@ -103,7 +108,7 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
 
       // 401 (chưa đăng nhập / token hết hạn): thử refresh 1 lần rồi gửi lại request.
       // Refresh thất bại, hoặc gửi lại vẫn 401 → về trang đăng nhập. Không hiện thông báo.
-      if (apiError.status === 401) {
+      if (apiError.status === 401 && !config?.skipAuthRefresh) {
         if (config && !config._retry) {
           config._retry = true
           try {

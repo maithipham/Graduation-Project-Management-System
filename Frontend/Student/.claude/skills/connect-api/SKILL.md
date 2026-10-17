@@ -19,7 +19,7 @@ Không bịa endpoint, tên trường hay mã lỗi. Các URL trong `src/shared/
 ## Dữ liệu của chính sinh viên
 
 - Phần lớn API của sinh viên là "của tôi" (đăng ký của tôi, đề cương của tôi, lịch của tôi): BE lấy sinh viên từ JWT.
-  **Không** gửi `studentId` của mình lên URL/body, không lấy id từ `authStore` để ghép URL — trừ khi Controller yêu cầu rõ.
+  **Không** gửi `studentId` của mình lên URL/body, không tự ghép id của mình vào URL — trừ khi Controller yêu cầu rõ.
 - API "của tôi" có thể trả `data = null` khi chưa có (chưa đăng ký, chưa nộp) → khai báo `T | null` và hiện trạng thái trống.
 - Nút thao tác phụ thuộc trạng thái (chỉ sửa khi `PENDING`, khóa khi hết hạn) → tính từ dữ liệu BE trả về,
   hiện nút `disabled` + dòng giải thích. Đây chỉ là giao diện, BE vẫn phải kiểm tra.

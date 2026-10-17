@@ -4,15 +4,14 @@ import {
   Menu,
   PanelLeft,
   ChevronRight,
-  Bell,
-  BellOff,
   ChevronDown,
   User,
   Settings,
   LogOut,
 } from 'lucide-react'
-import { useAuthStore } from '@/features/auth'
-import { getNavBreadcrumbs } from '@/shared/utils'
+import { RoleSwitcher, roleLabels, useLogout, useMyInfo } from '@/features/auth'
+import { NotificationBell } from '@/features/notification'
+import { getInitials, getNavBreadcrumbs } from '@/shared/utils'
 import { departmentNavItems } from './departmentNav.config'
 
 interface DepartmentHeaderProps {
@@ -26,15 +25,13 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
 }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const user = useAuthStore((state) => state.user)
-  const clearAuth = useAuthStore((state) => state.clearAuth)
+  const { data: user } = useMyInfo()
+  const logout = useLogout()
 
   // Dropdown states
   const [profileOpen, setProfileOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
 
   const profileRef = useRef<HTMLDivElement>(null)
-  const notifRef = useRef<HTMLDivElement>(null)
 
   // Đóng dropdown khi click bên ngoài
   useEffect(() => {
@@ -43,24 +40,15 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
       if (profileRef.current && !profileRef.current.contains(target)) {
         setProfileOpen(false)
       }
-      if (notifRef.current && !notifRef.current.contains(target)) {
-        setNotifOpen(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleLogout = () => {
-    clearAuth()
-    navigate('/login')
-  }
-
   // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
   const crumbs = getNavBreadcrumbs(departmentNavItems, location.pathname)
-  const displayName = user?.name || 'TS. Phạm Hoàng'
-  const displayTitle = 'Trưởng Bộ Môn CNPM'
-  const displayEmail = user?.email || 'phamhoang@tlu.edu.vn'
+  const displayName = user?.name ?? ''
+  const displayTitle = roleLabels.HEAD_OF_DEPARTMENT
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shadow-xs">
@@ -121,33 +109,10 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
           B. CỤM TIỆN ÍCH BÊN PHẢI
           ======================================================== */}
       <div className="flex items-center gap-2.5 sm:gap-3.5">
-        {/* 1. Thông báo — chưa nối API nên chỉ hiện trạng thái trống, không dùng dữ liệu giả */}
-        <div className="relative" ref={notifRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setNotifOpen(!notifOpen)
-              setProfileOpen(false)
-            }}
-            className="relative p-2 rounded-xl text-[#596D83] hover:text-[#1E293B] hover:bg-slate-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0288D1]/40"
-            aria-label="Thông báo"
-            aria-expanded={notifOpen}
-          >
-            <Bell size={19} />
-          </button>
-
-          {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white border border-slate-200/90 shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-                <span className="text-xs font-bold text-[#1E293B]">Thông báo</span>
-              </div>
-              <div className="px-4 py-8 flex flex-col items-center gap-2 text-center">
-                <BellOff size={22} className="text-slate-300" />
-                <p className="text-xs text-[#596D83]">Chưa có thông báo nào.</p>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Nút chuyển portal Trưởng bộ môn ⇄ Giảng viên (chỉ hiện với trưởng bộ môn) */}
+        <RoleSwitcher />
+        {/* Chuông thông báo: số chưa đọc, danh sách, nhận thông báo mới qua SSE */}
+        <NotificationBell />
 
         <div className="h-6 w-px bg-slate-200 hidden sm:block" />
 
@@ -155,17 +120,14 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
         <div className="relative" ref={profileRef}>
           <button
             type="button"
-            onClick={() => {
-              setProfileOpen(!profileOpen)
-              setNotifOpen(false)
-            }}
+            onClick={() => setProfileOpen(!profileOpen)}
             className="group flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0288D1]/40"
             aria-expanded={profileOpen}
             aria-haspopup="true"
           >
             {/* Avatar tròn gradient rực rỡ */}
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-400 to-blue-700 text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0 ring-2 ring-sky-100 group-hover:ring-[#0288D1]/30 transition-all">
-              PH
+              {getInitials(displayName)}
             </div>
 
             {/* Nhãn tên & chức vụ */}
@@ -193,14 +155,11 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-2.5 mb-1.5">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-700 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    PH
+                    {getInitials(displayName)}
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-[#1E293B] truncate leading-tight">
                       {displayName}
-                    </p>
-                    <p className="text-[11px] text-[#596D83] truncate leading-tight mt-0.5">
-                      {displayEmail}
                     </p>
                   </div>
                 </div>
@@ -237,11 +196,12 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
               <div className="border-t border-slate-100 pt-1">
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 font-semibold transition-colors cursor-pointer"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <LogOut size={15} />
-                  <span>Đăng xuất</span>
+                  <span>{logout.isPending ? 'Đang đăng xuất...' : 'Đăng xuất'}</span>
                 </button>
               </div>
             </div>

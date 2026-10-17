@@ -71,7 +71,7 @@ const SupervisorRegistrationPage = lazy(
   () => import('@/features/student/supervisor_registration/pages/SupervisorRegistrationPage'),
 )
 
-// trong children của StudentLayout (đã nằm trong ProtectedRoute allowedRoles={['student']}):
+// trong children của StudentLayout (routes/index.tsx đã bọc RequireAuth + ProtectedRoute allowedRoles={['STUDENT']}):
 { path: 'registration', element: withSuspense(<SupervisorRegistrationPage />) },
 ```
 
@@ -100,5 +100,5 @@ Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duy�
 - Import sâu vào feature khác (`@/features/student/x/services/...`) — chỉ qua `index.ts`.
 - Đặt component có tên nghiệp vụ (`TopicCard`) vào `src/shared/`.
 - Fetch dữ liệu bằng `useEffect + useState` — dùng skill `connect-api`.
-- Dùng `UserRole` từ `@/shared/types` (bản cũ) — dùng từ `@/features/auth`.
+- Tự viết chuỗi role (`'student'`…) — dùng `UserRole` (`STUDENT`), `CanAccess`, `useMyInfo` từ `@/features/auth`. Trang mới không cần tự chặn role: route của portal đã nằm trong `ProtectedRoute`.
 - Tạo đủ 6 thư mục con "cho đúng chuẩn" khi chưa có file đặt vào, hoặc viết mock fallback trong service (`catch { return mock }`).

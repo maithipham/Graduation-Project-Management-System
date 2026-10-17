@@ -39,6 +39,7 @@ src/
 │   └── index.ts                       # Cổng export duy nhất của feature
 ├── features/<role>/layouts/components/<role>Nav.config.ts   # Menu sidebar
 ├── features/auth/                     # Đăng nhập, phân quyền, UserRole
+├── features/notification/             # Chuông thông báo + SSE, dùng chung cho cả 3 role
 └── shared/                            # Chỉ chứa "viên gạch" không có nghiệp vụ
     ├── api/      (apiClient, interceptors, queryClient, endpoints)
     ├── components/ui/  (Button, Card, Dialog, Input, Select, Table, Tabs, Skeleton, Badge, Textarea)
@@ -61,7 +62,12 @@ Quy tắc:
    Feature chưa code chỉ có `index.ts` (`export {}`); chỉ tạo các thư mục con `types/ services/ hooks/ components/ pages/ store/`
    khi thực sự cần. Không tạo file placeholder rỗng.
 6. Ưu tiên dùng component sẵn có trong `@/shared/components/ui` trước khi tự viết. Gộp class bằng `cn()` từ `@/shared/utils/cn`.
-7. `UserRole` lấy từ `@/features/auth` (có `admin`). **Không** dùng `UserRole` trong `@/shared/types` (bản cũ, có `student`, thiếu `admin`).
+7. Role chỉ khai báo ở `@/features/auth`: `UserRole` = `'ADMIN' | 'HEAD_OF_DEPARTMENT' | 'LECTURER'` (đúng chuỗi BE trả về).
+   Người đang đăng nhập: `useMyInfo()` (cache TanStack `['auth','me']`, không có store riêng). Ẩn/hiện theo role: `CanAccess`.
+   Trưởng bộ môn có cả `HEAD_OF_DEPARTMENT` và `LECTURER`; portal đang dùng do URL quyết định (`/department` hay `/lecturer`).
+8. **Feature dùng chung nhiều role** (có nghiệp vụ nên không đặt trong `shared/`) nằm thẳng ở `features/<feature>/`,
+   ngoài thư mục role. Hiện chỉ có `auth` và `notification`. Vẫn theo đủ quy tắc trên (cổng `index.ts`, không deep import).
+   Feature chỉ một role dùng thì vẫn đặt trong `features/<role>/`; muốn thêm feature dùng chung mới thì hỏi người dùng trước.
 
 ## 4. Dữ liệu & API (tóm tắt — chi tiết ở skill `connect-api`)
 
@@ -112,10 +118,7 @@ Quy tắc:
 
 ## 7. Vấn đề đã biết trong code hiện tại (đừng sao chép, sửa khi được yêu cầu)
 
-- `authStore` / `LoginPage` vẫn ghi token giả vào `localStorage` (`setToken`) — interceptor đã không dùng nữa, sẽ bỏ khi làm đăng nhập thật.
-- `.env.example` trỏ `http://localhost:3000/api` → backend thật là `http://localhost:8080`.
-- `LoginPage.tsx` đang đăng nhập giả (mock), chưa gọi Google OAuth2 thật.
-- `UserRole` bị khai báo 2 nơi khác nhau (`features/auth/types.ts` và `shared/types`).
-- Các route chưa được bọc `ProtectedRoute`; `authStore` tự gán role mặc định `'lecturer'` khi chưa đăng nhập.
+- Menu "Hồ sơ" / "Cài đặt" trong dropdown tài khoản ở 3 header vẫn trỏ tới trang giả (`/<role>` hoặc `/<role>/feature-N`).
+- `LecturerDashboardPage` vẫn dùng số liệu tĩnh trong code, chưa nối API.
 
 Nếu một task chạm vào các chỗ trên, báo cho người dùng biết thay vì âm thầm làm theo code cũ.

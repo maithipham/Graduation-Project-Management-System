@@ -1,22 +1,4 @@
-export const userRoles = [
-  'student',
-  'lecturer',
-  'secretary',
-  'department-head',
-  'council',
-] as const
-
-export type UserRole = (typeof userRoles)[number]
-
-export interface UserProfile {
-  id: string
-  name: string
-  email: string
-  role: UserRole
-  avatarUrl?: string
-  department?: string
-  code?: string // Mã sinh viên hoặc mã cán bộ
-}
+// Role và thông tin người dùng đăng nhập nằm ở @/features/auth (UserRole, UserInfo)
 
 export const API_SUCCESS_CODE = 1000
 

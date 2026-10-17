@@ -10,6 +10,8 @@ Quy tắc chung (kiến trúc, import, giao diện) nằm trong `AGENTS.md` — 
 ## Cần xác định trước (thiếu thì HỎI, không đoán)
 
 1. **Role**: `admin` | `lecturer` | `department`.
+   Phần dùng chung cho cả 3 role (ví dụ chuông thông báo) không thuộc role nào: đặt ở `src/features/<feature>/`
+   như `auth`, `notification` (AGENTS.md mục 3, quy tắc 8). Thêm feature dùng chung mới thì hỏi người dùng trước.
 2. **Tên feature** theo nghiệp vụ, dạng `snake_case` (ví dụ `semester_management`, `topic_review`).
 3. **URL** và **nhãn menu** tiếng Việt (ví dụ `/admin/semesters` — "Quản lý học kỳ").
 4. Có cần gọi API không → nếu có, sau khi tạo khung thì làm tiếp skill `connect-api`.
@@ -103,5 +105,6 @@ Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duy�
 - Import sâu vào feature khác (`@/features/admin/x/services/...`) — chỉ qua `index.ts`.
 - Đặt component có tên nghiệp vụ (`SemesterCard`) vào `src/shared/`.
 - Fetch dữ liệu bằng `useEffect + useState` — dùng skill `connect-api`.
-- Dùng `UserRole` từ `@/shared/types` (bản cũ) — dùng từ `@/features/auth`.
+- Tự viết chuỗi role (`'admin'`, `'lecturer'`…) — dùng `UserRole` (`ADMIN`, `HEAD_OF_DEPARTMENT`, `LECTURER`),
+  `CanAccess`, `useMyInfo` từ `@/features/auth`. Trang mới không cần tự chặn role: route của portal đã nằm trong `ProtectedRoute`.
 - Tạo đủ 6 thư mục con "cho đúng chuẩn" khi chưa có file đặt vào, hoặc viết mock fallback trong service (`catch { return mock }`).

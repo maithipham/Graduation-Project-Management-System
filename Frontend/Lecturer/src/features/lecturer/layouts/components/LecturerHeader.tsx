@@ -4,15 +4,14 @@ import {
   Menu,
   PanelLeft,
   ChevronRight,
-  Bell,
-  BellOff,
   ChevronDown,
   User,
   Settings,
   LogOut,
 } from 'lucide-react'
-import { useAuthStore } from '@/features/auth'
-import { getNavBreadcrumbs } from '@/shared/utils'
+import { RoleSwitcher, roleLabels, useLogout, useMyInfo } from '@/features/auth'
+import { NotificationBell } from '@/features/notification'
+import { getInitials, getNavBreadcrumbs } from '@/shared/utils'
 import { lecturerNavItems } from './lecturerNav.config'
 
 interface LecturerHeaderProps {
@@ -26,15 +25,13 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
 }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const user = useAuthStore((state) => state.user)
-  const clearAuth = useAuthStore((state) => state.clearAuth)
+  const { data: user } = useMyInfo()
+  const logout = useLogout()
 
   // Dropdown states
   const [profileOpen, setProfileOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
 
   const profileRef = useRef<HTMLDivElement>(null)
-  const notifRef = useRef<HTMLDivElement>(null)
 
   // Đóng dropdown khi click bên ngoài
   useEffect(() => {
@@ -43,24 +40,15 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
       if (profileRef.current && !profileRef.current.contains(target)) {
         setProfileOpen(false)
       }
-      if (notifRef.current && !notifRef.current.contains(target)) {
-        setNotifOpen(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleLogout = () => {
-    clearAuth()
-    navigate('/login')
-  }
-
   // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
   const crumbs = getNavBreadcrumbs(lecturerNavItems, location.pathname)
-  const displayName = user?.name || 'TS. Trần Minh Khôi'
-  const displayTitle = 'Giảng viên Khoa CNTT'
-  const displayEmail = user?.email || 'khoi.tm@tlu.edu.vn'
+  const displayName = user?.name ?? ''
+  const displayTitle = roleLabels.LECTURER
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
@@ -122,31 +110,10 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
           2. BÊN PHẢI: THÔNG BÁO & USER PROFILE
           ======================================================== */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Chuông Thông Báo — chưa nối API nên chỉ hiện trạng thái trống, không dùng dữ liệu giả */}
-        <div className="relative" ref={notifRef}>
-          <button
-            type="button"
-            onClick={() => setNotifOpen(!notifOpen)}
-            className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-            aria-label="Thông báo"
-            aria-expanded={notifOpen}
-            title="Thông báo"
-          >
-            <Bell size={19} />
-          </button>
-
-          {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white shadow-2xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-4 py-3 border-b border-slate-100">
-                <span className="font-bold text-sm text-slate-800">Thông báo</span>
-              </div>
-              <div className="px-4 py-8 flex flex-col items-center gap-2 text-center">
-                <BellOff size={22} className="text-slate-300" />
-                <p className="text-xs text-slate-500">Chưa có thông báo nào.</p>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Nút chuyển portal Trưởng bộ môn ⇄ Giảng viên (chỉ hiện với trưởng bộ môn) */}
+        <RoleSwitcher />
+        {/* Chuông thông báo: số chưa đọc, danh sách, nhận thông báo mới qua SSE */}
+        <NotificationBell />
 
         {/* Đường phân cách */}
         <div className="h-6 w-px bg-slate-200 mx-0.5" />
@@ -162,7 +129,7 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
           >
             {/* Avatar chữ cái đại diện */}
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#1565C0] to-[#1E88E5] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-              GV
+              {getInitials(displayName)}
             </div>
 
             {/* Thông tin tên & Chức danh */}
@@ -191,12 +158,9 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
                 <p className="text-xs font-bold text-slate-900 truncate">
                   {displayName}
                 </p>
-                <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                  {displayEmail}
-                </p>
                 <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-[10.5px] font-semibold px-2 py-0.5 rounded-md border border-blue-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1565C0]" />
-                  Giảng viên Khoa CNTT
+                  {displayTitle}
                 </div>
               </div>
 
@@ -230,11 +194,12 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
               <div className="pt-1 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <LogOut size={15} className="text-red-500" />
-                  Đăng xuất
+                  {logout.isPending ? 'Đang đăng xuất...' : 'Đăng xuất'}
                 </button>
               </div>
             </div>

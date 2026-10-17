@@ -1,11 +1,5 @@
-export const userRoles = [
-  'student',
-  'lecturer',
-  'department-head',
-  'secretary',
-  'council',
-  'admin',
-] as const
+// Giá trị role đúng như BE trả về (Set<String> roles). Portal sinh viên chỉ dùng 1 role
+export const userRoles = ['STUDENT'] as const
 
 export type UserRole = (typeof userRoles)[number]
 
@@ -14,19 +8,21 @@ export function isUserRole(value: string): value is UserRole {
 }
 
 export const roleLabels: Record<UserRole, string> = {
-  student: 'Sinh viên',
-  lecturer: 'Giảng viên',
-  'department-head': 'Trưởng bộ môn',
-  secretary: 'Thư ký',
-  council: 'Hội đồng',
-  admin: 'Quản trị viên',
+  STUDENT: 'Sinh viên',
 }
 
+// Trang chủ (dashboard) của portal
 export const roleHomePaths: Record<UserRole, string> = {
-  student: '/student',
-  lecturer: '/lecturer',
-  'department-head': '/department',
-  secretary: '/department',
-  council: '/lecturer/council',
-  admin: '/admin',
+  STUDENT: '/student',
+}
+
+// GET /my-info → UserInfoResponse { name, roles }
+export interface UserInfo {
+  name: string
+  roles: UserRole[]
+}
+
+// POST /login → LoginResponse { authenticated, name, roles } (token nằm trong cookie HttpOnly)
+export interface LoginResponse extends UserInfo {
+  authenticated: boolean
 }

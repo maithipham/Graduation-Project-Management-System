@@ -4,14 +4,13 @@ import {
   Menu,
   PanelLeft,
   ChevronRight,
-  Bell,
-  BellOff,
   ChevronDown,
   User,
   LogOut,
 } from 'lucide-react'
-import { useAuthStore } from '@/features/auth'
-import { getNavBreadcrumbs, type BreadcrumbNavItem } from '@/shared/utils'
+import { roleLabels, useLogout, useMyInfo } from '@/features/auth'
+import { NotificationBell } from '@/features/notification'
+import { getInitials, getNavBreadcrumbs, type BreadcrumbNavItem } from '@/shared/utils'
 import { studentNavItems } from './studentNav.config'
 
 interface StudentHeaderProps {
@@ -32,15 +31,13 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const user = useAuthStore((state) => state.user)
-  const clearAuth = useAuthStore((state) => state.clearAuth)
+  const { data: user } = useMyInfo()
+  const logout = useLogout()
 
   // Dropdown states
   const [profileOpen, setProfileOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
 
   const profileRef = useRef<HTMLDivElement>(null)
-  const notifRef = useRef<HTMLDivElement>(null)
 
   // Đóng dropdown khi click bên ngoài
   useEffect(() => {
@@ -49,31 +46,16 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
       if (profileRef.current && !profileRef.current.contains(target)) {
         setProfileOpen(false)
       }
-      if (notifRef.current && !notifRef.current.contains(target)) {
-        setNotifOpen(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleLogout = () => {
-    clearAuth()
-    navigate('/login')
-  }
-
   // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
   const crumbs = getNavBreadcrumbs(breadcrumbItems, location.pathname)
-
-  // Chưa có API thông tin người dùng (/me) → chỉ hiện dữ liệu thật trong authStore, không dùng tên giả
-  const displayName = user?.name || 'Sinh viên'
-  const avatarInitials =
-    user?.name
-      ?.split(' ')
-      .slice(-2)
-      .map((w) => w.charAt(0))
-      .join('')
-      .toUpperCase() || 'SV'
+  // GET /my-info chỉ trả { name, roles } → chưa hiện được MSSV / email
+  const displayName = user?.name ?? ''
+  const displayTitle = roleLabels.STUDENT
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
@@ -135,31 +117,8 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           2. BÊN PHẢI: THÔNG BÁO & USER PROFILE
           ======================================================== */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Chuông Thông Báo — chưa nối API nên chỉ hiện trạng thái trống, không dùng dữ liệu giả */}
-        <div className="relative" ref={notifRef}>
-          <button
-            type="button"
-            onClick={() => setNotifOpen(!notifOpen)}
-            className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-            aria-label="Thông báo"
-            aria-expanded={notifOpen}
-            title="Thông báo"
-          >
-            <Bell size={19} />
-          </button>
-
-          {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white shadow-2xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-4 py-3 border-b border-slate-100">
-                <span className="font-bold text-sm text-slate-800">Thông báo</span>
-              </div>
-              <div className="px-4 py-8 flex flex-col items-center gap-2 text-center">
-                <BellOff size={22} className="text-slate-300" />
-                <p className="text-xs text-slate-500">Chưa có thông báo nào.</p>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Chuông thông báo: số chưa đọc, danh sách, nhận thông báo mới qua SSE */}
+        <NotificationBell />
 
         {/* Đường phân cách */}
         <div className="h-6 w-px bg-slate-200 mx-0.5" />
@@ -175,19 +134,17 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           >
             {/* Avatar chữ cái đại diện */}
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#1565C0] to-[#1E88E5] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-              {avatarInitials}
+              {getInitials(displayName)}
             </div>
 
-            {/* Thông tin tên & MSSV (ẩn trên màn hình quá nhỏ) */}
+            {/* Thông tin tên & vai trò (ẩn trên màn hình quá nhỏ) */}
             <div className="hidden sm:flex flex-col min-w-0">
               <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[130px]">
                 {displayName}
               </span>
-              {user?.code && (
-                <span className="text-[10.5px] text-slate-500 font-medium leading-tight truncate max-w-[130px]">
-                  MSSV: {user.code}
-                </span>
-              )}
+              <span className="text-[10.5px] text-slate-500 font-medium leading-tight truncate max-w-[130px]">
+                {displayTitle}
+              </span>
             </div>
 
             <ChevronDown
@@ -204,9 +161,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
               {/* Header của Profile Dropdown */}
               <div className="px-4 py-3 border-b border-slate-100">
                 <p className="text-xs font-bold text-slate-900 truncate">{displayName}</p>
-                {user?.email && (
-                  <p className="text-[11px] text-slate-500 truncate mt-0.5">{user.email}</p>
-                )}
                 <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-[10.5px] font-semibold px-2 py-0.5 rounded-md border border-blue-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1565C0]" />
                   Sinh viên làm đồ án
@@ -232,11 +186,12 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
               <div className="pt-1 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <LogOut size={15} className="text-red-500" />
-                  Đăng xuất
+                  {logout.isPending ? 'Đang đăng xuất...' : 'Đăng xuất'}
                 </button>
               </div>
             </div>

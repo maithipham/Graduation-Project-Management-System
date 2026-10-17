@@ -1,9 +1,15 @@
 export const API_ENDPOINTS = {
   auth: {
-    login: '/auth/login',
-    logout: '/auth/logout',
+    login: '/login',
+    logout: '/log-out',
     refreshToken: '/refresh-token',
-    me: '/auth/me',
+    myInfo: '/my-info',
+  },
+  notification: {
+    // GET: danh sách thông báo · PATCH (không có body): đánh dấu tất cả là đã đọc
+    base: '/notification',
+    // Kênh SSE nhận thông báo mới (event "notification")
+    stream: '/connection',
   },
   student: {
     overview: '/student/overview',

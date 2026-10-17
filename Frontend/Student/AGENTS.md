@@ -7,7 +7,7 @@
 
 ## 1. Dự án
 
-- Hệ thống Quản lý Đồ án Tốt nghiệp — Đại học Thủy Lợi. Thư mục này là portal cho **sinh viên** (role `student`).
+- Hệ thống Quản lý Đồ án Tốt nghiệp — Đại học Thủy Lợi. Thư mục này là portal cho **sinh viên** (role `STUDENT`).
   Portal cán bộ (admin, giảng viên, trưởng bộ môn) nằm ở `Frontend/Lecturer`, là một app riêng.
 - Nghiệp vụ của sinh viên (chi tiết ở `REQUIREMENT.md` mục 2 và 6): đăng ký GVHD và tên đề tài, nộp đề cương,
   nộp báo cáo cuối và bản sửa sau bảo vệ, xem GVHD / GV review / GVPB / hội đồng, lịch bảo vệ, kết quả, tài liệu mẫu,
@@ -36,13 +36,14 @@ Trước khi báo "xong" một thay đổi code: làm theo skill **`verify-chang
 
 ```
 src/
-├── app/routes/student.routes.tsx      # Đăng ký URL của sinh viên (đã bọc ProtectedRoute role 'student')
+├── app/routes/student.routes.tsx      # Đăng ký URL của sinh viên (routes/index.tsx đã bọc RequireAuth + ProtectedRoute 'STUDENT')
 ├── features/student/<sub_feature>/    # Nghiệp vụ, ví dụ overview, supervisor_registration
 │   ├── components/  pages/  hooks/  services/  store/  types/
 │   └── index.ts                       # Cổng export duy nhất của feature
 ├── features/student/layouts/          # StudentLayout, StudentHeader, StudentSidebar
 │   └── components/studentNav.config.ts   # Menu sidebar (breadcrumb trên header cũng lấy từ đây)
-├── features/auth/                     # Đăng nhập, ProtectedRoute, UserRole
+├── features/auth/                     # Đăng nhập Google, RequireAuth, ProtectedRoute, UserRole
+├── features/notification/             # Chuông thông báo + SSE
 └── shared/                            # Chỉ chứa "viên gạch" không có nghiệp vụ
     ├── api/      (apiClient, interceptors, session, queryClient, endpoints)
     ├── components/ui/  (Button, Card, Dialog, FormField, Input, Select, Table, Tabs, Skeleton, Badge, Textarea)
@@ -66,7 +67,12 @@ Quy tắc:
 6. Menu sidebar dạng `{ title, path, icon, badge? }` trong `studentNav.config.ts`. Thêm mục menu là breadcrumb tự cập nhật,
    không sửa `StudentHeader`.
 7. Ưu tiên dùng component sẵn có trong `@/shared/components/ui` trước khi tự viết. Gộp class bằng `cn()` từ `@/shared/utils/cn`.
-8. `UserRole` lấy từ `@/features/auth`. **Không** dùng `UserRole` trong `@/shared/types` (bản cũ, khác danh sách role).
+8. Role chỉ khai báo ở `@/features/auth`: `UserRole` = `'STUDENT'` (đúng chuỗi BE trả về).
+   Người đang đăng nhập: `useMyInfo()` (cache TanStack `['auth','me']`, không có store riêng; BE chỉ trả `{ name, roles }`).
+   Ẩn/hiện theo role: `CanAccess`. Tài khoản không có role `STUDENT` đăng nhập vào portal này sẽ thấy màn hình "không có quyền".
+9. **Feature có nghiệp vụ nhưng không thuộc riêng màn hình sinh viên** nằm thẳng ở `features/<feature>/`, ngoài `features/student/`.
+   Hiện chỉ có `auth` và `notification`. Vẫn theo đủ quy tắc trên (cổng `index.ts`, không deep import).
+   Muốn thêm feature kiểu này thì hỏi người dùng trước.
 
 ## 4. Dữ liệu & API (tóm tắt — chi tiết ở skill `connect-api`)
 
@@ -93,7 +99,8 @@ Quy tắc:
 - Mock data: chỉ bật khi `VITE_USE_MOCK=true`. **Không** dùng kiểu `try { api } catch { return mock }`
   (nó che mất lỗi thật của backend).
 - Dữ liệu từ server để TanStack Query giữ; Zustand (`store/`) chỉ dành cho state giao diện (bộ lọc, tab đang chọn, bản nháp).
-- Các endpoint trong `src/shared/api/endpoints.ts` hiện là **đoán trước**, chưa khớp Controller thật → khi nối API phải sửa theo Controller.
+- Trong `src/shared/api/endpoints.ts`, nhóm `auth` và `notification` đã khớp BE; các nhóm còn lại là **đoán trước**,
+  chưa khớp Controller thật → khi nối API phải sửa theo Controller.
 
 ## 5. Giao diện
 
@@ -123,10 +130,7 @@ Quy tắc:
 
 ## 7. Vấn đề đã biết trong code hiện tại (đừng sao chép, sửa khi được yêu cầu)
 
-- `authStore` / `LoginPage` vẫn ghi token giả vào `localStorage` (`setToken`) và lưu `active_role` vào `localStorage`;
-  `authStore` tự gán role mặc định `'student'` khi chưa đăng nhập → chưa đăng nhập vẫn vào được `/student`. Sẽ bỏ khi làm đăng nhập thật.
-- `LoginPage.tsx` đang đăng nhập giả (mock), chưa gọi Google OAuth2 thật.
-- `UserRole` bị khai báo 2 nơi khác nhau (`features/auth/types/types.ts` có `admin`, `shared/types` thì không).
+- Header chỉ hiện tên + "Sinh viên" vì `GET /my-info` chưa trả MSSV / email.
 - `src/shared/api/endpoints.ts` còn nhóm `lecturer` (không dùng ở portal này) và các URL `student` chưa khớp Controller.
 - `src/shared/styles/print.css` chỉ ẩn class của giao diện demo cũ → khi in, sidebar/header của `StudentLayout` vẫn bị in ra.
 - `VITE_USE_MOCK` chưa được nối vào code.

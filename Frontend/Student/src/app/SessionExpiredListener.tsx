@@ -1,11 +1,10 @@
 import { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/features/auth'
+import { SIGNED_OUT_STATE } from '@/features/auth'
 import { onUnauthorized } from '@/shared/api/session'
-import { queryClient } from '@/shared/api/queryClient'
 
 /**
- * Khi BE trả 401 và refresh token cũng thất bại: xóa trạng thái đăng nhập + cache, chuyển về /login (không hiện thông báo).
+ * Khi BE trả 401 và refresh token cũng thất bại: chuyển về /login, không hiện thông báo (trang /login xóa trạng thái đăng nhập + cache).
  * Đặt bên trong <BrowserRouter> để dùng được navigate.
  */
 export function SessionExpiredListener() {
@@ -18,9 +17,8 @@ export function SessionExpiredListener() {
       onUnauthorized(() => {
         // Đang ở trang đăng nhập thì 401 là bình thường (chưa đăng nhập)
         if (isOnLoginPage) return
-        useAuthStore.getState().clearAuth()
-        queryClient.clear()
-        navigate('/login', { replace: true })
+        // Cache (kể cả thông tin đăng nhập ['auth', 'me']) được xóa ở trang /login, sau khi layout cũ đã gỡ
+        navigate('/login', { replace: true, state: SIGNED_OUT_STATE })
       }),
     [navigate, isOnLoginPage],
   )
