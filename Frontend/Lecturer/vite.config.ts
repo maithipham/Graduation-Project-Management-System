@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./tests/setup.ts'],
       clearMocks: true,
+      fileParallelism: false,
     },
     resolve: {
       alias: {

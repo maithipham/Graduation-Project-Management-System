@@ -1,12 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
-  Layers,
-  Shield,
   Users,
-  Settings,
-  FolderKanban,
-  FileSpreadsheet,
+  CalendarRange,
+  School,
 } from 'lucide-react'
 
 export interface AdminSubNavItem {
@@ -26,40 +23,23 @@ export interface AdminNavItem {
 export const adminNavItems: AdminNavItem[] = [
   {
     to: '/admin',
-    label: 'Dashboard',
+    label: 'Tổng quan',
     icon: LayoutDashboard,
     end: true,
   },
   {
-    to: '/admin/feature-1',
-    label: 'Feature 1',
-    icon: Layers,
-  },
-  {
-    to: '/admin/feature-2',
-    label: 'Feature 2',
-    icon: Shield,
-    children: [
-      {
-        to: '/admin/feature-2/sub-1',
-        label: 'Feature 2.1',
-        icon: FolderKanban,
-      },
-      {
-        to: '/admin/feature-2/sub-2',
-        label: 'Feature 2.2',
-        icon: FileSpreadsheet,
-      },
-    ],
-  },
-  {
-    to: '/admin/feature-3',
-    label: 'Feature 3',
+    to: '/admin/accounts',
+    label: 'Quản lý tài khoản',
     icon: Users,
   },
   {
-    to: '/admin/feature-4',
-    label: 'Feature 4',
-    icon: Settings,
+    to: '/admin/semesters',
+    label: 'Quản lý học kỳ',
+    icon: CalendarRange,
+  },
+  {
+    to: '/admin/faculties',
+    label: 'Khoa',
+    icon: School,
   },
 ]

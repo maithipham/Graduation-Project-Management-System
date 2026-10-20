@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ChevronRight,
-  PanelLeftClose,
-  PanelLeftOpen,
   X,
 } from 'lucide-react'
 import { adminNavItems } from './adminNav.config'
@@ -71,10 +69,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
         {!collapsed && (
           <div className="min-w-0 flex-1 overflow-hidden flex flex-col justify-center">
-            <span className="block text-[13.5px] font-bold text-white tracking-wider leading-tight whitespace-nowrap">
+            <span className="block text-sm font-bold text-white tracking-wider leading-tight whitespace-nowrap">
               TLU CAPSTONE
             </span>
-            <span className="block text-[10.5px] text-blue-200 font-medium tracking-wider uppercase leading-tight whitespace-nowrap mt-0.5">
+            <span className="block text-[11px] text-blue-200 font-medium tracking-wider uppercase leading-tight whitespace-nowrap mt-0.5">
               QUẢN TRỊ VIÊN
             </span>
           </div>
@@ -136,7 +134,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
                   {!collapsed && (
                     <>
-                      <span className="truncate flex-1 text-left text-[13.5px] font-medium leading-5">
+                      <span className="truncate flex-1 text-left text-sm font-medium leading-5">
                         {item.label}
                       </span>
                       <ChevronRight
@@ -164,7 +162,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                           to={child.to}
                           onClick={() => onMobileClose?.()}
                           className={({ isActive }) =>
-                            `relative h-8.5 w-full px-2.5 rounded-md flex items-center gap-2.5 text-[12.5px] font-medium leading-5 transition-colors select-none ${isActive
+                            `relative h-8.5 w-full px-2.5 rounded-md flex items-center gap-2.5 text-xs font-medium leading-5 transition-colors select-none ${isActive
                               ? 'bg-white/[0.18] text-white font-medium shadow-xs'
                               : 'text-blue-100/90 hover:text-white hover:bg-white/10'
                             }`
@@ -222,7 +220,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   </span>
 
                   {!collapsed && (
-                    <span className="truncate flex-1 text-left text-[13.5px] font-medium leading-5">
+                    <span className="truncate flex-1 text-left text-sm font-medium leading-5">
                       {item.label}
                     </span>
                   )}
@@ -232,33 +230,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           )
         })}
       </nav>
-
-      {/* ========================================================
-          C. CHÂN SIDEBAR (Footer Sidebar)
-          ======================================================== */}
-      <div className="border-t border-white/10 p-3 shrink-0 flex flex-col gap-2">
-        {/* Nút thu gọn / mở rộng Sidebar Desktop */}
-        <button
-          type="button"
-          onClick={onToggle}
-          className={`hidden lg:flex items-center rounded-xl text-xs font-medium text-blue-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ${collapsed ? 'h-9 w-9 justify-center mx-auto' : 'h-9 px-3 gap-2.5 w-full'
-            }`}
-          title={collapsed ? 'Mở rộng menu (Ctrl + B)' : 'Thu gọn menu (Ctrl + B)'}
-          aria-label="Thu gọn / mở rộng menu"
-        >
-          {collapsed ? (
-            <PanelLeftOpen size={16} />
-          ) : (
-            <>
-              <PanelLeftClose size={16} />
-              <span className="truncate">Thu gọn menu</span>
-              <kbd className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-blue-100">
-                Ctrl+B
-              </kbd>
-            </>
-          )}
-        </button>
-      </div>
     </aside>
   )
 }

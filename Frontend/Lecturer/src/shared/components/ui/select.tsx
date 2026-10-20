@@ -6,8 +6,9 @@ export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
+    const isAuto = className?.includes('w-auto')
     return (
-      <div className="relative inline-block w-full">
+      <div className={cn('relative inline-block', isAuto ? 'w-auto' : 'w-full')}>
         <select
           ref={ref}
           className={cn(
@@ -18,7 +19,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         >
           {children}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-slate-400" />
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
       </div>
     )
   },

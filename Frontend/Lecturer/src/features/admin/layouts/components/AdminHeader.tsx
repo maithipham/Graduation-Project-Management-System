@@ -1,11 +1,10 @@
-import React, { Fragment, useState, useRef, useEffect } from 'react'
+import React, { Fragment, useState, useRef, useEffect, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Menu,
   PanelLeft,
   ChevronRight,
   ChevronDown,
-  User,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -46,8 +45,29 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   }, [])
 
   // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
-  const crumbs = getNavBreadcrumbs(adminNavItems, location.pathname)
-  const displayName = user?.name ?? ''
+  const baseCrumbs = getNavBreadcrumbs(adminNavItems, location.pathname)
+  const isFacultyDetail =
+    location.pathname.startsWith('/admin/faculties') &&
+    new URLSearchParams(location.search).has('facultyId')
+
+  const crumbs: { label: string; to?: string }[] = useMemo(() => {
+    if (isFacultyDetail) {
+      return [
+        { label: 'Khoa', to: '/admin/faculties' },
+        { label: 'Chuyên ngành' },
+      ]
+    }
+    if (baseCrumbs.length === 0) {
+      return [{ label: 'Tổng quan' }]
+    }
+    return baseCrumbs.map((label) => ({ label }))
+  }, [baseCrumbs, isFacultyDetail])
+
+  const rawName = user?.name?.trim() ?? ''
+  const displayName =
+    !rawName || rawName.toLowerCase().replace(/\s+/g, '') === 'admin'
+      ? 'Admin'
+      : rawName
   const displayTitle = roleLabels.ADMIN
 
   return (
@@ -82,27 +102,34 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           className="flex items-center text-xs sm:text-sm font-medium overflow-hidden ml-1"
           aria-label="Breadcrumb"
         >
-          <Link
-            to="/admin"
-            className="text-slate-400 hover:text-slate-700 transition-colors whitespace-nowrap truncate max-w-[100px] sm:max-w-none"
-          >
-            Admin
-          </Link>
-
-          {crumbs.map((label, index) => (
-            <Fragment key={label}>
-              <ChevronRight size={14} className="mx-1.5 text-slate-300 shrink-0" />
-              <span
-                className={
-                  index === crumbs.length - 1
-                    ? 'text-[#1565C0] font-semibold truncate max-w-[140px] sm:max-w-[260px]'
-                    : 'text-slate-400 whitespace-nowrap truncate max-w-[100px] sm:max-w-none'
-                }
-              >
-                {label}
-              </span>
-            </Fragment>
-          ))}
+          {crumbs.map((crumb, index) => {
+            const isLast = index === crumbs.length - 1
+            return (
+              <Fragment key={crumb.label}>
+                {index > 0 && (
+                  <ChevronRight size={14} className="mx-1.5 text-slate-300 shrink-0" />
+                )}
+                {crumb.to && !isLast ? (
+                  <Link
+                    to={crumb.to}
+                    className="text-slate-400 hover:text-slate-700 transition-colors whitespace-nowrap truncate max-w-[100px] sm:max-w-none"
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span
+                    className={
+                      isLast
+                        ? 'text-[#1565C0] font-semibold truncate max-w-[140px] sm:max-w-[260px]'
+                        : 'text-slate-400 whitespace-nowrap truncate max-w-[100px] sm:max-w-none'
+                    }
+                  >
+                    {crumb.label}
+                  </span>
+                )}
+              </Fragment>
+            )
+          })}
         </nav>
       </div>
 
@@ -132,10 +159,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
             {/* Thông tin tên & Chức danh (ẩn trên màn hình quá nhỏ) */}
             <div className="hidden sm:flex flex-col min-w-0">
-              <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[130px]">
+              <span className="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[130px]">
                 {displayName}
               </span>
-              <span className="text-[10.5px] text-slate-500 font-medium leading-tight truncate max-w-[130px]">
+              <span className="text-xs text-slate-500 font-normal leading-tight truncate max-w-[130px] mt-0.5">
                 {displayTitle}
               </span>
             </div>
@@ -153,33 +180,22 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
               {/* Header của Profile Dropdown */}
               <div className="px-4 py-3 border-b border-slate-100">
-                <p className="text-xs font-bold text-slate-900 truncate">
+                <p className="text-sm font-semibold text-slate-900 truncate">
                   {displayName}
                 </p>
-                <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-[10.5px] font-semibold px-2 py-0.5 rounded-md border border-blue-200">
+                <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-xs font-medium px-2 py-0.5 rounded-md border border-blue-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1565C0]" />
                   {displayTitle}
                 </div>
               </div>
 
-              {/* Danh sách hành động */}
+              {/* Danh sách hành động (Admin không có hồ sơ cá nhân) */}
               <div className="py-1">
                 <button
                   type="button"
                   onClick={() => {
                     setProfileOpen(false)
                     navigate('/admin')
-                  }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-                >
-                  <User size={15} className="text-slate-400" />
-                  Hồ sơ cá nhân
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileOpen(false)
-                    navigate('/admin/feature-4')
                   }}
                   className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >

@@ -1,7 +1,7 @@
 export const API_ENDPOINTS = {
   auth: {
     login: '/login',
-    logout: '/log-out',
+    logout: '/logout',
     refreshToken: '/refresh-token',
     myInfo: '/my-info',
   },
@@ -39,5 +39,11 @@ export const API_ENDPOINTS = {
     reportEvaluation: '/lecturer/report-eval',
     council: '/lecturer/council',
     department: '/lecturer/department',
+  },
+  admin: {
+    accounts: '/accounts',
+    semesters: '/semesters',
+    faculties: '/faculties',
+    majors: '/majors',
   },
 } as const
