@@ -51,6 +51,37 @@ export function DialogTrigger({ children }: { children: React.ReactElement<{ onC
   })
 }
 
+// Số popup đang mở cùng lúc: chỉ mở khóa cuộn khi popup cuối cùng đóng
+let scrollLockCount = 0
+let savedBodyStyle = { overflow: '', paddingRight: '' }
+
+/**
+ * Khóa cuộn trang nền khi mở popup.
+ * Ẩn thanh cuộn làm trang rộng thêm đúng bề rộng thanh cuộn (nội dung bị giãn ra rồi co lại khi đóng),
+ * nên bù lại bằng padding-right đúng bằng bề rộng đó.
+ */
+function lockBodyScroll() {
+  const { body } = document
+  if (scrollLockCount === 0) {
+    savedBodyStyle = { overflow: body.style.overflow, paddingRight: body.style.paddingRight }
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+    if (scrollbarWidth > 0) {
+      const currentPadding = parseFloat(window.getComputedStyle(body).paddingRight) || 0
+      body.style.paddingRight = `${currentPadding + scrollbarWidth}px`
+    }
+    body.style.overflow = 'hidden'
+  }
+  scrollLockCount += 1
+
+  return () => {
+    scrollLockCount -= 1
+    if (scrollLockCount === 0) {
+      body.style.overflow = savedBodyStyle.overflow
+      body.style.paddingRight = savedBodyStyle.paddingRight
+    }
+  }
+}
+
 export function DialogContent({
   className,
   children,
@@ -59,17 +90,14 @@ export function DialogContent({
   const { open, onOpenChange } = React.useContext(DialogContext)
 
   React.useEffect(() => {
+    if (!open) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onOpenChange(false)
     }
-    if (open) {
-      document.body.style.overflow = 'hidden'
-      window.addEventListener('keydown', onKeyDown)
-    } else {
-      document.body.style.overflow = ''
-    }
+    const unlockScroll = lockBodyScroll()
+    window.addEventListener('keydown', onKeyDown)
     return () => {
-      document.body.style.overflow = ''
+      unlockScroll()
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [open, onOpenChange])

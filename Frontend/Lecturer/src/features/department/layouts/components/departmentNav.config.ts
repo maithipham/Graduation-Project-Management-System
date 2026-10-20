@@ -34,7 +34,7 @@ export const departmentNavItems: DepartmentNavItem[] = [
     end: true,
   },
   {
-    to: '/department/students',
+    to: '/department/student-management',
     label: 'Quản lý sinh viên',
     icon: GraduationCap,
   },

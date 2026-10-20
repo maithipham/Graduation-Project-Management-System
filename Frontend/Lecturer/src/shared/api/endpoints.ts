@@ -21,6 +21,17 @@ export const API_ENDPOINTS = {
     results: '/student/results',
     documents: '/student/documents',
   },
+  // Quản lý sinh viên (Trưởng bộ môn / Admin). Khác nhóm `student` ở trên (portal của sinh viên)
+  departmentStudent: {
+    // GET: danh sách (Page) · POST: thêm thủ công
+    base: '/student',
+    detail: (publicId: string) => `/student/${publicId}`,
+    import: '/student/import',
+    activate: (publicId: string) => `/student/${publicId}/activate`,
+  },
+  major: {
+    base: '/major',
+  },
   lecturer: {
     dashboard: '/lecturer/dashboard',
     topics: '/lecturer/topics',

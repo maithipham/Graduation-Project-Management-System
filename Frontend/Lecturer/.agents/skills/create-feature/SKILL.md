@@ -23,8 +23,10 @@ Có rồi thì dùng lại, không tạo trùng.
 Menu và route hiện có (kiểm tra lại trong code, có thể đã đổi):
 - `admin`, `lecturer`: menu còn các mục giả "Feature 1…4" (URL `/<role>/feature-N`), route trỏ tới `FeaturePlaceholder`.
   Màn hình mới **thay** một mục giả (cả menu lẫn route), không thêm mục mới bên cạnh mục giả. Không rõ thay mục nào thì hỏi.
-- `department`: menu đã có mục thật (`/department/students`, `/department/councils`…) nhưng `department.routes.tsx`
+- `department`: menu đã có mục thật (`/department/councils`, `/department/schedule`…) nhưng `department.routes.tsx`
   chưa có route → chỉ thêm route đúng URL trong menu, không thêm mục menu trùng.
+  Mục nào chưa có route mà URL chưa rõ nghĩa thì có thể đổi sang dạng `<danh-từ>-management`
+  (như `/department/student-management`), nhớ sửa cả menu lẫn route.
 
 ## Các bước
 

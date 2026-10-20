@@ -7,6 +7,7 @@ Ví dụ dùng feature `admin/semester_management` (học kỳ). Khi làm featur
 ```ts
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse, SpringPage } from '@/shared/types'
+import { toSpringPage, type RawSpringPage } from '@/shared/utils'
 import type { Semester, SemesterListParams, SemesterRequest } from '../types/semester.types'
 
 const BASE_URL = API_ENDPOINTS.admin.semesters
@@ -15,12 +16,13 @@ const BASE_URL = API_ENDPOINTS.admin.semesters
 export const semesterService = {
   // GET /admin/semesters?page=0&size=10&sort=createdAt,desc&keyword=...
   async getPage(params: SemesterListParams): Promise<SpringPage<Semester>> {
-    const res = await apiClient.get<ApiResponse<SpringPage<Semester>>>(BASE_URL, {
+    const res = await apiClient.get<ApiResponse<RawSpringPage<Semester>>>(BASE_URL, {
       params,
       // sort dạng mảng → ?sort=a,asc&sort=b,desc (đúng kiểu Spring Pageable), không phải sort[]=...
       paramsSerializer: { indexes: null },
     })
-    return res.data.data
+    // BE có thể trả Page phẳng hoặc PagedModel ({ content, page: {...} }) → đưa về một dạng
+    return toSpringPage(res.data.data, params)
   },
 
   async getById(id: number): Promise<Semester> {

@@ -21,12 +21,16 @@ Không bịa endpoint, tên trường hay mã lỗi. Thấy endpoint "đoán" s�
 | --- | --- | --- |
 | `apiClient` | `@/shared/api` | axios, `withCredentials: true` (JWT nằm trong cookie HttpOnly) |
 | `API_ENDPOINTS` | `@/shared/api` (`endpoints.ts`) | thêm đường dẫn mới vào đây |
-| `ApiResponse<T>` | `@/shared/types` | `{ code, message, data }`, `code === 1000` là thành công |
+| `ApiResponse<T>` | `@/shared/types` | `{ code, message, data }`, `code === 1000` là thành công; `isApiWarningCode(code)` → dải `11xx` là thành công kèm cảnh báo |
 | `ApiError`, `isApiError` | `@/shared/types` | mọi lỗi từ `apiClient` đều là `ApiError` (`code` = mã BE, `status` = HTTP) |
 | `SpringPage<T>`, `PageParams` | `@/shared/types` | trang **bắt đầu từ 0** |
+| `toSpringPage`, `RawSpringPage<T>` | `@/shared/utils` | đưa JSON phân trang của BE (Page phẳng hoặc `PagedModel` có `page: {...}`) về `SpringPage<T>` |
 | `toast` | `@/shared/components/feedback/toast.store` | chỉ dùng `toast.success` |
 
 Interceptor đã tự lo: toast lỗi, lỗi nghiệp vụ (HTTP 200 nhưng `code ≠ 1000`), 401 → refresh token 1 lần → hết hạn thì về `/login`.
+Mã cảnh báo `11xx` (HTTP 200) **không** bị coi là lỗi: request vẫn resolve và interceptor hiện toast vàng
+(`{ skipWarningToast: true }` để tắt khi màn hình tự hiển thị kết quả). Màn hình cần phân biệt thành công / cảnh báo
+(ví dụ đổi màu một dòng) thì service trả thêm `code` + `message` thay vì chỉ `res.data.data`.
 
 ## Ánh xạ Java → TypeScript
 
@@ -63,6 +67,9 @@ Mẫu đầy đủ (đã chạy thử tsc/lint/test) nằm trong `templates/` �
 - Chỉ gọi API và **trả `res.data.data`** (bóc wrapper `ApiResponse`), không trả `res.data`.
 - Khai báo kiểu: `apiClient.get<ApiResponse<SpringPage<Semester>>>(...)`.
 - Phân trang: truyền `params` + `paramsSerializer: { indexes: null }` để `sort` dạng mảng thành `?sort=a,asc&sort=b,desc` như Spring cần.
+  Khai báo `ApiResponse<RawSpringPage<T>>` và trả `toSpringPage(res.data.data, params)`: Spring Data 3.3+ có thể trả
+  `PagedModel` (`{ content, page: { number, size, totalElements, totalPages } }`) thay vì Page phẳng; đọc thẳng `data.number`
+  khi đó ra `undefined` → STT thành `NaN`, mất thanh phân trang.
 - Request gọi từ **form** (tạo/sửa): thêm `{ skipErrorToast: true }` — form tự hiện lỗi (xem skill `build-form`).
 - Không `try/catch` trong service. Không xử lý giao diện.
 

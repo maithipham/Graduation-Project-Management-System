@@ -2,8 +2,17 @@
 
 export const API_SUCCESS_CODE = 1000
 
+/**
+ * Mã cảnh báo (dải 11xx, HTTP 200): thao tác vẫn hoàn tất nhưng có điều cần lưu ý,
+ * ví dụ 1101 "Sinh viên đã có trong hệ thống, thông tin không thay đổi".
+ * Interceptor coi là thành công (không reject) và hiện toast vàng.
+ */
+export function isApiWarningCode(code: number): boolean {
+  return code >= 1100 && code < 1200
+}
+
 export interface ApiResponse<T = unknown> {
-  code: number // 1000: thành công, khác 1000: thất bại
+  code: number // 1000: thành công, 11xx: thành công kèm cảnh báo, còn lại: thất bại
   message: string // thông báo từ Backend
   data: T // dữ liệu phản hồi
 }

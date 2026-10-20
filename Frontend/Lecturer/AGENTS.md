@@ -71,8 +71,11 @@ Quy tắc:
 
 ## 4. Dữ liệu & API (tóm tắt — chi tiết ở skill `connect-api`)
 
-- Mọi response: `APIResponse<T> { code, message, data }`. **`code === 1000` là thành công**; khác 1000 là lỗi
-  (ví dụ `2000` = phiên đăng nhập hết hạn). TS: `ApiResponse<T>`, `API_SUCCESS_CODE`, `ApiError` trong `@/shared/types`.
+- Mọi response: `APIResponse<T> { code, message, data }`. **`code === 1000` là thành công**;
+  **dải `11xx` (HTTP 200) là thành công kèm cảnh báo** (ví dụ `1101` = sinh viên đã có, thông tin không đổi):
+  interceptor không reject mà tự hiện toast vàng (tắt bằng `{ skipWarningToast: true }`); còn lại là lỗi
+  (ví dụ `2000` = phiên đăng nhập hết hạn). TS: `ApiResponse<T>`, `API_SUCCESS_CODE`, `isApiWarningCode`, `ApiError`
+  trong `@/shared/types`.
 - **HTTP 401** (chưa đăng nhập hoặc token hết hạn): interceptor tự gọi `POST /refresh-token` **1 lần** (nhiều request 401
   cùng lúc dùng chung 1 lần refresh) rồi gửi lại request. Refresh thất bại hoặc gửi lại vẫn 401 → xóa trạng thái đăng nhập
   + cache, chuyển về `/login`, **không hiện thông báo** (`shared/api/session.ts` + `app/SessionExpiredListener.tsx`).

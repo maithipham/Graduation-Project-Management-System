@@ -1,5 +1,11 @@
+import { lazy } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import { DepartmentLayout } from '@/features/department'
+import { withSuspense } from './withSuspense'
+
+const StudentManagementPage = lazy(
+  () => import('@/features/department/student_management/pages/StudentManagementPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
@@ -18,6 +24,7 @@ export const departmentRoutes: RouteObject = {
         </div>
       ),
     },
+    { path: 'student-management', element: withSuspense(<StudentManagementPage />) },
   ],
 }
 

@@ -1,5 +1,11 @@
 import axios, { type AxiosError, type AxiosInstance } from 'axios'
-import { API_SUCCESS_CODE, ApiError, NETWORK_ERROR_CODE, type ApiResponse } from '@/shared/types'
+import {
+  API_SUCCESS_CODE,
+  ApiError,
+  isApiWarningCode,
+  NETWORK_ERROR_CODE,
+  type ApiResponse,
+} from '@/shared/types'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { API_ENDPOINTS } from './endpoints'
 import { notifyUnauthorized } from './session'
@@ -11,6 +17,11 @@ declare module 'axios' {
      * Dùng: apiClient.post(url, body, { skipErrorToast: true })
      */
     skipErrorToast?: boolean
+    /**
+     * true: interceptor không tự hiện toast vàng cho mã cảnh báo 11xx (component tự hiển thị kết quả).
+     * Dùng: apiClient.post(url, body, { skipWarningToast: true })
+     */
+    skipWarningToast?: boolean
     /**
      * true: gặp 401 thì trả lỗi luôn, không gọi refresh token và không chuyển về /login.
      * Dùng cho chính các API đăng nhập / đăng xuất (401 ở đây không phải "token hết hạn").
@@ -66,16 +77,25 @@ function refreshSession(axiosInstance: AxiosInstance): Promise<void> {
 }
 
 export function setupInterceptors(axiosInstance: AxiosInstance): void {
-  // Response Interceptor: Chuẩn hóa phản hồi APIResponse (code 1000 = thành công, khác 1000 = thất bại)
+  // Response Interceptor: Chuẩn hóa phản hồi APIResponse
+  // (code 1000 = thành công, 11xx = thành công kèm cảnh báo, còn lại = thất bại)
   axiosInstance.interceptors.response.use(
     (response) => {
-      // Bắt trường hợp BE trả về HTTP 200 nhưng code khác 1000 (Lỗi nghiệp vụ)
+      // Bắt trường hợp BE trả về HTTP 200 nhưng code khác 1000
       if (
         response.data &&
         typeof response.data === 'object' &&
         'code' in response.data
       ) {
         const apiRes = response.data as ApiResponse
+        // Cảnh báo (VD 1101): thao tác vẫn xong → trả response bình thường, chỉ hiện toast vàng
+        if (isApiWarningCode(apiRes.code)) {
+          if (!response.config.skipWarningToast) {
+            toast.warning(apiRes.message, 3000)
+          }
+          return response
+        }
+        // Còn lại: lỗi nghiệp vụ
         if (apiRes.code !== API_SUCCESS_CODE) {
           const apiError = new ApiError(
             apiRes.message || 'Thao tác không thành công',

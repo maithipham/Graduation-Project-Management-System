@@ -34,6 +34,10 @@ function errorToasts() {
   return useToastStore.getState().toasts.filter((t) => t.type === 'error').map((t) => t.message)
 }
 
+function warningToasts() {
+  return useToastStore.getState().toasts.filter((t) => t.type === 'warning').map((t) => t.message)
+}
+
 describe('interceptors: chuẩn hóa lỗi thành ApiError', () => {
   beforeEach(() => {
     useToastStore.getState().clearAll()
@@ -52,6 +56,27 @@ describe('interceptors: chuẩn hóa lỗi thành ApiError', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ code: 1005, status: 200, message: 'Đề tài đã bị khóa' })
     expect(errorToasts()).toEqual(['Đề tài đã bị khóa'])
+  })
+
+  it('HTTP 200 + mã cảnh báo 11xx → trả response bình thường, toast vàng thay vì toast đỏ', async () => {
+    const message = 'Sinh viên đã có trong hệ thống, thông tin không thay đổi'
+    const client = createClient({ status: 200, data: { code: 1101, message, data: null } })
+    const res = await client.post('/x')
+    expect(res.data.code).toBe(1101)
+    expect(errorToasts()).toEqual([])
+    expect(warningToasts()).toEqual([message])
+  })
+
+  it('skipWarningToast: mã cảnh báo không hiện toast vàng', async () => {
+    const client = createClient({ status: 200, data: { code: 1100, message: 'Cảnh báo', data: null } })
+    await client.post('/x', undefined, { skipWarningToast: true })
+    expect(warningToasts()).toEqual([])
+  })
+
+  it('mã 1006 (ngoài dải 11xx) vẫn là lỗi', async () => {
+    const client = createClient({ status: 200, data: { code: 1006, message: 'Yêu cầu không hợp lệ', data: null } })
+    const error = await client.get('/x').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiError)
   })
 
   it('HTTP 400 có body APIResponse → ApiError lấy code + message của BE', async () => {
