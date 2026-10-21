@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatBytes, checkScoreOutlier } from '@/shared/utils'
+import { checkScoreOutlier, compactParams, formatBytes, formatDate, getNextSort } from '@/shared/utils'
 
 describe('Shared Utilities', () => {
   it('formatBytes formats file sizes correctly', () => {
@@ -22,5 +22,22 @@ describe('Shared Utilities', () => {
     const outlierScores = [6.0, 9.0, 8.5]
     expect(checkScoreOutlier(outlierScores).hasOutlier).toBe(true)
     expect(checkScoreOutlier(outlierScores).diff).toBe(3.0)
+  })
+})
+
+describe('sắp xếp & tham số dùng chung cho bảng', () => {
+  it('getNextSort: tăng dần → giảm dần → bỏ; đổi cột thì bắt đầu lại', () => {
+    expect(getNextSort<'name' | 'amount'>(undefined, 'name')).toBe('name,asc')
+    expect(getNextSort<'name' | 'amount'>('name,asc', 'name')).toBe('name,desc')
+    expect(getNextSort<'name' | 'amount'>('name,desc', 'name')).toBeUndefined()
+    expect(getNextSort<'name' | 'amount'>('name,desc', 'amount')).toBe('amount,asc')
+  })
+
+  it('compactParams bỏ giá trị undefined và chuỗi rỗng, giữ số 0 và false', () => {
+    expect(compactParams({ name: '', organization: undefined, page: 0, size: 10, active: false })).toEqual({
+      page: 0,
+      size: 10,
+      active: false,
+    })
   })
 })

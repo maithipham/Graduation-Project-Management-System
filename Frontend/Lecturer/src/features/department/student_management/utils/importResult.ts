@@ -11,8 +11,11 @@ export const IMPORT_TAB_ORDER: RowImportStatus[] = ['ERROR', 'WARNING', 'SUCCESS
 
 export type ImportRowCounts = Record<RowImportStatus, number>
 
-/** Đếm theo trạng thái hiện tại của từng dòng (đổi khi gửi lại dòng lỗi thành công) */
-export function countRowsByStatus(rows: StudentImportRowResult[]): ImportRowCounts {
+/**
+ * Đếm theo trạng thái hiện tại của từng dòng (đổi khi gửi lại dòng lỗi thành công).
+ * Dùng chung cho kết quả import sinh viên và giáo viên
+ */
+export function countRowsByStatus(rows: { status: RowImportStatus }[]): ImportRowCounts {
   const counts: ImportRowCounts = { ERROR: 0, WARNING: 0, SUCCESS: 0 }
   for (const row of rows) counts[row.status] += 1
   return counts

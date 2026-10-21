@@ -338,7 +338,7 @@ Field khớp `StudentCreationRequest` của BE (Mục 6.2). Lưới 2 cột (`St
 - Nút "Hủy" / "Lưu" ("Đang lưu..." khi đang gửi; không cho đóng popup lúc đang gửi). Gọi `POST /student` với `skipErrorToast`:
   - `1000` → `toast.success(message của BE)`, đóng và reset form.
   - `11xx` (ví dụ `1101`) → interceptor hiện toast vàng, đóng popup.
-  - Lỗi (`4000`, `3004`, `3005`, mất mạng) → hiện message ở đầu form (`setError('root.server')`).
+  - Lỗi (`4000`, `3004`, `3010`, `3011`, `3005`, mất mạng) → hiện message của BE ở đầu form (`setError('root.server')`).
 
 ---
 
@@ -380,6 +380,9 @@ Lỗi mức toàn file (HTTP 400, `code 4000`): "File import không được đ�
 "Dòng tiêu đề không đúng với file mẫu", "File import không được chứa ô bị gộp", "File import không có dòng dữ liệu nào",
 "File import vượt quá dung lượng cho phép (50MB)".
 
+Lỗi đối chiếu DB của từng dòng (`status = ERROR`) dùng cùng message với `POST /student` (bảng Mục 6.2), ví dụ
+"Mã sinh viên đã thuộc về một tài khoản khác trong hệ thống". FE chỉ hiển thị `message`, không cần đổi code khi BE đổi message.
+
 ### 6.2. `POST /student` (đã nối – thêm thủ công & gửi lại dòng import lỗi)
 
 Body JSON:
@@ -408,7 +411,9 @@ API ghi không có `data`, nên service trả `StudentWriteResult { code, messag
 | 1 lỗi định dạng | 400 | 4000 | Message lỗi cụ thể (bảng Mục 5.5) |
 | Email đúng định dạng nhưng không có đuôi `@gmail.com` | 400 | 4000 | Email sinh viên phải có đuôi @gmail.com |
 | ≥ 2 lỗi định dạng | 400 | 4000 | Thông tin nhập không hợp lệ, vui lòng kiểm tra lại |
-| Mã SV và email thuộc 2 tài khoản khác nhau | 409 | 3004 | Email (hoặc Mã sinh viên) đã thuộc về một tài khoản khác trong hệ thống |
+| Mã SV chưa có, email đã thuộc tài khoản khác (SV khác, giáo viên, admin) | 409 | 3010 | Email đã thuộc về một tài khoản khác trong hệ thống |
+| Mã SV đã có (gắn với email khác), email nhập vào chưa có trong hệ thống | 409 | 3011 | Mã sinh viên đã thuộc về một tài khoản khác trong hệ thống |
+| Mã SV và email đều đã có nhưng thuộc 2 tài khoản khác nhau | 409 | 3004 | Mã sinh viên và Email thuộc về hai tài khoản khác nhau trong hệ thống |
 | Đúng mã + email nhưng lệch họ tên/khóa/ngành | 409 | 3005 | Thông tin không khớp với hồ sơ gốc trong hệ thống |
 
 ### 6.3. `PATCH /student/{publicId}/activate` (chưa nối)

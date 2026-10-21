@@ -6,6 +6,9 @@ import { withSuspense } from './withSuspense'
 const StudentManagementPage = lazy(
   () => import('@/features/department/student_management/pages/StudentManagementPage'),
 )
+const LecturerManagementPage = lazy(
+  () => import('@/features/department/lecturer_management/pages/LecturerManagementPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
@@ -25,6 +28,7 @@ export const departmentRoutes: RouteObject = {
       ),
     },
     { path: 'student-management', element: withSuspense(<StudentManagementPage />) },
+    { path: 'lecturer-management', element: withSuspense(<LecturerManagementPage />) },
   ],
 }
 

@@ -12,11 +12,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FileDropZone,
   FormField,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
 import { useImportStudents } from '../hooks/useStudents'
-import { FileDropZone } from './FileDropZone'
 import { StudentImportResult } from './StudentImportResult'
 
 const MAX_IMPORT_SIZE = 50 * 1024 * 1024 // 50MB, trùng giới hạn của BE

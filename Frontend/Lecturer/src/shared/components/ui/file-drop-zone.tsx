@@ -1,6 +1,6 @@
 import { useState, type DragEvent } from 'react'
 import { FileSpreadsheet, UploadCloud, X } from 'lucide-react'
-import { Button } from '@/shared/components/ui'
+import { Button } from './button'
 import { cn } from '@/shared/utils/cn'
 import { formatBytes } from '@/shared/utils'
 

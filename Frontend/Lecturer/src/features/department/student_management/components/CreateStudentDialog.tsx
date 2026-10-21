@@ -68,7 +68,8 @@ export function CreateStudentDialog({
         if (result.code === API_SUCCESS_CODE) toast.success(result.message)
         onOpenChange(false)
       },
-      // 3004 (mã SV / email thuộc tài khoản khác), 3005 (không khớp hồ sơ gốc), 4000, mất mạng:
+      // 3010 (email thuộc tài khoản khác), 3011 (mã SV thuộc tài khoản khác),
+      // 3004 (mã SV và email thuộc 2 tài khoản khác nhau), 3005 (không khớp hồ sơ gốc), 4000, mất mạng:
       // hiện ngay trong form, giữ nguyên dữ liệu để sửa
       onError: (error) => setError('root.server', { message: error.message }),
     })

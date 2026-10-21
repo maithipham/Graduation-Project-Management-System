@@ -44,7 +44,7 @@ export const departmentNavItems: DepartmentNavItem[] = [
     icon: Users,
     children: [
       {
-        to: '/department/lecturers',
+        to: '/department/lecturer-management',
         label: 'Giảng viên',
         icon: UserCheck,
       },

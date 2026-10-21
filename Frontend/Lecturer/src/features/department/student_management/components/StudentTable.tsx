@@ -1,18 +1,19 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import type { SpringPage } from '@/shared/types'
 import {
   Button,
   Skeleton,
+  SortableTableHead,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
+  TablePagination,
   TableRow,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
 import type { StudentListItem, StudentSort, StudentSortField } from '../types'
-import { getNextSort, getPageItems } from '../utils/studentTable'
 import { StudentStatusBadge } from './StudentStatusBadge'
 
 const COLUMN_COUNT = 6
@@ -127,7 +128,7 @@ export function StudentTable({
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-16">STT</TableHead>
               {SORTABLE_COLUMNS.map((column) => (
-                <SortableHead
+                <SortableTableHead
                   key={column.field}
                   label={column.label}
                   field={column.field}
@@ -144,106 +145,12 @@ export function StudentTable({
       </div>
 
       {data && !data.empty && (
-        <Pagination data={data} disabled={isPlaceholderData} onPageChange={onPageChange} />
-      )}
-    </div>
-  )
-}
-
-interface SortableHeadProps {
-  label: string
-  field: StudentSortField
-  sort: StudentSort | undefined
-  onSortChange: (sort: StudentSort | undefined) => void
-  className?: string
-}
-
-function SortableHead({ label, field, sort, onSortChange, className }: SortableHeadProps) {
-  const direction =
-    sort === `${field},asc` ? 'asc' : sort === `${field},desc` ? 'desc' : undefined
-  const Icon = direction === 'asc' ? ArrowUp : direction === 'desc' ? ArrowDown : ArrowUpDown
-
-  return (
-    <TableHead
-      className={className}
-      aria-sort={
-        direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'
-      }
-    >
-      <button
-        type="button"
-        onClick={() => onSortChange(getNextSort(sort, field))}
-        className={cn(
-          '-ml-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-slate-100',
-          direction && 'text-blue-700',
-        )}
-      >
-        {label}
-        <Icon className={cn('h-3.5 w-3.5', direction ? 'text-blue-600' : 'text-slate-400')} />
-      </button>
-    </TableHead>
-  )
-}
-
-interface PaginationProps {
-  data: SpringPage<StudentListItem>
-  disabled: boolean
-  onPageChange: (page: number) => void
-}
-
-function Pagination({ data, disabled, onPageChange }: PaginationProps) {
-  const from = data.number * data.size + 1
-  const to = data.number * data.size + data.numberOfElements
-
-  return (
-    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-      <span>
-        Hiển thị <span className="font-medium text-slate-900">{from}–{to}</span> /{' '}
-        <span className="font-medium text-slate-900">{data.totalElements}</span> sinh viên
-      </span>
-
-      {data.totalPages > 1 && (
-        <nav className="flex items-center gap-1" aria-label="Phân trang">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            disabled={data.first || disabled}
-            onClick={() => onPageChange(data.number - 1)}
-            aria-label="Trang trước"
-          >
-            <ChevronLeft />
-          </Button>
-          {getPageItems(data.number, data.totalPages).map((item, index) =>
-            item === 'ellipsis' ? (
-              <span key={`ellipsis-${index}`} className="px-1.5 text-slate-400">
-                …
-              </span>
-            ) : (
-              <Button
-                key={item}
-                variant={item === data.number ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 min-w-8 px-2"
-                disabled={disabled}
-                onClick={() => onPageChange(item)}
-                aria-current={item === data.number ? 'page' : undefined}
-              >
-                {item + 1}
-              </Button>
-            ),
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            disabled={data.last || disabled}
-            onClick={() => onPageChange(data.number + 1)}
-            aria-label="Trang sau"
-          >
-            <ChevronRight />
-          </Button>
-        </nav>
+        <TablePagination
+          data={data}
+          disabled={isPlaceholderData}
+          onPageChange={onPageChange}
+          itemLabel="sinh viên"
+        />
       )}
     </div>
   )

@@ -1,6 +1,6 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse, SpringPage } from '@/shared/types'
-import { toSpringPage, type RawSpringPage } from '@/shared/utils'
+import { compactParams, toSpringPage, type RawSpringPage } from '@/shared/utils'
 import type {
   MajorOption,
   StudentCreationRequest,
@@ -15,13 +15,6 @@ const STUDENT = API_ENDPOINTS.departmentStudent
 
 // BE đọc file Excel tối đa 50MB, có thể lâu hơn timeout mặc định 30 giây của apiClient
 const IMPORT_TIMEOUT_MS = 5 * 60 * 1000
-
-/** Bỏ các tham số rỗng để URL gọn: không gửi `keyword=` hay `majorId=` */
-function compactParams(params: StudentListParams) {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== ''),
-  )
-}
 
 // Giống một @Service: chỉ gọi API và bóc wrapper ApiResponse, không xử lý giao diện
 export const studentService = {

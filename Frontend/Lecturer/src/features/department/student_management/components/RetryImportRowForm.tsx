@@ -43,7 +43,7 @@ export function RetryImportRowForm({ row, onRowChange, onCancel }: RetryImportRo
         onRowChange(applyRetrySuccess(row, values, result))
       },
       onError: (error) => {
-        // 3004/3005/4000 hoặc mất mạng: hiện ngay trong form, dòng vẫn ở tab Lỗi với lý do mới
+        // 3004/3010/3011/3005/4000 hoặc mất mạng: hiện ngay trong form, dòng vẫn ở tab Lỗi với lý do mới
         setError('root.server', { message: error.message })
         onRowChange(applyRetryError(row, values, error.message))
       },

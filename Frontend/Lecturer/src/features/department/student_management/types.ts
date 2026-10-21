@@ -1,12 +1,12 @@
 // Ánh xạ DTO của module quản lý sinh viên (BE: StudentController, MajorController)
+import type { SortValue } from '@/shared/types'
 
 /** Lọc trạng thái: ACTIVE = đang hoạt động (mặc định), INACTIVE = đã tắt từ kì trước */
 export type StudentStatusFilter = 'ACTIVE' | 'INACTIVE' | 'ALL'
 
 /** Các cột BE cho phép sắp xếp. Cột khác → HTTP 400, code 1008 */
 export type StudentSortField = 'studentCode' | 'name' | 'majorName' | 'className'
-export type SortDirection = 'asc' | 'desc'
-export type StudentSort = `${StudentSortField},${SortDirection}`
+export type StudentSort = SortValue<StudentSortField>
 
 // Một dòng trong GET /student
 export interface StudentListItem {
@@ -39,7 +39,7 @@ export interface StudentListParams {
 // GET /major
 export interface MajorOption {
   publicId: string
-  code: string
+  code: string | null // BE có ngành chưa có mã (null)
   name: string
 }
 

@@ -83,7 +83,7 @@ select:focus-visible {
 }
 
 .brand strong {
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 16px;
 }
 
@@ -113,7 +113,7 @@ select:focus-visible {
   right: 0;
   left: 0;
   height: 12px;
-  content: '';
+  content: "";
 }
 
 .profile-avatar-button {
@@ -129,7 +129,7 @@ select:focus-visible {
 }
 
 .profile-avatar-button:hover,
-.profile-avatar-button[aria-expanded='true'] {
+.profile-avatar-button[aria-expanded="true"] {
   background: #f2f0ff;
 }
 
@@ -296,7 +296,7 @@ p {
 h1,
 h2 {
   color: var(--ink);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
 }
 
 h1 {
@@ -330,7 +330,9 @@ h2 {
   cursor: pointer;
   font-weight: 600;
   padding: 0 19px;
-  transition: background 150ms ease, transform 150ms ease;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
 }
 
 .primary-button:hover {
@@ -398,7 +400,7 @@ h2 {
 
 .summary-card strong {
   color: var(--ink);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 28px;
 }
 
@@ -591,7 +593,9 @@ h2 {
   cursor: pointer;
   font-weight: 600;
   padding: 0 15px;
-  transition: border 150ms ease, background 150ms ease;
+  transition:
+    border 150ms ease,
+    background 150ms ease;
 }
 
 .role-card:hover {
@@ -1280,7 +1284,7 @@ h2 {
   left: 14px;
   width: 1px;
   background: #e5e7eb;
-  content: '';
+  content: "";
 }
 
 .timeline-marker {

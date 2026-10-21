@@ -23,3 +23,8 @@ export interface PageParams {
   size: number
   sort?: string | string[] // dạng "field,asc" hoặc "field,desc"
 }
+
+export type SortDirection = 'asc' | 'desc'
+
+/** Một giá trị `sort` của Spring Pageable cho các cột `F`, ví dụ `'name,asc'` */
+export type SortValue<F extends string> = `${F},${SortDirection}`

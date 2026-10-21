@@ -29,6 +29,16 @@ export const API_ENDPOINTS = {
     import: '/student/import',
     activate: (publicId: string) => `/student/${publicId}/activate`,
   },
+  // Quản lý giáo viên hướng dẫn (Trưởng bộ môn / Admin)
+  departmentTeacher: {
+    // GET: danh sách (Page) · POST: thêm thủ công
+    base: '/teacher',
+    detail: (publicId: string) => `/teacher/${publicId}`,
+    import: '/teacher/import',
+    activate: (publicId: string) => `/teacher/${publicId}/activate`,
+    // PATCH: thiết lập hạn mức sinh viên được nhận
+    amount: (publicId: string) => `/teacher/${publicId}/amount`,
+  },
   major: {
     base: '/major',
   },
