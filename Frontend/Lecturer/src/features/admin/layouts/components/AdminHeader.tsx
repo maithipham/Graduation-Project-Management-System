@@ -159,10 +159,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
             {/* Thông tin tên & Chức danh (ẩn trên màn hình quá nhỏ) */}
             <div className="hidden sm:flex flex-col min-w-0">
-              <span className="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[130px]">
+              <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[130px]">
                 {displayName}
               </span>
-              <span className="text-xs text-slate-500 font-normal leading-tight truncate max-w-[130px] mt-0.5">
+              <span className="text-[10.5px] text-slate-500 font-medium leading-tight truncate max-w-[130px]">
                 {displayTitle}
               </span>
             </div>
@@ -180,10 +180,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
               {/* Header của Profile Dropdown */}
               <div className="px-4 py-3 border-b border-slate-100">
-                <p className="text-sm font-semibold text-slate-900 truncate">
+                <p className="text-xs font-bold text-slate-900 truncate">
                   {displayName}
                 </p>
-                <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-xs font-medium px-2 py-0.5 rounded-md border border-blue-200">
+                <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-[10.5px] font-semibold px-2 py-0.5 rounded-md border border-blue-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1565C0]" />
                   {displayTitle}
                 </div>

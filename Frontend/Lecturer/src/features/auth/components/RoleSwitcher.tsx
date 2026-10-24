@@ -12,10 +12,10 @@ export function RoleSwitcher() {
   const { pathname } = useLocation()
   const { data: user } = useMyInfo()
 
-  if (!user?.roles.includes('HEAD_OF_DEPARTMENT')) return null
+  if (!user?.roles.includes('HEAD_OF_MAJOR')) return null
 
-  const isOnDepartment = pathname.startsWith(roleHomePaths.HEAD_OF_DEPARTMENT)
-  const target = isOnDepartment ? 'LECTURER' : 'HEAD_OF_DEPARTMENT'
+  const isOnDepartment = pathname.startsWith(roleHomePaths.HEAD_OF_MAJOR)
+  const target = isOnDepartment ? 'SUPERVISOR' : 'HEAD_OF_MAJOR'
   const label = `Chuyển sang ${roleLabels[target]}`
 
   return (

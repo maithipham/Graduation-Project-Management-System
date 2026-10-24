@@ -1,7 +1,7 @@
 import { roleHomePaths, type UserRole } from '../types'
 
 // Thứ tự ưu tiên khi chọn trang chủ. Không dùng roles[0]: BE trả Set (HashSet) nên thứ tự không cố định
-const rolePriority: UserRole[] = ['ADMIN', 'HEAD_OF_DEPARTMENT', 'LECTURER']
+const rolePriority: UserRole[] = ['ADMIN', 'HEAD_OF_MAJOR', 'SUPERVISOR']
 
 /**
  * Trang chủ (dashboard) sau khi đăng nhập: ADMIN → /admin, trưởng bộ môn → /department, giảng viên → /lecturer.

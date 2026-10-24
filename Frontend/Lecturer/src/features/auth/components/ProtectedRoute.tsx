@@ -12,7 +12,7 @@ type ProtectedRouteProps = {
 
 /**
  * Chặn route theo role. Đặt bên trong <RequireAuth /> nên lúc này đã có thông tin người dùng.
- * URL quyết định portal đang dùng: trưởng bộ môn có cả LECTURER nên vào thẳng /lecturer/... vẫn được.
+ * URL quyết định portal đang dùng: trưởng bộ môn có cả SUPERVISOR nên vào thẳng /lecturer/... vẫn được.
  */
 export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const { data: user } = useMyInfo()

@@ -89,7 +89,7 @@ Giống hệt Mục 3 của `api_addStudent.md`:
 - Response `{ code, message?, data? }`, `code = 1000` là thành công; dải `11xx` (HTTP 200) là thành công kèm cảnh báo, interceptor tự hiện toast vàng.
 - Lỗi HTTP 4xx/5xx → interceptor đã tự toast đỏ, component **không** `toast.error` lại.
   Form muốn tự hiện lỗi ngay trên form thì gửi `{ skipErrorToast: true }`; muốn tự hiện kết quả `11xx` thì gửi `{ skipWarningToast: true }`.
-- Quyền: mọi API ở đây yêu cầu role `ADMIN` hoặc `HEAD_OF_DEPARTMENT` (`@PreAuthorize` ở `UserServiceImpl`).
+- Quyền: mọi API ở đây yêu cầu role `ADMIN` hoặc `HEAD_OF_MAJOR` (`@PreAuthorize` ở `UserServiceImpl`).
 - Chỉ dùng `publicId` (UUID string), không có `id` số. `publicId` sai định dạng UUID được coi như không tìm thấy (`404 3009`), không ra `500`.
 - Mọi lỗi đều trả body `{ code, message }`, không có `data`. Code `4000` dùng chung cho mọi lỗi dữ liệu nhập, nên FE phân biệt
   từng lỗi bằng `message`, không bằng `code`.
@@ -99,7 +99,7 @@ Giống hệt Mục 3 của `api_addStudent.md`:
 | Trường hợp | HTTP | `code` | Message | FE xử lý |
 | :--- | :--- | :--- | :--- | :--- |
 | Chưa đăng nhập, access token hết hạn hoặc sai | 401 | 2000 | Phiên đăng nhập của bạn đã hết hạn | Interceptor tự gọi `/refresh-token` 1 lần rồi gửi lại request; refresh thất bại → về `/login`, **không** toast |
-| Không phải `ADMIN` / `HEAD_OF_DEPARTMENT` | 403 | 2001 | Bạn không có quyền truy cập (access denied) | Toast đỏ |
+| Không phải `ADMIN` / `HEAD_OF_MAJOR` | 403 | 2001 | Bạn không có quyền truy cập (access denied) | Toast đỏ |
 | Request sai ở tầng Spring (xem danh sách bên dưới) | 400 | 1006 | Yêu cầu không hợp lệ | Toast đỏ |
 | Sai HTTP method, ví dụ `PUT` thay cho `PATCH` | 405 | 1007 | Hệ thống không cấp phép | Toast đỏ |
 | URL không khớp API nào, ví dụ `/teacher/` (thừa dấu `/` ở cuối) | 404 | 1005 | Thông tin không có sẵn | Toast đỏ |

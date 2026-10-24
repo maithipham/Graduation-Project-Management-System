@@ -78,7 +78,7 @@ major: { base: '/major' },
   (tắt bằng `{ skipWarningToast: true }`).
 - Lỗi: HTTP 4xx/5xx kèm `code` nghiệp vụ → interceptor đã tự toast đỏ, component không toast lại.
   Request gọi từ form dùng `{ skipErrorToast: true }` để hiện lỗi ngay trong form.
-- Quyền: mọi API ở đây yêu cầu role `ADMIN` hoặc `HEAD_OF_DEPARTMENT`, không đủ quyền → `403`, `code 2001`.
+- Quyền: mọi API ở đây yêu cầu role `ADMIN` hoặc `HEAD_OF_MAJOR`, không đủ quyền → `403`, `code 2001`.
 - Không expose `id` số, chỉ dùng `publicId` (UUID string).
 
 ---

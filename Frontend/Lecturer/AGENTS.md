@@ -62,9 +62,9 @@ Quy tắc:
    Feature chưa code chỉ có `index.ts` (`export {}`); chỉ tạo các thư mục con `types/ services/ hooks/ components/ pages/ store/`
    khi thực sự cần. Không tạo file placeholder rỗng.
 6. Ưu tiên dùng component sẵn có trong `@/shared/components/ui` trước khi tự viết. Gộp class bằng `cn()` từ `@/shared/utils/cn`.
-7. Role chỉ khai báo ở `@/features/auth`: `UserRole` = `'ADMIN' | 'HEAD_OF_DEPARTMENT' | 'LECTURER'` (đúng chuỗi BE trả về).
+7. Role chỉ khai báo ở `@/features/auth`: `UserRole` = `'ADMIN' | 'HEAD_OF_MAJOR' | 'SUPERVISOR'` (đúng chuỗi BE trả về).
    Người đang đăng nhập: `useMyInfo()` (cache TanStack `['auth','me']`, không có store riêng). Ẩn/hiện theo role: `CanAccess`.
-   Trưởng bộ môn có cả `HEAD_OF_DEPARTMENT` và `LECTURER`; portal đang dùng do URL quyết định (`/department` hay `/lecturer`).
+   Trưởng bộ môn có cả `HEAD_OF_MAJOR` và `SUPERVISOR` (giảng viên); portal đang dùng do URL quyết định (`/department` hay `/lecturer`).
 8. **Feature dùng chung nhiều role** (có nghiệp vụ nên không đặt trong `shared/`) nằm thẳng ở `features/<feature>/`,
    ngoài thư mục role. Hiện chỉ có `auth` và `notification`. Vẫn theo đủ quy tắc trên (cổng `index.ts`, không deep import).
    Feature chỉ một role dùng thì vẫn đặt trong `features/<role>/`; muốn thêm feature dùng chung mới thì hỏi người dùng trước.

@@ -35,10 +35,10 @@ function renderApp(path: string, user?: UserInfo) {
             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin" element={<p>Trang admin</p>} />
             </Route>
-            <Route element={<ProtectedRoute allowedRoles={['HEAD_OF_DEPARTMENT']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['HEAD_OF_MAJOR']} />}>
               <Route path="/department" element={<p>Trang bộ môn</p>} />
             </Route>
-            <Route element={<ProtectedRoute allowedRoles={['LECTURER']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['SUPERVISOR']} />}>
               <Route path="/lecturer" element={<p>Trang giảng viên</p>} />
             </Route>
           </Route>
@@ -55,17 +55,22 @@ afterEach(() => {
 
 describe('RequireAuth + ProtectedRoute', () => {
   it('"/" → chuyển tới dashboard theo role ưu tiên', async () => {
-    renderApp('/', { name: 'An', roles: ['LECTURER', 'HEAD_OF_DEPARTMENT'] })
+    renderApp('/', { name: 'An', roles: ['SUPERVISOR', 'HEAD_OF_MAJOR'] })
     expect(await screen.findByText('Trang bộ môn')).toBeInTheDocument()
   })
 
   it('giảng viên mở /admin → bị đưa về /lecturer', async () => {
-    renderApp('/admin', { name: 'An', roles: ['LECTURER'] })
+    renderApp('/admin', { name: 'An', roles: ['SUPERVISOR'] })
     expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
   })
 
   it('trưởng bộ môn vẫn vào được /lecturer (URL quyết định portal)', async () => {
-    renderApp('/lecturer', { name: 'An', roles: ['HEAD_OF_DEPARTMENT', 'LECTURER'] })
+    renderApp('/lecturer', { name: 'An', roles: ['HEAD_OF_MAJOR', 'SUPERVISOR'] })
+    expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
+  })
+
+  it('giảng viên mở /department → bị đưa về /lecturer', async () => {
+    renderApp('/department', { name: 'An', roles: ['SUPERVISOR'] })
     expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
   })
 
@@ -107,13 +112,22 @@ describe('AuthenticatePage (Google chuyển về /authenticate)', () => {
   })
 
   it('state khớp → gửi code cho BE rồi vào dashboard theo role', async () => {
-    const login = vi.spyOn(authService, 'login').mockResolvedValue({ name: 'An', roles: ['LECTURER'] })
+    const login = vi.spyOn(authService, 'login').mockResolvedValue({ name: 'An', roles: ['SUPERVISOR'] })
     renderApp('/authenticate?code=abc&state=state-123')
 
     expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
     expect(login).toHaveBeenCalledTimes(1)
     expect(login).toHaveBeenCalledWith('abc')
     expect(sessionStorage.getItem('google_oauth_state')).toBeNull()
+  })
+
+  it('trưởng bộ môn (BE trả ["SUPERVISOR", "HEAD_OF_MAJOR"]) → vào /department', async () => {
+    vi.spyOn(authService, 'login').mockResolvedValue({
+      name: 'An',
+      roles: ['SUPERVISOR', 'HEAD_OF_MAJOR'],
+    })
+    renderApp('/authenticate?code=abc&state=state-123')
+    expect(await screen.findByText('Trang bộ môn')).toBeInTheDocument()
   })
 
   it('state không khớp → không gọi BE, về /login kèm lỗi', async () => {

@@ -107,6 +107,6 @@ Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duy�
 - Import sâu vào feature khác (`@/features/admin/x/services/...`) — chỉ qua `index.ts`.
 - Đặt component có tên nghiệp vụ (`SemesterCard`) vào `src/shared/`.
 - Fetch dữ liệu bằng `useEffect + useState` — dùng skill `connect-api`.
-- Tự viết chuỗi role (`'admin'`, `'lecturer'`…) — dùng `UserRole` (`ADMIN`, `HEAD_OF_DEPARTMENT`, `LECTURER`),
+- Tự viết chuỗi role (`'admin'`, `'lecturer'`…) — dùng `UserRole` (`ADMIN`, `HEAD_OF_MAJOR`, `SUPERVISOR`),
   `CanAccess`, `useMyInfo` từ `@/features/auth`. Trang mới không cần tự chặn role: route của portal đã nằm trong `ProtectedRoute`.
 - Tạo đủ 6 thư mục con "cho đúng chuẩn" khi chưa có file đặt vào, hoặc viết mock fallback trong service (`catch { return mock }`).

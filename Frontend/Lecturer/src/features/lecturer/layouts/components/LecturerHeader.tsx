@@ -48,7 +48,7 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
   // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
   const crumbs = getNavBreadcrumbs(lecturerNavItems, location.pathname)
   const displayName = user?.name ?? ''
-  const displayTitle = roleLabels.LECTURER
+  const displayTitle = roleLabels.SUPERVISOR
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">

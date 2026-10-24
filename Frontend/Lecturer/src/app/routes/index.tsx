@@ -28,10 +28,10 @@ const routes: RouteObject[] = [
       { index: true, element: <HomeRedirect /> },
       { element: <ProtectedRoute allowedRoles={['ADMIN']} />, children: [adminRoutes] },
       {
-        element: <ProtectedRoute allowedRoles={['HEAD_OF_DEPARTMENT']} />,
+        element: <ProtectedRoute allowedRoles={['HEAD_OF_MAJOR']} />,
         children: [departmentRoutes],
       },
-      { element: <ProtectedRoute allowedRoles={['LECTURER']} />, children: [lecturerRoutes] },
+      { element: <ProtectedRoute allowedRoles={['SUPERVISOR']} />, children: [lecturerRoutes] },
     ],
   },
   {
