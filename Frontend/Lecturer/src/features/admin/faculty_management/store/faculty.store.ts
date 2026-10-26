@@ -68,7 +68,10 @@ export const useFacultyStore = create<FacultyState>()(
               : 1
             const newMajor: Major = {
               id: nextMajorId,
+              code: values.code ? values.code.toUpperCase().trim() : '',
               name: values.name,
+              headTeacherId: values.headTeacherId ? Number(values.headTeacherId) : null,
+              headFullName: values.headFullName || 'Chưa bổ nhiệm',
               description: values.description || '',
               status: values.status,
             }
@@ -92,7 +95,15 @@ export const useFacultyStore = create<FacultyState>()(
                 m.id === majorId
                   ? {
                       ...m,
+                      code: values.code ? values.code.toUpperCase().trim() : m.code,
                       name: values.name,
+                      headTeacherId:
+                        values.headTeacherId !== undefined
+                          ? values.headTeacherId
+                            ? Number(values.headTeacherId)
+                            : null
+                          : m.headTeacherId,
+                      headFullName: values.headFullName ?? m.headFullName,
                       description: values.description ?? m.description,
                       status: values.status,
                     }

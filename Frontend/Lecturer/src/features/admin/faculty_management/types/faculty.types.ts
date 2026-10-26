@@ -6,9 +6,14 @@ export type FacultyStatus = 'active' | 'inactive'
 export interface Major {
   id: number
   backendId?: string
+  code: string
   name: string
   description: string
   status: FacultyStatus
+  headTeacherId?: number | null
+  headTeacherPublicId?: string | null
+  headAccountId?: number | null
+  headFullName?: string | null
 }
 
 export interface Faculty {
@@ -47,11 +52,18 @@ export const facultySchema = z.object({
 export type FacultyFormValues = z.infer<typeof facultySchema>
 
 export const majorSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, 'Vui lòng nhập mã chuyên ngành')
+    .max(20, 'Mã ngành tối đa 20 ký tự'),
   name: z
     .string()
     .trim()
     .min(1, 'Vui lòng nhập tên chuyên ngành')
     .max(150, 'Tên ngành tối đa 150 ký tự'),
+  headTeacherId: z.string().optional(),
+  headFullName: z.string().optional(),
   description: z
     .string()
     .trim()
@@ -69,10 +81,13 @@ export interface HeadOfDepartmentResponseBE {
 }
 
 export interface HeadCandidateResponseBE {
-  id: number
+  id: number // account id
+  teacherId?: number
+  teacherPublicId?: string
   fullName: string
   email: string
-  academicRank: string // TS., PGS., etc.
+  academicRank?: string // TS., PGS., etc.
+  majorName?: string
 }
 
 export interface FacultyResponseBE {
@@ -95,6 +110,7 @@ export interface FacultyDetailResponseBE {
   description: string
   status: string
   statusCode: ActiveStatusCode
+  majors?: MajorResponseBE[]
 }
 
 export interface FacultyCreationRequestBE {
@@ -116,22 +132,38 @@ export interface FacultyUpdateRequestBE {
 export interface MajorResponseBE {
   id: string
   publicId?: string
+  code?: string
   name: string
   description?: string
+  headTeacherId?: number | null
+  headTeacherPublicId?: string | null
+  headAccountId?: number | null
+  headFullName?: string | null
   status: string
   statusCode: ActiveStatusCode
 }
 
 export interface MajorCreationRequestBE {
+  code: string
   name: string
+  headTeacherId?: number | null
+  headAccountId?: number | null
   description?: string
   status?: ActiveStatusCode
 }
 
 export interface MajorUpdateRequestBE {
+  code: string
   name: string
+  headTeacherId?: number | null
+  headAccountId?: number | null
   description?: string
   status: ActiveStatusCode
+}
+
+export interface MajorHeadRequestBE {
+  teacherId?: number | null
+  accountId?: number | null
 }
 
 export type MajorRequestBE = MajorCreationRequestBE
@@ -169,5 +201,6 @@ export const FACULTY_ERROR_CODES = {
   MAJOR_CANNOT_BE_DELETED: 3014,
   HEAD_OF_DEPARTMENT_NOT_FOUND: 3015,
   ACCOUNT_NOT_HEAD_OF_DEPARTMENT: 3016,
+  MAJOR_CODE_EXIST: 3021,
 } as const
 

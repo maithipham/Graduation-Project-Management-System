@@ -7,6 +7,7 @@ import type {
   FacultyUpdateRequestBE,
   MajorCreationRequestBE,
   MajorUpdateRequestBE,
+  MajorHeadRequestBE,
   FacultyListParams,
   FacultyMajorParams,
 } from '../types/faculty.types'
@@ -132,3 +133,16 @@ export function useDeleteMajor() {
     },
   })
 }
+
+export function useAssignMajorHead() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ majorId, body }: { majorId: string; body: MajorHeadRequestBE }) =>
+      majorService.assignHead(majorId, body),
+    onSuccess: () => {
+      toast.success('Bổ nhiệm Trưởng bộ môn thành công!')
+      queryClient.invalidateQueries({ queryKey: FACULTY_KEYS.all })
+    },
+  })
+}
+

@@ -55,5 +55,6 @@ export const API_ENDPOINTS = {
     semesters: '/semesters',
     faculties: '/faculties',
     majors: '/majors',
+    majorHead: (majorId: string) => `/majors/${majorId}/head`,
   },
 } as const

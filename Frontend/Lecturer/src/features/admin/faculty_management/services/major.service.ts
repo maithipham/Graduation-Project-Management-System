@@ -6,6 +6,7 @@ import type {
   MajorResponseBE,
   MajorCreationRequestBE,
   MajorUpdateRequestBE,
+  MajorHeadRequestBE,
   FacultyMajorParams,
 } from '../types/faculty.types'
 
@@ -67,6 +68,19 @@ export const majorService = {
   update: async (majorId: string, body: MajorUpdateRequestBE) => {
     const res = await apiClient.put<ApiResponse<void>>(
       `${API_ENDPOINTS.admin.majors}/${majorId}`,
+      body,
+      { skipErrorToast: true },
+    )
+    return res.data.data
+  },
+
+  /**
+   * Bổ nhiệm Trưởng bộ môn cho ngành
+   * PUT /majors/{majorId}/head
+   */
+  assignHead: async (majorId: string, body: MajorHeadRequestBE) => {
+    const res = await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.admin.majorHead(majorId),
       body,
       { skipErrorToast: true },
     )

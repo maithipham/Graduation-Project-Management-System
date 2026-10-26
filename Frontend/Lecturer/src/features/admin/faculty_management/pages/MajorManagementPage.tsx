@@ -134,6 +134,7 @@ export default function MajorManagementPage() {
     if (!selectedFacultyId) return
     const faculty = faculties.find((f) => f.id === selectedFacultyId)
     const facultyUuid = faculty?.backendId || apiFaculties?.content[selectedFacultyId - 1]?.id
+    const headTeacherIdNum = values.headTeacherId ? Number(values.headTeacherId) : null
 
     if (id) {
       updateMajor(selectedFacultyId, id, values)
@@ -142,7 +143,9 @@ export default function MajorManagementPage() {
         await updateMajorMutation.mutateAsync({
           majorId: majorUuid,
           body: {
+            code: values.code,
             name: values.name,
+            headTeacherId: headTeacherIdNum,
             description: values.description,
             status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
           },
@@ -154,7 +157,9 @@ export default function MajorManagementPage() {
         await addMajorMutation.mutateAsync({
           facultyId: facultyUuid,
           body: {
+            code: values.code,
             name: values.name,
+            headTeacherId: headTeacherIdNum,
             description: values.description,
             status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
           },
@@ -197,6 +202,7 @@ export default function MajorManagementPage() {
         onOpenChange={setIsMajorFormOpen}
         facultyName={selectedFaculty?.name || ''}
         editingMajor={editingMajor}
+        existingMajors={selectedFaculty?.majors || []}
         onSubmitSuccess={handleMajorFormSubmit}
       />
     </div>

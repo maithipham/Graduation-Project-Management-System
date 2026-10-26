@@ -71,13 +71,19 @@ export const facultyService = {
   },
 
   /**
-   * Lấy danh sách giảng viên ứng cử trưởng khoa
+   * Lấy danh sách giảng viên ứng cử trưởng bộ môn / khoa
    */
   getHeadCandidates: async () => {
-    const res = await apiClient.get<ApiResponse<HeadCandidateResponseBE[]>>(
-      `${API_ENDPOINTS.admin.faculties}/head-candidates`,
-    )
-    return res.data.data
+    try {
+      const res = await apiClient.get<ApiResponse<HeadCandidateResponseBE[]>>(
+        `${API_ENDPOINTS.admin.faculties}/head-candidates`,
+        { skipErrorToast: true },
+      )
+      return res.data?.data || []
+    } catch {
+      // Backend có thể chưa khởi động lại hoặc chưa nạp endpoint, fallback danh sách rỗng
+      return []
+    }
   },
 
   /**

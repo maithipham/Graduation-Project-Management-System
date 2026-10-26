@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table'
-import { useFacultyMajors } from '../hooks/useFaculties'
+import { useFacultyMajors, useFacultyDetail } from '../hooks/useFaculties'
 import type { Faculty, Major } from '../types/faculty.types'
 
 const PAGE_SIZE = 10
@@ -43,24 +43,48 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
   const [selectedStatus, setSelectedStatus] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
-  // Gọi API lấy danh sách chuyên ngành thực tế từ DB của khoa này
+  // Gọi API lấy thông tin chi tiết khoa và danh sách chuyên ngành
   const facultyApiId = faculty.backendId || String(faculty.id)
+  const { data: facultyDetail } = useFacultyDetail(facultyApiId)
   const { data: apiMajorsData, isLoading: isLoadingMajors } = useFacultyMajors(facultyApiId)
 
-  // Kết hợp: Ưu tiên dữ liệu từ backend DB
+  // Kết hợp: Ưu tiên dữ liệu từ backend DB (từ endpoint majors phân trang hoặc từ facultyDetail)
   const majors: Major[] = useMemo(() => {
     if (apiMajorsData?.content && apiMajorsData.content.length > 0) {
       return apiMajorsData.content.map((m, idx) => ({
         id: idx + 1,
-        backendId: m.id,
+        backendId: m.id || m.publicId,
+        code: m.code || '—',
         name: m.name,
         description: m.description || '',
+        headTeacherId: m.headTeacherId,
+        headTeacherPublicId: m.headTeacherPublicId,
+        headAccountId: m.headAccountId,
+        headFullName: m.headFullName || 'Chưa bổ nhiệm',
+        status: m.statusCode === 'ACTIVE' ? 'active' : 'inactive',
+      }))
+    }
+    if (facultyDetail?.majors && facultyDetail.majors.length > 0) {
+      return facultyDetail.majors.map((m, idx) => ({
+        id: idx + 1,
+        backendId: m.id || m.publicId,
+        code: m.code || '—',
+        name: m.name,
+        description: m.description || '',
+        headTeacherId: m.headTeacherId,
+        headTeacherPublicId: m.headTeacherPublicId,
+        headAccountId: m.headAccountId,
+        headFullName: m.headFullName || 'Chưa bổ nhiệm',
         status: m.statusCode === 'ACTIVE' ? 'active' : 'inactive',
       }))
     }
     // Nếu khoa chưa có trên API, lấy từ local store của khoa
-    return faculty.majors || []
-  }, [apiMajorsData, faculty.majors])
+    return (faculty.majors || []).map((m) => ({
+      ...m,
+      code: m.code || '—',
+      headFullName: m.headFullName || 'Chưa bổ nhiệm',
+    }))
+  }, [apiMajorsData, facultyDetail, faculty.majors])
 
   const filteredMajors = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
@@ -68,6 +92,8 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
       const matchSearch =
         !term ||
         m.name.toLowerCase().includes(term) ||
+        m.code.toLowerCase().includes(term) ||
+        (m.headFullName && m.headFullName.toLowerCase().includes(term)) ||
         m.description.toLowerCase().includes(term)
 
       const matchStatus = !selectedStatus || m.status === selectedStatus
@@ -169,7 +195,7 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   type="search"
-                  placeholder="Tìm theo tên hoặc mô tả ngành..."
+                  placeholder="Tìm theo mã ngành, tên ngành, trưởng bộ môn..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 pr-8 h-10 w-full bg-slate-50/70 border-slate-200 focus:bg-white"
@@ -225,8 +251,14 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
               <TableHead className="w-14 text-center font-bold text-slate-600 text-xs uppercase">
                 No.
               </TableHead>
+              <TableHead className="w-28 font-bold text-slate-600 text-xs uppercase">
+                Mã ngành
+              </TableHead>
               <TableHead className="w-56 font-bold text-slate-600 text-xs uppercase">
                 Tên ngành
+              </TableHead>
+              <TableHead className="w-52 font-bold text-slate-600 text-xs uppercase">
+                Trưởng bộ môn
               </TableHead>
               <TableHead className="font-bold text-slate-600 text-xs uppercase">
                 Chi tiết về ngành
@@ -243,13 +275,13 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
           <TableBody>
             {isLoadingMajors ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-slate-500 text-sm">
+                <TableCell colSpan={7} className="h-32 text-center text-slate-500 text-sm">
                   Đang tải danh sách chuyên ngành từ cơ sở dữ liệu...
                 </TableCell>
               </TableRow>
             ) : filteredMajors.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-slate-400 text-sm">
+                <TableCell colSpan={7} className="h-32 text-center text-slate-400 text-sm">
                   Chưa có chuyên ngành nào trong cơ sở dữ liệu.
                 </TableCell>
               </TableRow>
@@ -261,14 +293,40 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
                   </TableCell>
 
                   <TableCell>
+                    <span className="font-bold font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-200">
+                      {major.code || '—'}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
                     <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                       <BookOpen className="h-4 w-4 text-blue-600 shrink-0" />
                       <span>{major.name}</span>
                     </div>
                   </TableCell>
 
+                  <TableCell>
+                    {major.headFullName && major.headFullName !== 'Chưa bổ nhiệm' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 ring-1 ring-blue-200">
+                          {major.headFullName.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-semibold text-slate-800 text-xs block truncate" title={major.headFullName}>
+                            {major.headFullName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">Trưởng bộ môn</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center text-xs text-slate-400 italic">
+                        Chưa bổ nhiệm
+                      </span>
+                    )}
+                  </TableCell>
+
                   <TableCell className="text-slate-600 text-xs leading-relaxed max-w-md">
-                    {major.description}
+                    {major.description || '—'}
                   </TableCell>
 
                   <TableCell>
