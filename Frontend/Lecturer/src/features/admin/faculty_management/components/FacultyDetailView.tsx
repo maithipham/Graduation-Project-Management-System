@@ -52,6 +52,7 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
     if (apiMajorsData?.content && apiMajorsData.content.length > 0) {
       return apiMajorsData.content.map((m, idx) => ({
         id: idx + 1,
+        backendId: m.id,
         name: m.name,
         description: m.description || '',
         status: m.statusCode === 'ACTIVE' ? 'active' : 'inactive',

@@ -14,8 +14,10 @@ import { Input } from '@/shared/components/ui/input'
 import { Textarea } from '@/shared/components/ui/textarea'
 import { Button } from '@/shared/components/ui/button'
 import { toast } from '@/shared/components/feedback/toast.store'
+import { isApiError } from '@/shared/types'
 import {
   majorSchema,
+  FACULTY_ERROR_CODES,
   type Major,
   type MajorFormValues,
 } from '../types/faculty.types'
@@ -25,7 +27,7 @@ interface MajorFormDialogProps {
   onOpenChange: (open: boolean) => void
   facultyName: string
   editingMajor: Major | null
-  onSubmitSuccess: (values: MajorFormValues, id?: number) => void
+  onSubmitSuccess: (values: MajorFormValues, id?: number) => Promise<unknown> | unknown
 }
 
 const emptyValues: MajorFormValues = {
@@ -68,19 +70,26 @@ export const MajorFormDialog: React.FC<MajorFormDialogProps> = ({
     }
   }, [open, editingMajor, reset])
 
-  const onSubmit = (values: MajorFormValues) => {
+  const onSubmit = async (values: MajorFormValues) => {
     try {
-      onSubmitSuccess(values, editingMajor?.id)
+      await onSubmitSuccess(values, editingMajor?.id)
       toast.success(
         isEdit
           ? 'Cập nhật chuyên ngành thành công!'
           : 'Thêm chuyên ngành mới thành công!',
       )
       onOpenChange(false)
-    } catch {
-      setError('root.server', {
-        message: 'Đã có lỗi xảy ra khi lưu thông tin chuyên ngành.',
-      })
+    } catch (err: unknown) {
+      if (isApiError(err)) {
+        if (err.code === FACULTY_ERROR_CODES.MAJOR_NAME_EXIST_IN_FACULTY) {
+          setError('name', { message: err.message }, { shouldFocus: true })
+          return
+        }
+        setError('root.server', { message: err.message })
+        return
+      }
+      const msg = err instanceof Error ? err.message : 'Đã có lỗi xảy ra khi lưu thông tin chuyên ngành.'
+      setError('root.server', { message: msg })
     }
   }
 

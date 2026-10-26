@@ -1,16 +1,14 @@
 import React from 'react'
-import { UserPlus, CalendarPlus, Building } from 'lucide-react'
+import { UserPlus, Building } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 
 interface OverviewBannerProps {
   onQuickAddAccount: () => void
-  onQuickAddSemester: () => void
   onQuickAddFaculty: () => void
 }
 
 export const OverviewBanner: React.FC<OverviewBannerProps> = ({
   onQuickAddAccount,
-  onQuickAddSemester,
   onQuickAddFaculty,
 }) => {
   return (
@@ -38,16 +36,6 @@ export const OverviewBanner: React.FC<OverviewBannerProps> = ({
           >
             <UserPlus className="h-4 w-4 text-blue-700" />
             <span>Thêm tài khoản</span>
-          </Button>
-
-          <Button
-            type="button"
-            onClick={onQuickAddSemester}
-            variant="outline"
-            className="h-10 bg-white/10 hover:bg-white/20 text-white border-white/25 font-semibold text-xs gap-1.5 backdrop-blur-xs"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            <span>Thêm học kỳ</span>
           </Button>
 
           <Button

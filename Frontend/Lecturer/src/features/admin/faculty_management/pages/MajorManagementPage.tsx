@@ -6,6 +6,7 @@ import {
   useCreateFaculty,
   useUpdateFaculty,
   useAddMajorToFaculty,
+  useUpdateMajor,
 } from '../hooks/useFaculties'
 import { FacultyListView } from '../components/FacultyListView'
 import { FacultyDetailView } from '../components/FacultyDetailView'
@@ -48,6 +49,7 @@ export default function MajorManagementPage() {
   const createFacultyMutation = useCreateFaculty()
   const updateFacultyMutation = useUpdateFaculty()
   const addMajorMutation = useAddMajorToFaculty()
+  const updateMajorMutation = useUpdateMajor()
 
   // Đồng bộ hoặc fallback
   const faculties: Faculty[] = useMemo(() => {
@@ -61,6 +63,7 @@ export default function MajorManagementPage() {
         description: `Khoa ${f.name}`,
         status: f.statusCode === 'ACTIVE' ? 'active' : 'inactive',
         majors: [],
+        totalMajors: f.totalMajors,
       }))
     }
     return localFaculties
@@ -89,14 +92,17 @@ export default function MajorManagementPage() {
   const handleFacultyFormSubmit = async (values: FacultyFormValues, id?: number) => {
     if (id) {
       updateFaculty(id, values)
-      const matched = apiFaculties?.content[id - 1]
-      if (matched?.id) {
+      const target = editingFaculty?.backendId
+        ? editingFaculty
+        : faculties.find((f) => f.id === id)
+      const uuid = target?.backendId || apiFaculties?.content[id - 1]?.id
+      if (uuid) {
         await updateFacultyMutation.mutateAsync({
-          id: matched.id,
+          id: uuid,
           body: {
             code: values.code,
             name: values.name,
-            headOfDepartmentId: values.headOfDepartmentId ? Number(values.headOfDepartmentId) : undefined,
+            headOfDepartmentId: values.headOfDepartmentId ? Number(values.headOfDepartmentId) : null,
             description: values.description,
             status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
           },
@@ -107,7 +113,7 @@ export default function MajorManagementPage() {
       await createFacultyMutation.mutateAsync({
         code: values.code,
         name: values.name,
-        headOfDepartmentId: values.headOfDepartmentId ? Number(values.headOfDepartmentId) : undefined,
+        headOfDepartmentId: values.headOfDepartmentId ? Number(values.headOfDepartmentId) : null,
         description: values.description,
         status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
       })
@@ -126,25 +132,34 @@ export default function MajorManagementPage() {
 
   const handleMajorFormSubmit = async (values: MajorFormValues, id?: number) => {
     if (!selectedFacultyId) return
-    try {
-      if (id) {
-        updateMajor(selectedFacultyId, id, values)
-      } else {
-        addMajor(selectedFacultyId, values)
-        const matchedFaculty = apiFaculties?.content[selectedFacultyId - 1]
-        if (matchedFaculty?.id) {
-          await addMajorMutation.mutateAsync({
-            facultyId: matchedFaculty.id,
-            body: {
-              name: values.name,
-              description: values.description,
-              status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
-            },
-          })
-        }
+    const faculty = faculties.find((f) => f.id === selectedFacultyId)
+    const facultyUuid = faculty?.backendId || apiFaculties?.content[selectedFacultyId - 1]?.id
+
+    if (id) {
+      updateMajor(selectedFacultyId, id, values)
+      const majorUuid = editingMajor?.backendId
+      if (majorUuid) {
+        await updateMajorMutation.mutateAsync({
+          majorId: majorUuid,
+          body: {
+            name: values.name,
+            description: values.description,
+            status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
+          },
+        })
       }
-    } catch {
-      // Fallback local store đã được update
+    } else {
+      addMajor(selectedFacultyId, values)
+      if (facultyUuid) {
+        await addMajorMutation.mutateAsync({
+          facultyId: facultyUuid,
+          body: {
+            name: values.name,
+            description: values.description,
+            status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
+          },
+        })
+      }
     }
   }
 

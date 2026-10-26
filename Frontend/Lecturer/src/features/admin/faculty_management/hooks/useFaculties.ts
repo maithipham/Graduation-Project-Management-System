@@ -1,27 +1,33 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { facultyService } from '../services/faculty.service'
 import { majorService } from '../services/major.service'
 import type {
   FacultyCreationRequestBE,
   FacultyUpdateRequestBE,
-  MajorRequestBE,
+  MajorCreationRequestBE,
+  MajorUpdateRequestBE,
+  FacultyListParams,
+  FacultyMajorParams,
 } from '../types/faculty.types'
 
 export const FACULTY_KEYS = {
   all: ['admin', 'faculties'] as const,
-  list: (params?: { page?: number; size?: number; keyword?: string }) =>
+  list: (params?: FacultyListParams) =>
     [...FACULTY_KEYS.all, 'list', params] as const,
   detail: (id: string) => [...FACULTY_KEYS.all, 'detail', id] as const,
   headCandidates: () => [...FACULTY_KEYS.all, 'head-candidates'] as const,
-  majors: (facultyId: string) => [...FACULTY_KEYS.all, 'majors', facultyId] as const,
+  majors: (facultyId: string, params?: FacultyMajorParams) =>
+    [...FACULTY_KEYS.all, 'majors', facultyId, params] as const,
+  allMajors: () => ['admin', 'majors', 'all'] as const,
 }
 
-export function useFaculties(params?: { page?: number; size?: number; keyword?: string }) {
+export function useFaculties(params?: FacultyListParams) {
   return useQuery({
     queryKey: FACULTY_KEYS.list(params),
     queryFn: () => facultyService.getAll(params),
-    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -37,15 +43,24 @@ export function useHeadCandidates() {
   return useQuery({
     queryKey: FACULTY_KEYS.headCandidates(),
     queryFn: () => facultyService.getHeadCandidates(),
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
-export function useFacultyMajors(facultyId: string) {
+export function useFacultyMajors(facultyId: string, params?: FacultyMajorParams) {
   return useQuery({
-    queryKey: FACULTY_KEYS.majors(facultyId),
-    queryFn: () => majorService.getByFaculty(facultyId),
+    queryKey: FACULTY_KEYS.majors(facultyId, params),
+    queryFn: () => majorService.getByFaculty(facultyId, params),
     enabled: Boolean(facultyId),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useAllMajors() {
+  return useQuery({
+    queryKey: FACULTY_KEYS.allMajors(),
+    queryFn: () => majorService.getAllMajors(),
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -86,7 +101,7 @@ export function useDeleteFaculty() {
 export function useAddMajorToFaculty() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ facultyId, body }: { facultyId: string; body: MajorRequestBE }) =>
+    mutationFn: ({ facultyId, body }: { facultyId: string; body: MajorCreationRequestBE }) =>
       majorService.create(facultyId, body),
     onSuccess: () => {
       toast.success('Thêm chuyên ngành thành công!')
@@ -98,7 +113,7 @@ export function useAddMajorToFaculty() {
 export function useUpdateMajor() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ majorId, body }: { majorId: string; body: MajorRequestBE }) =>
+    mutationFn: ({ majorId, body }: { majorId: string; body: MajorUpdateRequestBE }) =>
       majorService.update(majorId, body),
     onSuccess: () => {
       toast.success('Cập nhật chuyên ngành thành công!')

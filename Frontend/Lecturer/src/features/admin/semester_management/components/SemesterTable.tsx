@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { MoreVertical, Edit2, PlayCircle } from 'lucide-react'
+import React from 'react'
+import { Edit2 } from 'lucide-react'
+import { Button } from '@/shared/components/ui/button'
 import {
   Table,
   TableBody,
@@ -14,27 +15,12 @@ import type { Semester } from '../types/semester.types'
 interface SemesterTableProps {
   semesters: Semester[]
   onEditSemester: (semester: Semester) => void
-  onActivateSemester: (semester: Semester) => void
 }
 
 export const SemesterTable: React.FC<SemesterTableProps> = ({
   semesters,
   onEditSemester,
-  onActivateSemester,
 }) => {
-  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpenDropdownId(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   const getStatusBadge = (status: Semester['status']) => {
     switch (status) {
       case 'active':
@@ -62,7 +48,7 @@ export const SemesterTable: React.FC<SemesterTableProps> = ({
   }
 
   return (
-    <div className="relative overflow-visible" ref={dropdownRef}>
+    <div className="relative overflow-visible">
       <Table containerClassName="overflow-visible">
         <TableHeader>
           <TableRow className="bg-slate-50/80">
@@ -81,7 +67,7 @@ export const SemesterTable: React.FC<SemesterTableProps> = ({
             <TableHead className="font-bold text-slate-600 text-xs uppercase">
               Trạng thái
             </TableHead>
-            <TableHead className="w-20 text-center font-bold text-slate-600 text-xs uppercase whitespace-nowrap">
+            <TableHead className="w-28 text-center font-bold text-slate-600 text-xs uppercase whitespace-nowrap">
               Hành động
             </TableHead>
           </TableRow>
@@ -95,102 +81,51 @@ export const SemesterTable: React.FC<SemesterTableProps> = ({
               </TableCell>
             </TableRow>
           ) : (
-            semesters.map((semester, idx) => {
-              const isMenuOpen = openDropdownId === semester.id
-              const isUpcoming = semester.status === 'upcoming'
+            semesters.map((semester, idx) => (
+              <TableRow
+                key={semester.id}
+                className="hover:bg-slate-50/80 transition-colors"
+              >
+                <TableCell className="text-center font-medium text-slate-500 text-xs">
+                  {idx + 1}
+                </TableCell>
 
-              return (
-                <TableRow
-                  key={semester.id}
-                  className="hover:bg-slate-50/80 transition-colors"
-                >
-                  <TableCell className="text-center font-medium text-slate-500 text-xs">
-                    {idx + 1}
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                      <span>{semester.name}</span>
-                      {semester.status === 'active' && (
-                        <span className="text-[10px] font-semibold bg-blue-600 text-white px-2 py-0.5 rounded-full ml-1">
-                          Hiện tại
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="text-slate-600 text-sm">
-                    {formatDate(semester.startDate)}
-                  </TableCell>
-
-                  <TableCell className="text-slate-600 text-sm">
-                    {formatDate(semester.endDate)}
-                  </TableCell>
-
-                  <TableCell>{getStatusBadge(semester.status)}</TableCell>
-
-                  <TableCell className="text-center relative">
-                    {isUpcoming ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenDropdownId(isMenuOpen ? null : semester.id)
-                          }
-                          className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-                          aria-label="Thao tác học kỳ"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-
-                        {isMenuOpen && (
-                          <div
-                            className={`absolute right-4 z-50 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in-0 zoom-in-95 text-left ${
-                              idx >= Math.max(0, semesters.length - 2)
-                                ? 'bottom-8 origin-bottom-right'
-                                : 'top-10 origin-top-right'
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenDropdownId(null)
-                                onEditSemester(semester)
-                              }}
-                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 cursor-pointer whitespace-nowrap"
-                            >
-                              <Edit2 className="h-3.5 w-3.5 text-blue-600" />
-                              <span>Sửa thông tin</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenDropdownId(null)
-                                onActivateSemester(semester)
-                              }}
-                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 cursor-pointer whitespace-nowrap"
-                            >
-                              <PlayCircle className="h-3.5 w-3.5 text-emerald-600" />
-                              <span>Kích hoạt học kỳ</span>
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="p-1.5 text-slate-300 cursor-not-allowed"
-                        title="Học kỳ đã bắt đầu hoặc đã kết thúc không thể chỉnh sửa"
-                      >
-                        <MoreVertical className="h-4 w-4 opacity-40" />
-                      </button>
+                <TableCell>
+                  <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                    <span>{semester.name}</span>
+                    {semester.status === 'active' && (
+                      <span className="text-[10px] font-semibold bg-blue-600 text-white px-2 py-0.5 rounded-full ml-1">
+                        Hiện tại
+                      </span>
                     )}
-                  </TableCell>
-                </TableRow>
-              )
-            })
+                  </div>
+                </TableCell>
+
+                <TableCell className="text-slate-600 text-sm">
+                  {formatDate(semester.startDate) || semester.startDate || '—'}
+                </TableCell>
+
+                <TableCell className="text-slate-600 text-sm">
+                  {formatDate(semester.endDate) || semester.endDate || '—'}
+                </TableCell>
+
+                <TableCell>{getStatusBadge(semester.status)}</TableCell>
+
+                <TableCell className="text-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEditSemester(semester)}
+                    className="h-8 px-2.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1.5 rounded-lg cursor-pointer"
+                    title="Chỉnh sửa khoảng thời gian học kỳ"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                    <span>Sửa thời gian</span>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
           )}
         </TableBody>
       </Table>

@@ -5,6 +5,7 @@ export type FacultyStatus = 'active' | 'inactive'
 
 export interface Major {
   id: number
+  backendId?: string
   name: string
   description: string
   status: FacultyStatus
@@ -19,6 +20,7 @@ export interface Faculty {
   description: string
   status: FacultyStatus
   majors: Major[]
+  totalMajors?: number
 }
 
 export const facultySchema = z.object({
@@ -98,7 +100,7 @@ export interface FacultyDetailResponseBE {
 export interface FacultyCreationRequestBE {
   code: string
   name: string
-  headOfDepartmentId?: number
+  headOfDepartmentId?: number | null
   description?: string
   status?: ActiveStatusCode
 }
@@ -106,7 +108,7 @@ export interface FacultyCreationRequestBE {
 export interface FacultyUpdateRequestBE {
   code: string
   name: string
-  headOfDepartmentId?: number
+  headOfDepartmentId?: number | null
   description?: string
   status: ActiveStatusCode
 }
@@ -120,9 +122,52 @@ export interface MajorResponseBE {
   statusCode: ActiveStatusCode
 }
 
-export interface MajorRequestBE {
+export interface MajorCreationRequestBE {
   name: string
   description?: string
   status?: ActiveStatusCode
 }
+
+export interface MajorUpdateRequestBE {
+  name: string
+  description?: string
+  status: ActiveStatusCode
+}
+
+export type MajorRequestBE = MajorCreationRequestBE
+
+export interface FacultyListParams {
+  keyword?: string
+  status?: string
+  page?: number
+  size?: number
+  sortBy?: 'code' | 'name' | 'headOfDepartment' | 'status' | 'id' | 'createdAt'
+  sortDir?: 'ASC' | 'DESC' | 'asc' | 'desc'
+}
+
+export interface FacultyMajorParams {
+  keyword?: string
+  status?: string
+  page?: number
+  size?: number
+  sortBy?: 'name' | 'status' | 'id' | 'createdAt'
+  sortDir?: 'ASC' | 'DESC' | 'asc' | 'desc'
+}
+
+export const FACULTY_ERROR_CODES = {
+  FACULTY_CODE_EMPTY: 4000,
+  FACULTY_NAME_EMPTY: 4000,
+  FACULTY_STATUS_NULL: 4000,
+  MAJOR_NAME_EMPTY: 4000,
+  MAJOR_STATUS_NULL: 4000,
+  FACULTY_NOT_FOUND: 3008,
+  FACULTY_CODE_EXIST: 3009,
+  FACULTY_NAME_EXIST: 3010,
+  MAJOR_NAME_EXIST_IN_FACULTY: 3011,
+  FACULTY_CANNOT_BE_DEACTIVATED: 3012,
+  FACULTY_CANNOT_BE_DELETED: 3013,
+  MAJOR_CANNOT_BE_DELETED: 3014,
+  HEAD_OF_DEPARTMENT_NOT_FOUND: 3015,
+  ACCOUNT_NOT_HEAD_OF_DEPARTMENT: 3016,
+} as const
 

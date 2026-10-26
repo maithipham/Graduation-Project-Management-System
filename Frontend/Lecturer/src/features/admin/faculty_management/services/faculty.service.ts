@@ -8,13 +8,17 @@ import type {
   FacultyCreationRequestBE,
   FacultyUpdateRequestBE,
   HeadCandidateResponseBE,
+  MajorResponseBE,
+  MajorCreationRequestBE,
+  FacultyListParams,
+  FacultyMajorParams,
 } from '../types/faculty.types'
 
 export const facultyService = {
   /**
-   * Lấy danh sách khoa có phân trang và tìm kiếm
+   * Lấy danh sách khoa có phân trang, tìm kiếm và sắp xếp
    */
-  getAll: async (params?: { page?: number; size?: number; keyword?: string }) => {
+  getAll: async (params?: FacultyListParams) => {
     const res = await apiClient.get<ApiResponse<PageResponseBE<FacultyResponseBE>>>(
       API_ENDPOINTS.admin.faculties,
       { params },
@@ -33,23 +37,25 @@ export const facultyService = {
   },
 
   /**
-   * Tạo khoa mới
+   * Tạo khoa mới - skipErrorToast để form tự hiển thị lỗi
    */
   create: async (body: FacultyCreationRequestBE) => {
     const res = await apiClient.post<ApiResponse<void>>(
       API_ENDPOINTS.admin.faculties,
       body,
+      { skipErrorToast: true },
     )
     return res.data.data
   },
 
   /**
-   * Cập nhật thông tin khoa
+   * Cập nhật thông tin khoa - skipErrorToast để form tự hiển thị lỗi
    */
   update: async (id: string, body: FacultyUpdateRequestBE) => {
     const res = await apiClient.put<ApiResponse<void>>(
       `${API_ENDPOINTS.admin.faculties}/${id}`,
       body,
+      { skipErrorToast: true },
     )
     return res.data.data
   },
@@ -70,6 +76,29 @@ export const facultyService = {
   getHeadCandidates: async () => {
     const res = await apiClient.get<ApiResponse<HeadCandidateResponseBE[]>>(
       `${API_ENDPOINTS.admin.faculties}/head-candidates`,
+    )
+    return res.data.data
+  },
+
+  /**
+   * Lấy danh sách ngành theo khoa từ endpoint GET /{id}/majors
+   */
+  getMajorsByFaculty: async (facultyId: string, params?: FacultyMajorParams) => {
+    const res = await apiClient.get<ApiResponse<PageResponseBE<MajorResponseBE>>>(
+      `${API_ENDPOINTS.admin.faculties}/${facultyId}/majors`,
+      { params },
+    )
+    return res.data.data
+  },
+
+  /**
+   * Thêm ngành mới vào khoa từ endpoint POST /{id}/majors
+   */
+  addMajor: async (facultyId: string, body: MajorCreationRequestBE) => {
+    const res = await apiClient.post<ApiResponse<void>>(
+      `${API_ENDPOINTS.admin.faculties}/${facultyId}/majors`,
+      body,
+      { skipErrorToast: true },
     )
     return res.data.data
   },

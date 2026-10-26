@@ -1,5 +1,5 @@
 import React from 'react'
-import { Search, Plus, X } from 'lucide-react'
+import { Search, X, CalendarRange } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Select } from '@/shared/components/ui/select'
@@ -10,7 +10,7 @@ interface SemesterFilterToolbarProps {
   selectedStatus: string
   onStatusChange: (status: string) => void
   totalCount: number
-  onOpenAddModal: () => void
+  onOpenConfigModal?: () => void
   onExportCsv?: () => void
 }
 
@@ -20,7 +20,7 @@ export const SemesterFilterToolbar: React.FC<SemesterFilterToolbarProps> = ({
   selectedStatus,
   onStatusChange,
   totalCount,
-  onOpenAddModal,
+  onOpenConfigModal,
 }) => {
   return (
     <div className="flex flex-col gap-3 p-4 bg-white border-b border-slate-200">
@@ -61,16 +61,20 @@ export const SemesterFilterToolbar: React.FC<SemesterFilterToolbarProps> = ({
           </Select>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Button: Config */}
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            onClick={onOpenAddModal}
-            className="h-10 bg-[#1565C0] hover:bg-[#0D47A1] text-white text-sm font-semibold gap-1.5 shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Thêm học kỳ</span>
-          </Button>
+          {onOpenConfigModal && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onOpenConfigModal}
+              className="h-10 text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border-slate-200 text-xs font-semibold gap-1.5 shadow-xs"
+              title="Cấu hình khung thời gian chuẩn áp dụng cho tất cả các năm sau"
+            >
+              <CalendarRange className="h-3.5 w-3.5 text-blue-600" />
+              <span>Khung thời gian chuẩn</span>
+            </Button>
+          )}
         </div>
       </div>
 

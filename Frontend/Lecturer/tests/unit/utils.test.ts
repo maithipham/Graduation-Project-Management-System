@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkScoreOutlier, compactParams, formatBytes, formatDate, getNextSort } from '@/shared/utils'
+import { checkScoreOutlier, compactParams, formatBytes, formatDate, formatDateForInput, getNextSort } from '@/shared/utils'
 
 describe('Shared Utilities', () => {
   it('formatBytes formats file sizes correctly', () => {
@@ -13,6 +13,24 @@ describe('Shared Utilities', () => {
     const formatted = formatDate(date, 'short')
     expect(formatted).toContain('18')
     expect(formatted).toContain('2026')
+  })
+
+  it('formatDate correctly parses and formats dd-MM-yyyy and other formats', () => {
+    expect(formatDate('20-10-2026')).toContain('20')
+    expect(formatDate('20-10-2026')).toContain('2026')
+    expect(formatDate('15/08/2024')).toContain('15')
+    expect(formatDate('2024-08-15')).toContain('15')
+    expect(formatDate([2024, 8, 15])).toContain('15')
+    expect(formatDate('')).toBe('')
+    expect(formatDate(null as any)).toBe('')
+  })
+
+  it('formatDateForInput converts dates to YYYY-MM-DD for HTML input', () => {
+    expect(formatDateForInput('20-10-2026')).toBe('2026-10-20')
+    expect(formatDateForInput('15/08/2024')).toBe('2024-08-15')
+    expect(formatDateForInput('2024-08-15')).toBe('2024-08-15')
+    expect(formatDateForInput([2024, 8, 15])).toBe('2024-08-15')
+    expect(formatDateForInput('')).toBe('')
   })
 
   it('checkScoreOutlier detects outlier scores (> 2.0 difference)', () => {

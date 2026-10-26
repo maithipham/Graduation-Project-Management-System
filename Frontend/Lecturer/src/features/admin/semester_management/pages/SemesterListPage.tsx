@@ -2,16 +2,15 @@ import { useState, useMemo } from 'react'
 import { Card } from '@/shared/components/ui/card'
 import { Button } from '@/shared/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { toast } from '@/shared/components/feedback/toast.store'
 import { useSemesterStore } from '../store/semester.store'
 import {
   useSemesters,
-  useCreateSemester,
   useUpdateSemester,
 } from '../hooks/useSemesters'
 import { SemesterFilterToolbar } from '../components/SemesterFilterToolbar'
 import { SemesterTable } from '../components/SemesterTable'
 import { SemesterFormDialog } from '../components/SemesterFormDialog'
+import { SemesterConfigDialog } from '../components/SemesterConfigDialog'
 import type { Semester, SemesterFormValues } from '../types/semester.types'
 
 const PAGE_SIZE = 10
@@ -19,36 +18,41 @@ const PAGE_SIZE = 10
 export default function SemesterListPage() {
   const {
     semesters: localSemesters,
-    addSemester,
     updateSemester,
-    activateSemester,
   } = useSemesterStore()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [editingSemester, setEditingSemester] = useState<Semester | null>(null)
 
   // Kết nối Backend API
   const { data: apiData } = useSemesters({
     search: searchTerm || undefined,
   })
-  const createMutation = useCreateSemester()
   const updateMutation = useUpdateSemester()
 
   // Chuyển đổi dữ liệu từ Backend sang model hiển thị của UI (hoặc fallback store)
   const displaySemesters: Semester[] = useMemo(() => {
-    if (apiData && apiData.content && apiData.content.length > 0) {
-      return apiData.content.map((s, idx) => ({
+    const rawList = Array.isArray(apiData)
+      ? apiData
+      : apiData && Array.isArray((apiData as any).content)
+        ? (apiData as any).content
+        : null
+
+    if (rawList && rawList.length > 0) {
+      return rawList.map((s: any, idx: number) => ({
         id: idx + 1,
+        backendId: s.id,
         name: s.name,
-        startDate: s.startDate,
-        endDate: s.endDate,
+        startDate: s.startDate ?? s.startTime ?? s.start_date ?? '',
+        endDate: s.endDate ?? s.endTime ?? s.end_date ?? '',
         status:
-          s.statusCode === 'ONGOING'
+          s.statusCode === 'ONGOING' || s.status === 'ACTIVE'
             ? 'active'
-            : s.statusCode === 'UPCOMING'
+            : s.statusCode === 'UPCOMING' || s.status === 'UPCOMING'
               ? 'upcoming'
               : 'ended',
       }))
@@ -75,48 +79,30 @@ export default function SemesterListPage() {
     startIndex + PAGE_SIZE,
   )
 
-  const handleOpenAdd = () => {
-    setEditingSemester(null)
-    setIsFormOpen(true)
-  }
-
   const handleOpenEdit = (semester: Semester) => {
     setEditingSemester(semester)
     setIsFormOpen(true)
   }
 
   const handleFormSubmit = async (values: SemesterFormValues, id?: number) => {
-    try {
-      if (id) {
-        updateSemester(id, values)
-        // Tìm UUID nếu có từ API
-        const matched = apiData?.content[id - 1]
-        if (matched?.id) {
-          await updateMutation.mutateAsync({
-            id: matched.id,
-            body: {
-              name: values.name,
-              startDate: values.startDate,
-              endDate: values.endDate,
-            },
-          })
-        }
-      } else {
-        addSemester(values)
-        await createMutation.mutateAsync({
+    if (!id) return
+    // Tìm UUID nếu có từ API
+    const target = editingSemester?.backendId
+      ? editingSemester
+      : displaySemesters.find((s) => s.id === id)
+    const uuid = target?.backendId
+    if (uuid) {
+      await updateMutation.mutateAsync({
+        id: uuid,
+        body: {
           name: values.name,
           startDate: values.startDate,
           endDate: values.endDate,
-        })
-      }
-    } catch {
-      // Đã được xử lý hoặc fallback cập nhật local store
+          applyToFutureSemesters: values.applyToFutureSemesters,
+        },
+      })
     }
-  }
-
-  const handleActivate = (semester: Semester) => {
-    activateSemester(semester.id)
-    toast.success(`Đã kích hoạt học kỳ "${semester.name}" thành công!`)
+    updateSemester(id, values)
   }
 
   return (
@@ -135,13 +121,12 @@ export default function SemesterListPage() {
             setCurrentPage(1)
           }}
           totalCount={filteredSemesters.length}
-          onOpenAddModal={handleOpenAdd}
+          onOpenConfigModal={() => setIsConfigOpen(true)}
         />
 
         <SemesterTable
           semesters={paginatedSemesters}
           onEditSemester={handleOpenEdit}
-          onActivateSemester={handleActivate}
         />
 
         {/* Pagination Footer */}
@@ -189,12 +174,18 @@ export default function SemesterListPage() {
         </div>
       </Card>
 
-      {/* Add / Edit Dialog */}
+      {/* Edit Semester Dialog */}
       <SemesterFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         editingSemester={editingSemester}
         onSubmitSuccess={handleFormSubmit}
+      />
+
+      {/* Template Config Dialog */}
+      <SemesterConfigDialog
+        open={isConfigOpen}
+        onOpenChange={setIsConfigOpen}
       />
     </div>
   )

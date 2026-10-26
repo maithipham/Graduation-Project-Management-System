@@ -17,8 +17,10 @@ import { Button } from '@/shared/components/ui/button'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { useHeadCandidates } from '../hooks/useFaculties'
 import { useAccountStore } from '@/features/admin/account_management'
+import { isApiError } from '@/shared/types'
 import {
   facultySchema,
+  FACULTY_ERROR_CODES,
   type Faculty,
   type FacultyFormValues,
 } from '../types/faculty.types'
@@ -149,10 +151,27 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
       )
       onOpenChange(false)
     } catch (err: unknown) {
+      if (isApiError(err)) {
+        if (err.code === FACULTY_ERROR_CODES.FACULTY_CODE_EXIST) {
+          setError('code', { message: err.message }, { shouldFocus: true })
+          return
+        }
+        if (err.code === FACULTY_ERROR_CODES.FACULTY_NAME_EXIST) {
+          setError('name', { message: err.message }, { shouldFocus: true })
+          return
+        }
+        if (
+          err.code === FACULTY_ERROR_CODES.HEAD_OF_DEPARTMENT_NOT_FOUND ||
+          err.code === FACULTY_ERROR_CODES.ACCOUNT_NOT_HEAD_OF_DEPARTMENT
+        ) {
+          setError('headOfDepartmentId', { message: err.message })
+          return
+        }
+        setError('root.server', { message: err.message })
+        return
+      }
       const msg = err instanceof Error ? err.message : 'Đã có lỗi xảy ra khi lưu thông tin khoa.'
-      setError('root.server', {
-        message: msg,
-      })
+      setError('root.server', { message: msg })
     }
   }
 

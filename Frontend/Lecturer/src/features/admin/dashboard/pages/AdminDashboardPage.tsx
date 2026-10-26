@@ -10,18 +10,16 @@ import { FacultySummaryCard } from '../components/FacultySummaryCard'
 import { SemesterTimelineCard } from '../components/SemesterTimelineCard'
 import { ActivityHistoryTimeline } from '../components/ActivityHistoryTimeline'
 import { AddAccountDialog } from '@/features/admin/account_management/components/AddAccountDialog'
-import { SemesterFormDialog } from '@/features/admin/semester_management/components/SemesterFormDialog'
 import { FacultyFormDialog } from '@/features/admin/faculty_management/components/FacultyFormDialog'
 import type { SystemOverviewStats } from '../types/overview.types'
 
 export default function AdminDashboardPage() {
   const { accounts, addAccount } = useAccountStore()
-  const { semesters, addSemester } = useSemesterStore()
+  const { semesters } = useSemesterStore()
   const { faculties, addFaculty } = useFacultyStore()
 
   // Quick Action Modal states
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false)
-  const [isAddSemesterOpen, setIsAddSemesterOpen] = useState(false)
   const [isAddFacultyOpen, setIsAddFacultyOpen] = useState(false)
 
   // Compute live overview statistics
@@ -89,7 +87,6 @@ export default function AdminDashboardPage() {
       {/* 1. Overview Banner */}
       <OverviewBanner
         onQuickAddAccount={() => setIsAddAccountOpen(true)}
-        onQuickAddSemester={() => setIsAddSemesterOpen(true)}
         onQuickAddFaculty={() => setIsAddFacultyOpen(true)}
       />
 
@@ -117,13 +114,6 @@ export default function AdminDashboardPage() {
         onOpenChange={setIsAddAccountOpen}
         existingAccounts={accounts}
         onAccountAdded={addAccount}
-      />
-
-      <SemesterFormDialog
-        open={isAddSemesterOpen}
-        onOpenChange={setIsAddSemesterOpen}
-        editingSemester={null}
-        onSubmitSuccess={(vals) => addSemester(vals)}
       />
 
       <FacultyFormDialog

@@ -194,7 +194,7 @@ export const FacultyListView: React.FC<FacultyListViewProps> = ({
 
                 <TableCell>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                    {faculty.majors.length} chuyên ngành
+                    {faculty.totalMajors ?? faculty.majors.length} chuyên ngành
                   </span>
                 </TableCell>
 

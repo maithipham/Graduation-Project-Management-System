@@ -4,6 +4,7 @@ import type { ApiResponse } from '@/shared/types'
 import type {
   SemesterResponseBE,
   SemesterRequestBE,
+  SemesterConfigBE,
   PageResponseBE,
 } from '../types/semester.types'
 
@@ -20,6 +21,26 @@ export const semesterService = {
   },
 
   /**
+   * Lấy học kỳ hiện tại đang diễn ra
+   */
+  getCurrent: async () => {
+    const res = await apiClient.get<ApiResponse<SemesterResponseBE>>(
+      `${API_ENDPOINTS.admin.semesters}/current`,
+    )
+    return res.data.data
+  },
+
+  /**
+   * Kích hoạt đồng bộ chu kỳ học kỳ tự động
+   */
+  sync: async () => {
+    const res = await apiClient.post<ApiResponse<void>>(
+      `${API_ENDPOINTS.admin.semesters}/sync`,
+    )
+    return res.data.data
+  },
+
+  /**
    * Lấy chi tiết một học kỳ theo UUID
    */
   getById: async (id: string) => {
@@ -30,35 +51,33 @@ export const semesterService = {
   },
 
   /**
-   * Tạo học kỳ mới
-   */
-  create: async (body: SemesterRequestBE) => {
-    const res = await apiClient.post<ApiResponse<void>>(
-      API_ENDPOINTS.admin.semesters,
-      body,
-      { skipErrorToast: true },
-    )
-    return res.data.data
-  },
-
-  /**
-   * Cập nhật thông tin học kỳ
+   * Cập nhật khoảng thời gian học kỳ (startDate, endDate)
    */
   update: async (id: string, body: SemesterRequestBE) => {
     const res = await apiClient.put<ApiResponse<void>>(
       `${API_ENDPOINTS.admin.semesters}/${id}`,
       body,
-      { skipErrorToast: true },
     )
     return res.data.data
   },
 
   /**
-   * Xóa học kỳ theo UUID
+   * Lấy cấu hình khung thời gian chuẩn hiện tại (GET /semesters/config)
    */
-  delete: async (id: string) => {
-    const res = await apiClient.delete<ApiResponse<void>>(
-      `${API_ENDPOINTS.admin.semesters}/${id}`,
+  getConfig: async () => {
+    const res = await apiClient.get<ApiResponse<SemesterConfigBE>>(
+      `${API_ENDPOINTS.admin.semesters}/config`,
+    )
+    return res.data.data
+  },
+
+  /**
+   * Cập nhật khung thời gian chuẩn áp dụng cho tất cả các năm sau (PUT /semesters/config)
+   */
+  updateConfig: async (body: SemesterConfigBE) => {
+    const res = await apiClient.put<ApiResponse<void>>(
+      `${API_ENDPOINTS.admin.semesters}/config`,
+      body,
     )
     return res.data.data
   },
