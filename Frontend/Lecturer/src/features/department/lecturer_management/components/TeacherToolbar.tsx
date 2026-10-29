@@ -44,7 +44,7 @@ export function TeacherToolbar({
           value={filters.organization}
           onChange={(e) => onChange({ organization: e.target.value as OrganizationFilter })}
           aria-label="Lọc theo đơn vị công tác"
-          className="lg:w-44"
+          containerClassName="lg:w-44 lg:shrink-0"
         >
           <option value="">Tất cả đơn vị</option>
           {ORGANIZATION_OPTIONS.map((option) => (
@@ -60,7 +60,7 @@ export function TeacherToolbar({
           onChange={(e) => onChange({ majorName: e.target.value })}
           disabled={majorsLoading}
           aria-label="Lọc theo khoa"
-          className="lg:w-56"
+          containerClassName="lg:w-56 lg:shrink-0"
         >
           <option value="">{majorsLoading ? 'Đang tải khoa...' : 'Tất cả khoa'}</option>
           {majors?.map((major) => (

@@ -1,27 +1,86 @@
-import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import { referenceDataQueryOptions } from '@/shared/api'
+import { isApiError } from '@/shared/types'
 import { studentService } from '../services/student.service'
-import type { StudentListParams } from '../types'
+import type { StudentBatchParams, StudentListParams } from '../types'
 
-// Bộ "tên cache" của feature. Sau khi ghi (import/thêm/kích hoạt) thì invalidate theo các key này
+// Bộ "tên cache" của feature. Sau khi ghi (import/thêm) thì invalidate theo `all`
+// → danh sách và dropdown Khóa đều được tải lại
 export const departmentStudentKeys = {
   all: ['department', 'students'] as const,
   lists: () => [...departmentStudentKeys.all, 'list'] as const,
   list: (params: StudentListParams) => [...departmentStudentKeys.lists(), params] as const,
   detail: (publicId: string | undefined) =>
     [...departmentStudentKeys.all, 'detail', publicId] as const,
+  batches: (params: StudentBatchParams) => [...departmentStudentKeys.all, 'batches', params] as const,
 }
 
 export const majorKeys = {
   all: ['majors'] as const,
 }
 
-/** Danh sách sinh viên có phân trang. Đổi trang/bộ lọc vẫn giữ dữ liệu cũ đến khi dữ liệu mới về */
-export function useStudents(params: StudentListParams) {
+export const semesterKeys = {
+  all: ['semester-options'] as const,
+  current: () => [...semesterKeys.all, 'current'] as const,
+}
+
+/** POST /student, POST /student/import: chưa có học kì đang diễn ra */
+export const NO_CURRENT_SEMESTER_CODE = 3030
+
+/**
+ * Học kì hiện tại FE đang cache đã cũ (kì vừa kết thúc / bị đổi) → tải lại GET /semester/current,
+ * trang sẽ tự khóa nút Import / Thêm sinh viên
+ */
+function refreshCurrentSemesterOn3030(queryClient: QueryClient, error: unknown) {
+  if (isApiError(error) && error.code === NO_CURRENT_SEMESTER_CODE) {
+    void queryClient.invalidateQueries({ queryKey: semesterKeys.current() })
+  }
+}
+
+/**
+ * Danh sách sinh viên có phân trang. Đổi trang/bộ lọc vẫn giữ dữ liệu cũ đến khi dữ liệu mới về.
+ * `enabled = false` khi trang chưa xác định được học kì (tránh gọi 2 lần lúc mở trang)
+ */
+export function useStudents(params: StudentListParams, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: departmentStudentKeys.list(params),
     queryFn: () => studentService.getStudents(params),
     placeholderData: keepPreviousData,
+    enabled,
+  })
+}
+
+/** Các khóa có sinh viên trong học kì (dropdown Khóa). Chưa có học kì → chưa gọi */
+export function useBatches(params: StudentBatchParams) {
+  return useQuery({
+    queryKey: departmentStudentKeys.batches(params),
+    queryFn: params.semesterId ? () => studentService.getBatches(params) : skipToken,
+  })
+}
+
+/** Tất cả học kì cho dropdown Năm học / Học kì */
+export function useSemesters() {
+  return useQuery({
+    queryKey: semesterKeys.all,
+    queryFn: studentService.getSemesters,
+    ...referenceDataQueryOptions,
+  })
+}
+
+/** Học kì hiện tại — chọn sẵn khi mở trang. Lỗi / không có → trang tự chọn kì mới nhất */
+export function useCurrentSemester() {
+  return useQuery({
+    queryKey: semesterKeys.current(),
+    queryFn: studentService.getCurrentSemester,
+    ...referenceDataQueryOptions,
+    retry: false,
   })
 }
 
@@ -51,14 +110,31 @@ export function useImportStudents() {
   return useMutation({
     mutationFn: studentService.importStudents,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: departmentStudentKeys.all }),
+    onError: (error) => refreshCurrentSemesterOn3030(queryClient, error),
   })
 }
 
-/** Thêm một sinh viên (POST /student). Thành công hoặc cảnh báo đều tải lại danh sách */
+/**
+ * Xóa sinh viên khỏi học kì. Lỗi cũng tải lại danh sách: thường là do dữ liệu trên bảng đã cũ
+ * (sinh viên vừa đăng ký GVHD – 3028, đã bị xóa – 3027...)
+ */
+export function useDeleteStudent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: studentService.deleteStudent,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: departmentStudentKeys.all }),
+  })
+}
+
+/**
+ * Thêm một sinh viên (POST /student) vào học kì hiện tại — BE tự xác định, không gửi semesterId.
+ * Thành công hoặc cảnh báo đều tải lại danh sách
+ */
 export function useCreateStudent() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: studentService.createStudent,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: departmentStudentKeys.all }),
+    onError: (error) => refreshCurrentSemesterOn3030(queryClient, error),
   })
 }

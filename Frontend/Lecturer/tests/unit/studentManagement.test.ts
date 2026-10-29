@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getNextSort, getPageItems } from '@/features/department/student_management/utils/studentTable'
+import {
+  canDeleteStudent,
+  getNextSort,
+  getPageItems,
+} from '@/features/department/student_management/utils/studentTable'
 import {
   createStudentSchema,
   EMPTY_CREATE_STUDENT_VALUES,
@@ -15,7 +19,10 @@ import {
   importRowToFormValues,
   pickDefaultTab,
 } from '@/features/department/student_management/utils/importResult'
-import type { StudentImportRowResult } from '@/features/department/student_management'
+import type {
+  StudentImportRowResult,
+  StudentListItem,
+} from '@/features/department/student_management'
 
 describe('getNextSort', () => {
   it('bấm cùng cột: tăng dần → giảm dần → bỏ sắp xếp', () => {
@@ -47,13 +54,13 @@ describe('getPageItems', () => {
 })
 
 describe('hasActiveFilters', () => {
-  it('bộ lọc mặc định (status ACTIVE) không tính là đang lọc', () => {
+  it('bộ lọc mặc định (tất cả trạng thái) không tính là đang lọc', () => {
     expect(hasActiveFilters(DEFAULT_STUDENT_FILTERS)).toBe(false)
     expect(hasActiveFilters({ ...DEFAULT_STUDENT_FILTERS, keyword: '   ' })).toBe(false)
   })
 
   it('đổi bất kỳ bộ lọc nào thì tính là đang lọc', () => {
-    expect(hasActiveFilters({ ...DEFAULT_STUDENT_FILTERS, status: 'ALL' })).toBe(true)
+    expect(hasActiveFilters({ ...DEFAULT_STUDENT_FILTERS, status: 'STAGE_2_TOPIC_CONFIRMED' })).toBe(true)
     expect(hasActiveFilters({ ...DEFAULT_STUDENT_FILTERS, batch: 'K63' })).toBe(true)
   })
 })
@@ -183,5 +190,25 @@ describe('kết quả import sinh viên', () => {
       phone: '0911111111',
       rowNumber: 5,
     })
+  })
+})
+
+describe('canDeleteStudent', () => {
+  const base: StudentListItem = {
+    publicId: 'id',
+    studentCode: '2251172489',
+    name: 'Lê Trung Đức',
+    className: '64KTPM1',
+    batch: 'K64',
+    status: 'STAGE_1_REGISTERING_ADVISOR',
+    statusLabel: 'Đang đăng ký GVHD',
+    accountStatus: true,
+  }
+
+  it('chỉ cho xóa khi đang đăng ký GVHD, chưa có GVHD và chưa có đề tài', () => {
+    expect(canDeleteStudent(base)).toBe(true)
+    expect(canDeleteStudent({ ...base, lecturerName: 'ThS. A' })).toBe(false)
+    expect(canDeleteStudent({ ...base, topicName: 'Đề tài' })).toBe(false)
+    expect(canDeleteStudent({ ...base, status: 'STAGE_1_ADVISOR_ASSIGNED' })).toBe(false)
   })
 })

@@ -4,13 +4,25 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ImportStudentDialog } from '@/features/department/student_management/components/ImportStudentDialog'
 import { studentService } from '@/features/department/student_management/services/student.service'
+import type { SemesterOption } from '@/features/department/student_management/types'
 import { ApiError } from '@/shared/types'
+
+const currentSemester: SemesterOption = {
+  publicId: 'sem-1',
+  name: 'Học kỳ 1 năm học 2026-2027',
+  academicYear: '2026-2027',
+  term: 'Học kỳ 1',
+  startDate: '01-09-2026',
+  endDate: '15-01-2027',
+  status: 'Đang diễn ra',
+  statusCode: 'ONGOING',
+}
 
 function renderDialog() {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
-      <ImportStudentDialog open onOpenChange={() => {}} />
+      <ImportStudentDialog open onOpenChange={() => {}} targetSemester={currentSemester} />
     </QueryClientProvider>,
   )
 }
@@ -61,5 +73,26 @@ describe('ImportStudentDialog — bỏ chọn file', () => {
 
     expect(screen.queryByText('sai_mau.xlsx')).not.toBeInTheDocument()
     expect(screen.queryByText('File import không đúng mẫu')).not.toBeInTheDocument()
+  })
+})
+
+describe('ImportStudentDialog — học kì hiện tại', () => {
+  it('hiện học kì sẽ import vào', () => {
+    renderDialog()
+    expect(screen.getByText('Học kỳ 1 năm học 2026-2027')).toBeInTheDocument()
+  })
+
+  it('BE báo 3030 (chưa có học kì hiện tại): hiện message dưới ô chọn file', async () => {
+    const message = 'Hiện chưa có học kỳ nào đang diễn ra, không thể thêm sinh viên'
+    vi.spyOn(studentService, 'importStudents').mockRejectedValue(
+      new ApiError(message, 3030, undefined, 409),
+    )
+    const user = userEvent.setup()
+    renderDialog()
+
+    await user.upload(fileInput(), new File(['x'], 'ds.xlsx'))
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+
+    expect(await screen.findByText(message)).toBeInTheDocument()
   })
 })

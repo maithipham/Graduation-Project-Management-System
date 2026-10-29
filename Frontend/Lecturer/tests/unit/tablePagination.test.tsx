@@ -25,14 +25,14 @@ describe('TablePagination', () => {
   it('chỉ 1 trang: hiện số đếm, không có nút chuyển trang', () => {
     renderPagination({ number: 0, totalElements: 7, totalPages: 1, count: 7 })
 
-    expect(screen.getByText(/Hiển thị/)).toHaveTextContent('Hiển thị 1–7 / 7 sinh viên')
+    expect(screen.getByText(/Hiển thị/)).toHaveTextContent('Hiển thị 1–7 trên 7 sinh viên')
     expect(screen.queryByRole('navigation', { name: 'Phân trang' })).not.toBeInTheDocument()
   })
 
   it('trang cuối: đếm đúng khoảng, khóa "Trang sau", trang hiện tại có aria-current', () => {
     renderPagination({ number: 2, totalElements: 25, totalPages: 3, count: 5 })
 
-    expect(screen.getByText(/Hiển thị/)).toHaveTextContent('Hiển thị 21–25 / 25 sinh viên')
+    expect(screen.getByText(/Hiển thị/)).toHaveTextContent('Hiển thị 21–25 trên 25 sinh viên')
     expect(screen.getByRole('button', { name: 'Trang sau' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Trang trước' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '3' })).toHaveAttribute('aria-current', 'page')

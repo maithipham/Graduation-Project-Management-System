@@ -14,7 +14,7 @@ import {
 } from '@/shared/components/ui'
 import { API_SUCCESS_CODE } from '@/shared/types'
 import { useCreateStudent } from '../hooks/useStudents'
-import type { MajorOption } from '../types'
+import type { MajorOption, SemesterOption } from '../types'
 import {
   createStudentSchema,
   EMPTY_CREATE_STUDENT_VALUES,
@@ -22,12 +22,15 @@ import {
   type CreateStudentFormValues,
 } from '../utils/createStudentSchema'
 import { StudentFormFields } from './StudentFormFields'
+import { TargetSemesterNote } from './TargetSemesterNote'
 
 interface CreateStudentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   majors: MajorOption[] | undefined
   majorsLoading: boolean
+  /** Học kì hiện tại — chỉ để hiển thị, không gửi lên BE */
+  targetSemester: SemesterOption | undefined
 }
 
 export function CreateStudentDialog({
@@ -35,6 +38,7 @@ export function CreateStudentDialog({
   onOpenChange,
   majors,
   majorsLoading,
+  targetSemester,
 }: CreateStudentDialogProps) {
   const createStudent = useCreateStudent()
 
@@ -63,13 +67,13 @@ export function CreateStudentDialog({
   const onSubmit = (values: CreateStudentFormValues) => {
     createStudent.mutate(values, {
       onSuccess: (result) => {
-        // 1000: thêm mới / cập nhật / kích hoạt lại → toast xanh với đúng câu của BE.
-        // 11xx (VD 1101 đã có, không đổi): interceptor đã hiện toast vàng
+        // 1000: thêm mới / thêm vào kì / cập nhật → toast xanh với đúng câu của BE.
+        // 11xx (1101 đã có trong kì, 1102 đã hoàn thành đồ án): interceptor đã hiện toast vàng
         if (result.code === API_SUCCESS_CODE) toast.success(result.message)
         onOpenChange(false)
       },
-      // 3010 (email thuộc tài khoản khác), 3011 (mã SV thuộc tài khoản khác),
-      // 3004 (mã SV và email thuộc 2 tài khoản khác nhau), 3005 (không khớp hồ sơ gốc), 4000, mất mạng:
+      // 3014 (trùng tài khoản khác), 3030 (chưa có kì hiện tại), 3023 (kì hiện tại đã kết thúc),
+      // 3024 / 3025 (đã xong / đang làm đồ án ở kì khác), 4000, mất mạng:
       // hiện ngay trong form, giữ nguyên dữ liệu để sửa
       onError: (error) => setError('root.server', { message: error.message }),
     })
@@ -85,6 +89,7 @@ export function CreateStudentDialog({
 
         {/* noValidate: tắt popup của trình duyệt, lỗi do zod + FormField hiển thị */}
         <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <TargetSemesterNote label="Thêm vào" semester={targetSemester} />
           <StudentFormFields
             register={register}
             errors={errors}

@@ -1,68 +1,74 @@
-import { useState, useMemo } from 'react'
-import { useAccountStore } from '@/features/admin/account_management'
-import { useSemesterStore } from '@/features/admin/semester_management'
-import { useFacultyStore } from '@/features/admin/faculty_management'
-import { formatDate } from '@/shared/utils/formatDate'
-import { OverviewBanner } from '../components/OverviewBanner'
-import { StatCardGrid } from '../components/StatCardGrid'
-import { RoleDistributionCard } from '../components/RoleDistributionCard'
-import { FacultySummaryCard } from '../components/FacultySummaryCard'
-import { SemesterTimelineCard } from '../components/SemesterTimelineCard'
-import { ActivityHistoryTimeline } from '../components/ActivityHistoryTimeline'
-import { AddAccountDialog } from '@/features/admin/account_management/components/AddAccountDialog'
-import { FacultyFormDialog } from '@/features/admin/faculty_management/components/FacultyFormDialog'
-import type { SystemOverviewStats } from '../types/overview.types'
+import { useState, useMemo } from "react";
+import { useAccountStore } from "@/features/admin/account_management";
+import { useSemesterStore } from "@/features/admin/semester_management";
+import { useFacultyStore } from "@/features/admin/faculty_management";
+import { formatDate } from "@/shared/utils/formatDate";
+import { OverviewBanner } from "../components/OverviewBanner";
+import { StatCardGrid } from "../components/StatCardGrid";
+import { RoleDistributionCard } from "../components/RoleDistributionCard";
+import { FacultySummaryCard } from "../components/FacultySummaryCard";
+import { SemesterTimelineCard } from "../components/SemesterTimelineCard";
+import { ActivityHistoryTimeline } from "../components/ActivityHistoryTimeline";
+import { AddAccountDialog } from "@/features/admin/account_management/components/AddAccountDialog";
+import { FacultyFormDialog } from "@/features/admin/faculty_management/components/FacultyFormDialog";
+import type { SystemOverviewStats } from "../types/overview.types";
 
 export default function AdminDashboardPage() {
-  const { accounts, addAccount } = useAccountStore()
-  const { semesters } = useSemesterStore()
-  const { faculties, addFaculty } = useFacultyStore()
+  const { accounts, addAccount } = useAccountStore();
+  const { semesters } = useSemesterStore();
+  const { faculties, addFaculty } = useFacultyStore();
 
   // Quick Action Modal states
-  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false)
-  const [isAddFacultyOpen, setIsAddFacultyOpen] = useState(false)
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [isAddFacultyOpen, setIsAddFacultyOpen] = useState(false);
 
   // Compute live overview statistics
   const stats: SystemOverviewStats = useMemo(() => {
-    const totalAccounts = accounts.length
-    const activeAccounts = accounts.filter((a) => a.status === 'active').length
-    const inactiveAccounts = accounts.filter((a) => a.status === 'inactive').length
+    const totalAccounts = accounts.length;
+    const activeAccounts = accounts.filter((a) => a.status === "active").length;
+    const inactiveAccounts = accounts.filter(
+      (a) => a.status === "inactive",
+    ).length;
     const activeRate = totalAccounts
       ? Math.round((activeAccounts / totalAccounts) * 100)
-      : 0
+      : 0;
 
-    const studentCount = accounts.filter((a) => a.role === 'Sinh viên').length
-    const lecturerCount = accounts.filter((a) => a.role === 'Giảng viên').length
-    const adminCount = accounts.filter((a) => a.role === 'Quản trị viên').length
+    const studentCount = accounts.filter((a) => a.role === "Sinh viên").length;
+    const lecturerCount = accounts.filter(
+      (a) => a.role === "Giảng viên",
+    ).length;
+    const adminCount = accounts.filter(
+      (a) => a.role === "Quản trị viên",
+    ).length;
 
     const studentPct = totalAccounts
       ? Number(((studentCount / totalAccounts) * 100).toFixed(1))
-      : 0
+      : 0;
     const lecturerPct = totalAccounts
       ? Number(((lecturerCount / totalAccounts) * 100).toFixed(1))
-      : 0
+      : 0;
     const adminPct = totalAccounts
       ? Number(((adminCount / totalAccounts) * 100).toFixed(1))
-      : 0
+      : 0;
 
-    const activeSemester = semesters.find((s) => s.status === 'active')
-    const upcomingSemester = semesters.find((s) => s.status === 'upcoming')
-    const currentSemester = activeSemester || upcomingSemester
+    const activeSemester = semesters.find((s) => s.status === "active");
+    const upcomingSemester = semesters.find((s) => s.status === "upcoming");
+    const currentSemester = activeSemester || upcomingSemester;
 
     const currentSemesterName = currentSemester
       ? currentSemester.name
-      : 'Chưa thiết lập'
+      : "Chưa thiết lập";
     const currentSemesterPeriod = currentSemester
       ? `${formatDate(currentSemester.startDate)} - ${formatDate(
           currentSemester.endDate,
         )}`
-      : 'Chưa có lịch'
+      : "Chưa có lịch";
 
-    const totalFaculties = faculties.length
+    const totalFaculties = faculties.length;
     const totalMajors = faculties.reduce(
       (sum, f) => sum + (f.majors?.length || 0),
       0,
-    )
+    );
 
     return {
       totalAccounts,
@@ -79,8 +85,8 @@ export default function AdminDashboardPage() {
       currentSemesterPeriod,
       totalFaculties,
       totalMajors,
-    }
-  }, [accounts, semesters, faculties])
+    };
+  }, [accounts, semesters, faculties]);
 
   return (
     <div className="space-y-6">
@@ -124,5 +130,5 @@ export default function AdminDashboardPage() {
         onSubmitSuccess={(vals) => addFaculty(vals)}
       />
     </div>
-  )
+  );
 }

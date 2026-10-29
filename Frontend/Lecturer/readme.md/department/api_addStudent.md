@@ -3,22 +3,40 @@
 > Ban đầu file này là **brief giao cho phiên chat khác** làm frontend; nay đã cập nhật theo code thực tế
 > (`src/features/department/student_management/`). Đọc kèm `AGENTS.md` và các skill
 > `create-feature`, `connect-api`, `build-form`, `verify-changes`.
-> Hợp đồng API lấy từ backend Spring Boot (`tlu_gpms_system`, branch `Login_Feature`); tài liệu nghiệp vụ gốc ở
-> `Do_An_Fall26/README.md/case_execution/addStudent_TBM.md`.
+> Hợp đồng API lấy từ backend Spring Boot (`tlu_gpms_system`); tài liệu nghiệp vụ gốc ở
+> `Do_An_Fall26/readme.md/case_execution/addStudent_TBM.md` (Mục 6.2 – 6.5, 7.1).
+
+---
+
+## 0. Thay đổi phía BE so với bản FE đang dùng (cần sửa FE)
+
+| #   | Thay đổi                                                                                                                                                | Ảnh hưởng tới FE                                                           |
+| :-- | :------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------- |
+| 1   | Danh sách sinh viên giờ **theo học kì**: mỗi dòng ứng với 1 đề tài (`thesis_topic`) của kì đang chọn. Sinh viên không có đề tài trong kì thì không hiện | Thêm bộ lọc **Năm học** + **Học kì**, gửi `semesterId`                     |
+| 2   | Bỏ `Student.status` (đang hoạt động / đã tắt). Field `status: boolean` trong list và detail **không còn**                                               | Bỏ badge "Đang hoạt động / Đã tắt", bỏ bộ lọc `ACTIVE / INACTIVE / ALL`    |
+| 3   | `status` trên list giờ là **trạng thái đồ án** (chuỗi enum) + `statusLabel` (tiếng Việt)                                                                | Bộ lọc Trạng thái dùng danh sách giai đoạn ở Mục 4.1.3                     |
+| 4   | List trả thêm `batch`, `topicName`, `lecturerName`, `coLecturerName`, `statusLabel`, `accountStatus`                                                    | Bảng đổi cột: Họ và tên · Lớp / Khóa · Bộ môn · Đề tài · GVHD · Trạng thái |
+| 5   | Có API danh sách khóa `GET /student/batch`                                                                                                              | Bỏ mảng tĩnh `BATCH_OPTIONS` (K62 → K66)                                   |
+| 6   | Sort thêm key `batch`                                                                                                                                   |                                                                            |
+| 7   | API `PATCH /student/{publicId}/activate` **đã xóa**                                                                                                     | Bỏ endpoint `activate`, bỏ nút "Kích hoạt"                                 |
+| 8   | `POST /student`, `POST /student/import` **không nhận học kì**: BE tự thêm sinh viên vào năm học + học kì hiện tại                                      | **Không** gửi `semesterId`; chưa có học kì hiện tại → BE trả `409 3030`    |
+| 9   | Thêm `PUT /student/{publicId}` (sửa) và `DELETE /student/{publicId}?semesterId=` (xóa SV import nhầm)                                                   | Chưa nối (Mục 6.4, 6.5)                                                    |
+| 10  | Mã lỗi trùng dữ liệu gộp về `3014` (thay `3004`, `3005`, `3010`, `3011`)                                                                                | FE chỉ hiện `message`, không cần đổi logic                                 |
 
 ---
 
 ## 1. Trạng thái hiện tại
 
-| # | Việc | Trạng thái |
-| :--- | :--- | :--- |
-| 1 | Trang danh sách sinh viên: bảng, tìm kiếm, bộ lọc, sắp xếp, phân trang | ✅ API thật – `GET /student`, `GET /major` |
-| 2 | Bấm 1 dòng → popup "Thông tin sinh viên" | ✅ API thật – `GET /student/{publicId}` |
-| 3 | Nút **Import file** → popup, kết quả theo tab, sửa & gửi lại dòng lỗi | ✅ API thật – `POST /student/import`, `POST /student` |
-| 4 | Nút **Thêm sinh viên** → popup form | ✅ API thật – `POST /student` |
-| 5 | Nút **Export file** → popup | ⏳ Chỉ giao diện (BE **chưa có** API export) |
-| 6 | Kích hoạt lại sinh viên đã tắt | ⏳ Chưa làm – `PATCH /student/{publicId}/activate` (Mục 6.3) |
-| 7 | Tải file mẫu import | ⏳ Chưa làm – BE chưa có API tải file mẫu |
+| #   | Việc                                                                   | Trạng thái                                                       |
+| :-- | :--------------------------------------------------------------------- | :--------------------------------------------------------------- |
+| 1   | Trang danh sách sinh viên: bảng, tìm kiếm, bộ lọc, sắp xếp, phân trang | 🔄 Cần sửa theo Mục 4.1 (cột + bộ lọc mới)                       |
+| 2   | Bấm 1 dòng → popup "Thông tin sinh viên"                               | 🔄 Cần sửa: `status` → `accountStatus` (Mục 4.5)                 |
+| 3   | Nút **Import file** → popup, kết quả theo tab, sửa & gửi lại dòng lỗi  | 🔄 Hiện học kì hiện tại, xử lý `1102`, `3023` – `3025`, `3030`   |
+| 4   | Nút **Thêm sinh viên** → popup form                                    | 🔄 Hiện học kì hiện tại, xử lý `1102`, `3023` – `3025`, `3030`   |
+| 5   | Nút **Export file** → popup                                            | ⏳ Chỉ giao diện (BE **chưa có** API export)                     |
+| 6   | Sửa sinh viên                                                          | ⏳ Chưa làm – `PUT /student/{publicId}` (Mục 6.4)                |
+| 7   | Xóa sinh viên import nhầm khỏi học kì                                  | ⏳ Chưa làm – `DELETE /student/{publicId}?semesterId=` (Mục 6.5) |
+| 8   | Tải file mẫu import                                                    | ⏳ Chưa làm – BE chưa có API tải file mẫu                        |
 
 ---
 
@@ -29,26 +47,27 @@
 
 ```
 student_management/
-├── types.ts                         # StudentListItem, StudentDetail, MajorOption, StudentListParams,
+├── types.ts                         # StudentListItem, StudentDetail, MajorOption, SemesterOption, StudentListParams,
 │                                    # StudentCreationRequest, StudentWriteResult, StudentImportResponse...
-├── services/student.service.ts      # getStudents, getStudentDetail, getMajors, importStudents, createStudent
+├── services/student.service.ts      # getStudents, getStudentDetail, getMajors, getBatches, getSemesters,
+│                                    # importStudents, createStudent, updateStudent, deleteStudent
 ├── hooks/useStudents.ts             # departmentStudentKeys, majorKeys, useStudents, useStudentDetail, useMajors,
-│                                    # useImportStudents, useCreateStudent
+│                                    # useBatches, useSemesters, useImportStudents, useCreateStudent...
 ├── utils/
-│   ├── studentFilters.ts            # DEFAULT_STUDENT_FILTERS, BATCH_OPTIONS, hasActiveFilters, mô tả bộ lọc
+│   ├── studentFilters.ts            # DEFAULT_STUDENT_FILTERS, STUDENT_STATUS_OPTIONS, hasActiveFilters, mô tả bộ lọc
 │   ├── studentTable.ts              # getNextSort (asc → desc → bỏ), getPageItems (nút số trang)
 │   ├── createStudentSchema.ts       # schema zod form sinh viên, STUDENT_EMAIL_DOMAIN
 │   └── importResult.ts              # đếm/chọn tab kết quả import, đổi dòng lỗi → giá trị form, cập nhật dòng sau khi gửi lại
 ├── components/
 │   ├── StudentToolbar.tsx           # tìm kiếm + bộ lọc
 │   ├── StudentTable.tsx             # bảng + sort header + phân trang
-│   ├── StudentStatusBadge.tsx
+│   ├── StudentStatusBadge.tsx       # badge trạng thái đồ án (theo status / statusLabel)
 │   ├── StudentDetailDialog.tsx      # popup "Thông tin sinh viên"
 │   ├── ImportStudentDialog.tsx      # popup import
 │   ├── FileDropZone.tsx             # khung chọn/kéo-thả file
 │   ├── StudentImportResult.tsx      # kết quả import theo tab Lỗi / Cảnh báo / Thành công
 │   ├── RetryImportRowForm.tsx       # form sửa 1 dòng lỗi rồi gửi lại qua POST /student
-│   ├── StudentFormFields.tsx        # 8 ô nhập dùng chung (popup Thêm + form sửa dòng lỗi)
+│   ├── StudentFormFields.tsx        # 8 ô nhập dùng chung (popup Thêm / Sửa + form sửa dòng lỗi)
 │   ├── CreateStudentDialog.tsx      # popup Thêm sinh viên
 │   └── ExportStudentDialog.tsx      # popup export (UI)
 ├── pages/StudentManagementPage.tsx  # export default
@@ -59,12 +78,14 @@ Endpoint trong `src/shared/api/endpoints.ts` (key `student` đang dùng cho port
 
 ```ts
 departmentStudent: {
-  base: '/student',                                   // GET danh sách · POST thêm thủ công
-  detail: (publicId: string) => `/student/${publicId}`,
+  base: '/student',                                     // GET danh sách · POST thêm thủ công
+  detail: (publicId: string) => `/student/${publicId}`, // GET chi tiết · PUT sửa · DELETE xóa
   import: '/student/import',
-  activate: (publicId: string) => `/student/${publicId}/activate`,
+  batch: '/student/batch',                              // dropdown Khóa
+  // activate: đã xóa (BE bỏ API kích hoạt)
 },
 major: { base: '/major' },
+semester: { base: '/semester', current: '/semester/current' },
 ```
 
 ---
@@ -74,36 +95,150 @@ major: { base: '/major' },
 - Mọi response: `{ code, message?, data? }`. BE bật `@JsonInclude(NON_NULL)` nên **`message` có thể không có**
   (API GET thường chỉ có `code` + `data`), **`data` không có** ở API ghi.
 - `code = 1000`: thành công.
-- **Dải `11xx` (HTTP 200): thành công kèm cảnh báo** (`1100`, `1101`). Interceptor không reject mà tự hiện toast vàng
+- **Dải `11xx` (HTTP 200): thành công kèm cảnh báo** (`1101`, `1102`, `1103`). Interceptor không reject mà tự hiện toast vàng
   (tắt bằng `{ skipWarningToast: true }`).
 - Lỗi: HTTP 4xx/5xx kèm `code` nghiệp vụ → interceptor đã tự toast đỏ, component không toast lại.
   Request gọi từ form dùng `{ skipErrorToast: true }` để hiện lỗi ngay trong form.
 - Quyền: mọi API ở đây yêu cầu role `ADMIN` hoặc `HEAD_OF_MAJOR`, không đủ quyền → `403`, `code 2001`.
+  Trưởng bộ môn chỉ thấy / thao tác sinh viên thuộc các ngành mình phụ trách.
 - Không expose `id` số, chỉ dùng `publicId` (UUID string).
 
 ---
 
 ## 4. API đọc dữ liệu
 
-### 4.1. `GET /student` – Danh sách sinh viên
+### 4.1. `GET /student` – Danh sách sinh viên theo học kì
 
-**Query params** (đều không bắt buộc):
+#### 4.1.1. Cột trên bảng ↔ field BE trả về
 
-| Param | Kiểu | Ý nghĩa | Ví dụ |
-| :--- | :--- | :--- | :--- |
-| `keyword` | string | Tìm gần đúng, không phân biệt hoa/thường, theo **mã SV**, **họ tên đầy đủ** hoặc **email**. BE tự trim, gộp khoảng trắng | `2251172489`, `trung đức`, `@gmail.com` |
-| `batch` | string | Khóa, khớp chính xác, BE tự viết hoa (`k63` → `K63`) | `K63` |
-| `majorId` | UUID | `publicId` của ngành lấy từ `GET /major` | `0192f3a1-...` |
-| `status` | `ACTIVE` \| `INACTIVE` \| `ALL` | Mặc định `ACTIVE` (đang hoạt động). `INACTIVE` = đã tắt từ kì trước | `ALL` |
-| `page` | number | Trang, **bắt đầu từ 0** | `0` |
-| `size` | number | Mặc định **15** | `15` |
-| `sort` | string, lặp được | `field,asc\|desc`. Chỉ nhận: **`studentCode`, `name`, `majorName`, `className`** | `sort=name,asc` |
+```
+┌─────┬──────────────────┬───────────────┬────────────────────┬──────────────────────┬────────────────────────┬──────────────────────┐
+│ STT │ Họ và tên ↕      │ Lớp / Khóa ↕  │ Bộ môn ↕           │ Đề tài               │ GVHD                   │ Trạng thái           │
+├─────┼──────────────────┼───────────────┼────────────────────┼──────────────────────┼────────────────────────┼──────────────────────┤
+│  1  │ Lê Trung Đức     │ 63KTPM1       │ Kỹ thuật phần mềm  │ Hệ thống quản lý     │ ThS. Nguyễn Văn A      │ ● Đã phân công GVHD  │
+│     │ 2251172489       │ K63           │                    │ đồ án tốt nghiệp     │ TS. Trần Thị B         │                      │
+└─────┴──────────────────┴───────────────┴────────────────────┴──────────────────────┴────────────────────────┴──────────────────────┘
+```
 
+| Cột                      | Field                                                                  | Cách hiển thị                                                                                                                                       |
+| :----------------------- | :--------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _(ẩn)_                   | `publicId`                                                             | `publicId` sinh viên, dùng mở popup chi tiết / sửa / xóa                                                                                            |
+| **Họ và tên**            | `name` (dòng trên, đậm) + `studentCode` (dòng dưới, chữ nhỏ xám)       | `name` = Họ + Tên đã ghép sẵn. **Mã sinh viên nằm ngay dưới tên**, không còn cột Mã SV riêng                                                        |
+| **Lớp / Khóa**           | `className` (dòng trên) + `batch` (dòng dưới, chữ nhỏ xám)             | Ví dụ `63KTPM1` / `K63`                                                                                                                             |
+| **Bộ môn**               | `majorName`                                                            | Tên ngành; `null` → "—"                                                                                                                             |
+| **Đề tài**               | `topicName`                                                            | `null` khi chưa chốt tên đề tài (trước Giai đoạn 2) → hiện "Chưa có đề tài" (chữ xám nghiêng). Tên dài: `line-clamp-2` + `title` để xem đủ          |
+| **GVHD**                 | `lecturerName` (dòng trên) + `coLecturerName` (dòng dưới, nếu có)      | Đã kèm học hàm học vị (VD `ThS. Nguyễn Văn A`). `lecturerName = null` → "Chưa phân công" (chữ xám). `coLecturerName = null` → không hiện dòng thứ 2 |
+| **Trạng thái**           | `statusLabel` (chữ hiển thị) + `status` (mã enum, dùng chọn màu badge) | Bảng màu ở Mục 4.1.3                                                                                                                                |
+| _(không hiện trên bảng)_ | `accountStatus`                                                        | `true` được đăng nhập, `false` tài khoản bị khóa đăng nhập. Có thể hiện icon khóa nhỏ cạnh tên khi `false` (tùy chọn)                               |
+
+Một phần tử trong `content`:
+
+```json
+{
+  "publicId": "0192f3a1-7c2e-7b4d-9a10-3f5e2d1c0b9a",
+  "studentCode": "2251172489",
+  "name": "Lê Trung Đức",
+  "className": "63KTPM1",
+  "batch": "K63",
+  "majorName": "Kỹ thuật phần mềm",
+  "lecturerName": "ThS. Nguyễn Văn A",
+  "status": "STAGE_1_ADVISOR_ASSIGNED",
+  "statusLabel": "Đã phân công GVHD",
+  "accountStatus": true
+}
+```
+
+> BE bật `NON_NULL` nên field `null` (`topicName`, `lecturerName`, `coLecturerName`, `majorName`) **không có** trong JSON
+> (ví dụ trên: chưa có đề tài, không có GV đồng hướng dẫn). FE khai báo các field này là optional và đọc bằng `?? null`.
+
+```ts
+export type StudentThesisStatus =
+  | "STAGE_1_REGISTERING_ADVISOR"
+  | "STAGE_1_ADVISOR_ASSIGNED"
+  | "STAGE_2_TOPIC_CONFIRMED"
+  | "STAGE_3_OUTLINE_APPROVED"
+  | "STAGE_4_REPORT_APPROVED"
+  | "STAGE_5_REVIEW_PASSED"
+  | "STAGE_6_DEFENSE_COMPLETED"
+  | "DISQUALIFIED"
+  | "CANCELLED";
+
+export interface StudentListItem {
+  publicId: string;
+  studentCode: string;
+  name: string; // Họ + Tên, đã ghép sẵn
+  className: string;
+  batch: string;
+  majorName?: string | null;
+  topicName?: string | null; // không có: chưa chốt tên đề tài
+  lecturerName?: string | null; // không có: chưa phân công GVHD
+  coLecturerName?: string | null; // không có: không có GV đồng hướng dẫn
+  status: StudentThesisStatus;
+  statusLabel: string;
+  accountStatus: boolean;
+}
+```
+
+#### 4.1.2. Query params (bộ lọc)
+
+| Param        | Kiểu             | Ý nghĩa                                                                                                                   | Ví dụ                                   |
+| :----------- | :--------------- | :------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------- |
+| `semesterId` | UUID             | `publicId` học kì (lấy từ `GET /semester`, Mục 4.3). **Bỏ trống → học kì hiện tại**; chưa có học kì hiện tại → trang rỗng | `0192f3a1-...`                          |
+| `keyword`    | string           | Tìm gần đúng, không phân biệt hoa/thường, theo **mã SV**, **họ tên đầy đủ** hoặc **email**. BE tự trim, gộp khoảng trắng  | `2251172489`, `trung đức`, `@gmail.com` |
+| `batch`      | string           | Khóa, khớp chính xác, BE tự viết hoa (`k63` → `K63`). Giá trị lấy từ `GET /student/batch`                                 | `K63`                                   |
+| `majorId`    | UUID             | Bộ môn: `publicId` của ngành lấy từ `GET /major`                                                                          | `0192f3a1-...`                          |
+| `status`     | string           | Trạng thái đồ án: 1 giá trị trong Mục 4.1.3. Không phân biệt hoa/thường. Không gửi → tất cả                               | `STAGE_2_TOPIC_CONFIRMED`, `CANCELLED`  |
+| `page`       | number           | Trang, **bắt đầu từ 0**                                                                                                   | `0`                                     |
+| `size`       | number           | Mặc định **15**                                                                                                           | `15`                                    |
+| `sort`       | string, lặp được | `field,asc\|desc`. Chỉ nhận: **`studentCode`, `name`, `className`, `batch`, `majorName`**                                 | `sort=name,asc`                         |
+
+- **Năm học không phải param của BE.** FE tự gom từ danh sách học kì (`academicYear`) rồi gửi `semesterId` của học kì đã chọn (Mục 5.1).
 - Không gửi param rỗng (`keyword=`): service bỏ hẳn key khi giá trị rỗng/`undefined` (`compactParams`).
 - `sort=name` sắp theo **Tên rồi Họ** (thói quen tra danh sách tiếng Việt).
-- Không gửi `sort`: BE tự sắp — đang hoạt động lên trước, sinh viên mới thêm lên trước.
+- Không gửi `sort`: BE tự sắp — sinh viên mới thêm vào kì lên trước.
 - axios mặc định serialize mảng thành `sort[]=...` → **sai với Spring**. Service dùng
   `paramsSerializer: { indexes: null }` (ra `sort=a,asc&sort=b,desc`).
+
+```ts
+export type StudentSortField =
+  | "studentCode"
+  | "name"
+  | "className"
+  | "batch"
+  | "majorName";
+
+export interface StudentListParams {
+  semesterId?: string;
+  keyword?: string;
+  batch?: string;
+  majorId?: string;
+  status?: StudentThesisStatus;
+  page: number;
+  size: number;
+  sort?: `${StudentSortField},${"asc" | "desc"}`;
+}
+```
+
+#### 4.1.3. Giá trị bộ lọc Trạng thái & màu badge
+
+Cột Trạng thái BE ghép từ 2 nguồn: đề tài bị **đình chỉ / hủy** → lấy trạng thái đề tài; còn lại → lấy **giai đoạn** đồ án.
+Lọc theo 1 giai đoạn chỉ trả các đề tài đang ở giai đoạn đó **và chưa** bị đình chỉ / hủy.
+
+| `status` (giá trị gửi lên / nhận về) | `statusLabel`                            | Badge gợi ý        |
+| :----------------------------------- | :--------------------------------------- | :----------------- |
+| `STAGE_1_REGISTERING_ADVISOR`        | Đang đăng ký GVHD                        | xám `slate`        |
+| `STAGE_1_ADVISOR_ASSIGNED`           | Đã phân công GVHD                        | xanh dương `blue`  |
+| `STAGE_2_TOPIC_CONFIRMED`            | Đã chốt tên đề tài                       | xanh dương `blue`  |
+| `STAGE_3_OUTLINE_APPROVED`           | Đã duyệt đề cương                        | chàm `indigo`      |
+| `STAGE_4_REPORT_APPROVED`            | Đã duyệt báo cáo                         | chàm `indigo`      |
+| `STAGE_5_REVIEW_PASSED`              | Đạt phản biện                            | tím `violet`       |
+| `STAGE_6_DEFENSE_COMPLETED`          | Đã bảo vệ hội đồng                       | xanh lá `green`    |
+| `DISQUALIFIED`                       | Bị đình chỉ / Không đủ điều kiện đi tiếp | đỏ `red`           |
+| `CANCELLED`                          | Đã hủy                                   | đỏ nhạt / xám gạch |
+
+- Option đầu của dropdown: "Tất cả trạng thái" (không gửi `status`).
+- Danh sách option FE khai báo tĩnh (`STUDENT_STATUS_OPTIONS`) theo đúng bảng trên. Badge hiển thị **`statusLabel` của BE**
+  (không tự map lại chữ), chỉ dùng `status` để chọn màu; `status` lạ → màu xám.
 
 **Response `data`:** danh sách phân trang. Spring có thể trả **một trong hai dạng**:
 
@@ -117,70 +252,104 @@ major: { base: '/major' },
 ```
 
 Service khai báo `ApiResponse<RawSpringPage<StudentListItem>>` và trả `toSpringPage(res.data.data, params)`
-(`@/shared/utils`) để đưa cả hai dạng về `SpringPage<StudentListItem>`. Nếu đọc thẳng `data.number` khi BE trả
-`PagedModel` thì ra `undefined` → STT thành `NaN`, mất thanh phân trang.
+(`@/shared/utils`) để đưa cả hai dạng về `SpringPage<StudentListItem>`.
 
-Một phần tử trong `content`:
+**Lỗi:**
+
+| Trường hợp                                   | HTTP | `code` | Message                     |
+| :------------------------------------------- | :--- | :----- | :-------------------------- |
+| `status` không thuộc bảng Mục 4.1.3          | 400  | 3026   | Trạng thái lọc không hợp lệ |
+| `sort` ngoài 5 key trên (ví dụ `sort=email`) | 400  | 1008   | Trường sắp xếp không hợp lệ |
+| `semesterId` / `majorId` không phải UUID     | 400  | 1006   | Yêu cầu không hợp lệ        |
+
+### 4.2. `GET /student/batch` – Dropdown Khóa
+
+| Param        | Ý nghĩa                                                               |
+| :----------- | :-------------------------------------------------------------------- |
+| `semesterId` | Học kì đang chọn (bỏ trống → kì hiện tại; chưa có kì hiện tại → `[]`) |
+| `majorId`    | Tùy chọn, gửi khi đã chọn Bộ môn để chỉ ra khóa của ngành đó          |
+
+```json
+{ "code": 1000, "data": ["K63", "K64"] }
+```
+
+- Chỉ gồm các khóa **đang có sinh viên có đề tài trong kì**, không trùng, sắp tăng dần.
+- Query key phụ thuộc `semesterId` + `majorId`: đổi học kì / bộ môn → gọi lại. Nếu khóa đang chọn không còn trong danh sách mới → reset về "Tất cả khóa".
+
+### 4.3. `GET /semester` – Dropdown Năm học & Học kì
+
+Dùng chung API của feature học kì (quyền `VIEW_SEMESTER`).
+
+| Param               | Ý nghĩa                                                      |
+| :------------------ | :----------------------------------------------------------- |
+| `page`, `size`      | Mặc định `0`, `10`. FE gọi `size=100` để lấy đủ cho dropdown |
+| `sortBy`, `sortDir` | Mặc định `startDate`, `DESC` (học kì mới nhất lên đầu)       |
+| `keyword`, `status` | Không cần dùng ở màn này                                     |
+
+Response `data` là `PageResponse` (**khác** dạng `Page` của `/student`: dùng `page` thay cho `number`, không có `first`/`last`):
 
 ```json
 {
-  "publicId": "0192f3a1-7c2e-7b4d-9a10-3f5e2d1c0b9a",
-  "studentCode": "2251172489",
-  "name": "Lê Trung Đức",
-  "majorName": "Kỹ thuật phần mềm",
-  "className": "63KTPM1",
-  "status": true
+  "code": 1000,
+  "data": {
+    "totalElements": 2,
+    "totalPages": 1,
+    "page": 0,
+    "size": 100,
+    "content": [
+      {
+        "publicId": "0192f3a1-...",
+        "name": "Học kỳ 1 năm học 2026-2027",
+        "academicYear": "2026-2027",
+        "term": "Học kỳ 1",
+        "startDate": "01-08-2026",
+        "endDate": "31-01-2027",
+        "status": "Đang diễn ra",
+        "statusCode": "ONGOING"
+      }
+    ]
+  }
 }
 ```
 
 ```ts
-export interface StudentListItem {
-  publicId: string
-  studentCode: string
-  name: string            // Họ + Tên, đã ghép sẵn
-  majorName: string | null
-  className: string
-  status: boolean         // true = đang hoạt động
-}
-
-export type StudentStatusFilter = 'ACTIVE' | 'INACTIVE' | 'ALL'
-export type StudentSortField = 'studentCode' | 'name' | 'majorName' | 'className'
-
-export interface StudentListParams {
-  keyword?: string
-  batch?: string
-  majorId?: string
-  status: StudentStatusFilter
-  page: number
-  size: number
-  sort?: `${StudentSortField},${'asc' | 'desc'}`
+export interface SemesterOption {
+  publicId: string;
+  name: string;
+  academicYear: string; // "2026-2027"
+  term: string; // "Học kỳ 1"
+  startDate: string; // dd-MM-yyyy
+  endDate: string;
+  status: string; // "Chưa bắt đầu" | "Đang diễn ra" | "Kết thúc"
+  statusCode: "UPCOMING" | "ONGOING" | "COMPLETED";
 }
 ```
 
-**Lỗi:**
+- Học kì mặc định khi mở trang: `GET /semester/current` (trả 1 `SemesterOption`) → chọn sẵn Năm học + Học kì theo kết quả này.
+- Dùng `publicId` làm `semesterId` (bỏ qua field `id`).
 
-| Trường hợp | HTTP | `code` | Message |
-| :--- | :--- | :--- | :--- |
-| `sort` ngoài 4 key trên (ví dụ `sort=email`, `sort=batch`) | 400 | 1008 | Trường sắp xếp không hợp lệ |
-| `majorId` không phải UUID, `status` sai giá trị | 400 | 1006 | Yêu cầu không hợp lệ |
-
-### 4.2. `GET /major` – Dropdown ngành
+### 4.4. `GET /major` – Dropdown Bộ môn
 
 Không có param. `data` là mảng, BE đã sắp theo tên ngành. Hook `useMajors` cache lâu (`referenceDataQueryOptions`).
 
 ```json
-{ "code": 1000, "data": [ { "publicId": "0192f3a1-...", "code": "KTPM", "name": "Kỹ thuật phần mềm" } ] }
+{
+  "code": 1000,
+  "data": [
+    { "publicId": "0192f3a1-...", "code": "KTPM", "name": "Kỹ thuật phần mềm" }
+  ]
+}
 ```
 
 ```ts
-export interface MajorOption { publicId: string; code: string; name: string }
+export interface MajorOption {
+  publicId: string;
+  code: string;
+  name: string;
+}
 ```
 
-Trưởng bộ môn quản lý **nhiều ngành**, nên cần cả bộ lọc ngành và cột Ngành trên bảng.
-
-### 4.3. `GET /student/{publicId}` – Chi tiết (popup)
-
-Gọi khi bấm 1 dòng, dùng `publicId` của dòng đó.
+### 4.5. `GET /student/{publicId}` – Chi tiết (popup)
 
 ```json
 {
@@ -194,22 +363,30 @@ Gọi khi bấm 1 dòng, dùng `publicId` của dòng đó.
     "majorName": "Kỹ thuật phần mềm",
     "className": "63KTPM1",
     "batch": "K63",
-    "status": true
+    "accountStatus": true
   }
 }
 ```
 
 ```ts
-export interface StudentDetail extends StudentListItem {
-  email: string
-  phone: string | null
-  batch: string
+export interface StudentDetail {
+  publicId: string;
+  studentCode: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  majorName?: string | null;
+  className: string;
+  batch: string;
+  accountStatus: boolean; // thay cho status cũ
 }
 ```
 
-| Lỗi | HTTP | `code` | Message |
-| :--- | :--- | :--- | :--- |
-| `publicId` sai định dạng hoặc không có trong DB | 404 | 3008 | Sinh viên không tồn tại |
+> Detail **không** kế thừa `StudentListItem` nữa (list có field theo học kì, detail thì không).
+
+| Lỗi                                             | HTTP | `code` | Message                 |
+| :---------------------------------------------- | :--- | :----- | :---------------------- |
+| `publicId` sai định dạng hoặc không có trong DB | 404  | 3008   | Sinh viên không tồn tại |
 
 ---
 
@@ -218,174 +395,150 @@ export interface StudentDetail extends StudentListItem {
 Dùng component sẵn có ở `@/shared/components/ui` (`Button`, `Input`, `Select`, `Table*`, `Dialog*`, `Tabs*`, `Badge`,
 `Skeleton`, `FormField`), icon `lucide-react`, tông `slate` + `blue`. Toàn bộ chữ tiếng Việt có dấu.
 
-Mọi popup dùng `Dialog` dùng chung: khi mở, trang nền bị khóa cuộn và được bù đúng bề rộng thanh cuộn
-(`padding-right`) nên trang phía sau không bị giãn ra / co lại khi mở / đóng popup.
+Mọi popup dùng `Dialog` dùng chung: khi mở, trang nền bị khóa cuộn và được bù đúng bề rộng thanh cuộn.
 
 ### 5.1. Bố cục trang `/department/student-management`
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │ Quản lý sinh viên                         [⬆ Import file] [⬇ Export file] [+ Thêm sinh viên] │
-│ Danh sách sinh viên làm đồ án kì này.                                         │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ [🔍 Tìm theo mã SV, họ tên hoặc email...]  [Ngành ▾] [Khóa ▾] [Trạng thái ▾] [Xóa lọc] │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ STT │ Mã SV ↕   │ Họ và tên ↕     │ Ngành ↕            │ Lớp ↕    │ Trạng thái      │
-│  1  │ 2251172489│ Lê Trung Đức    │ Kỹ thuật phần mềm  │ 63KTPM1  │ ● Đang hoạt động│
-│  …                                                                            │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Hiển thị 1–15 / 120 sinh viên                         [‹] 1 2 3 … 8 [›]        │
-└──────────────────────────────────────────────────────────────────────────────┘
+│ Danh sách sinh viên làm đồ án trong học kì.                                               │
+├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ [Năm học ▾] [Học kì ▾]  [🔍 Tìm theo mã SV, họ tên hoặc email...]                          │
+│ [Khóa ▾] [Bộ môn ▾] [Trạng thái ▾] [Xóa lọc]                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ STT │ Họ và tên ↕ │ Lớp / Khóa ↕ │ Bộ môn ↕ │ Đề tài │ GVHD │ Trạng thái                   │
+│  …  (xem Mục 4.1.1)                                                                       │
+├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ Hiển thị 1–15 / 120 sinh viên                                   [‹] 1 2 3 … 8 [›]          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Thanh công cụ:**
-- Ô tìm kiếm: debounce 400 ms bằng `useDebounce` (`@/shared/hooks`), đổi keyword thì về `page = 0`.
-- Ngành: `Select` từ `GET /major`, option đầu "Tất cả ngành" (không gửi `majorId`).
-- Khóa: `Select` tĩnh `BATCH_OPTIONS` = K62 → K66, option đầu "Tất cả khóa" (BE chưa có API danh sách khóa). Gửi `batch`.
-- Trạng thái: "Đang hoạt động" (mặc định, `ACTIVE`) · "Đã tắt" (`INACTIVE`) · "Tất cả" (`ALL`).
-- "Xóa lọc": về keyword rỗng, mọi filter mặc định, `page = 0`, bỏ sort. Chỉ hiện khi đang có filter khác mặc định.
+**Bộ lọc:**
+
+| Bộ lọc         | Nguồn option                                                            | Gửi lên BE                                   | Mặc định                                  |
+| :------------- | :---------------------------------------------------------------------- | :------------------------------------------- | :---------------------------------------- |
+| **Năm học**    | Các `academicYear` không trùng từ `GET /semester` (giữ thứ tự mới → cũ) | _Không gửi_ – chỉ để thu hẹp dropdown Học kì | Năm học của học kì hiện tại               |
+| **Học kì**     | Các học kì thuộc năm học đã chọn, hiện `term` ("Học kỳ 1", "Học kỳ 2")  | `semesterId` = `publicId`                    | Học kì hiện tại (`GET /semester/current`) |
+| **Khóa**       | `GET /student/batch?semesterId=&majorId=`, option đầu "Tất cả khóa"     | `batch`                                      | Tất cả                                    |
+| **Bộ môn**     | `GET /major`, option đầu "Tất cả bộ môn"                                | `majorId`                                    | Tất cả                                    |
+| **Trạng thái** | Tĩnh theo Mục 4.1.3, option đầu "Tất cả trạng thái"                     | `status`                                     | Tất cả                                    |
+| Tìm kiếm       | Ô nhập, debounce 400 ms (`useDebounce`)                                 | `keyword`                                    | rỗng                                      |
+
+- Đổi **Năm học** → tự chọn học kì đầu tiên (mới nhất) của năm đó; đổi Năm học / Học kì → reset Khóa (danh sách khóa phụ thuộc kì).
+- Đổi **Bộ môn** → gọi lại `GET /student/batch` với `majorId`, khóa đang chọn không còn thì reset.
 - Đổi bất kỳ filter hoặc sort nào → `page = 0`.
+- "Xóa lọc": về keyword rỗng, Khóa / Bộ môn / Trạng thái = Tất cả, `page = 0`, bỏ sort. **Giữ nguyên** Năm học + Học kì.
+  Chỉ hiện khi đang có filter khác mặc định.
+- Chưa có học kì nào (`GET /semester` rỗng / `current` lỗi): vẫn gọi `GET /student` không có `semesterId`
+  (BE trả trang rỗng) và hiện "Chưa có học kì nào".
+- Học kì đang chọn có `statusCode = COMPLETED`: ẩn / disable nút "Xóa" (BE sẽ trả `3029`).
+- "Import file" và "Thêm sinh viên" **luôn thêm vào học kì hiện tại** (BE tự xác định), không phụ thuộc học kì đang chọn trên bộ lọc.
+  Chỉ disable khi chưa có học kì hiện tại (`GET /semester/current` lỗi); BE vẫn chặn bằng `409 3030`.
 - State bộ lọc: `useState` trong page (chưa đồng bộ lên URL).
 
 **Bảng:**
-- STT = `number * size + index + 1` (lấy từ `SpringPage` đã chuẩn hóa), ví dụ trang 2 bắt đầu từ 16.
-- Header bấm được ở 4 cột Mã SV / Họ và tên / Ngành / Lớp: lần 1 `asc`, lần 2 `desc`, lần 3 bỏ sort. Hiện icon
-  `ArrowUp` / `ArrowDown` / `ArrowUpDown`. Cột STT, Trạng thái **không** sort được (BE sẽ trả 1008).
-- Trạng thái: `Badge` xanh lá "Đang hoạt động" khi `status = true`, xám "Đã tắt" khi `false`.
-- `majorName` null → hiện "—".
+
+- STT = `number * size + index + 1` (lấy từ `SpringPage` đã chuẩn hóa).
+- Cột bấm sort được: **Họ và tên** (`name`), **Lớp / Khóa** (`className`), **Bộ môn** (`majorName`). Lần 1 `asc`, lần 2 `desc`,
+  lần 3 bỏ sort. Key `studentCode`, `batch` BE cũng nhận nếu sau này cần thêm menu sort phụ.
+  Cột STT, Đề tài, GVHD, Trạng thái **không** sort được (BE trả `1008`).
+- Nội dung từng cột theo Mục 4.1.1 (tên + mã SV 2 dòng; lớp + khóa 2 dòng; GVHD chính + đồng hướng dẫn 2 dòng).
 - Cả dòng có `cursor-pointer` + hover nền `slate-50`; bấm dòng mở popup chi tiết. Hỗ trợ bàn phím: `tabIndex={0}`, Enter mở popup.
-- Đang tải lần đầu: 15 dòng `Skeleton`. Đổi trang/filter: giữ dữ liệu cũ (`placeholderData: keepPreviousData`), làm mờ nhẹ
-  bảng và khóa nút phân trang đến khi dữ liệu mới về.
-- Rỗng: icon `Users` + "Không tìm thấy sinh viên phù hợp" (khi có filter) hoặc "Chưa có sinh viên nào" (khi không filter),
+- Đang tải lần đầu: 15 dòng `Skeleton`. Đổi trang/filter: giữ dữ liệu cũ (`placeholderData: keepPreviousData`), làm mờ nhẹ.
+- Rỗng: icon `Users` + "Không tìm thấy sinh viên phù hợp" (khi có filter) hoặc "Chưa có sinh viên nào trong học kì này" (khi không filter),
   kèm nút "Thêm sinh viên".
-- Phân trang: "Hiển thị X–Y / totalElements sinh viên"; nút trước/sau disabled theo `first` / `last`; nút số trang
-  (`getPageItems`: luôn có trang đầu, trang cuối, 1 trang mỗi bên trang hiện tại, còn lại là "…"). Chỉ hiện nút khi `totalPages > 1`.
+- Phân trang: "Hiển thị X–Y / totalElements sinh viên"; chỉ hiện nút khi `totalPages > 1`.
 
 ### 5.2. Popup "Thông tin sinh viên"
 
-- Mở với `publicId` của dòng; `useStudentDetail(publicId)` (chưa có `publicId` → chưa gọi API, dùng `skipToken`).
-- Header: chỉ tiêu đề **"Thông tin sinh viên"** (không có avatar / tên / mã SV / badge ở header).
-- Nội dung dạng lưới 2 cột (label xám nhỏ, giá trị đậm):
+- Mở với `publicId` của dòng; `useStudentDetail(publicId)` (chưa có `publicId` → `skipToken`).
+- Lưới 2 cột (label xám nhỏ, giá trị đậm):
 
-  | Label | Field |
-  | :--- | :--- |
-  | Mã sinh viên | `studentCode` |
-  | Họ và tên | `name` |
-  | Email | `email` (link `mailto:`) |
-  | Số điện thoại | `phone` (null → "—") |
-  | Ngành | `majorName` (null → "—") |
-  | Lớp | `className` |
-  | Khóa | `batch` |
-  | Trạng thái | `status` (badge) |
+  | Label         | Field                                                                                   |
+  | :------------ | :-------------------------------------------------------------------------------------- |
+  | Mã sinh viên  | `studentCode`                                                                           |
+  | Họ và tên     | `name`                                                                                  |
+  | Email         | `email` (link `mailto:`)                                                                |
+  | Số điện thoại | `phone` (null → "—")                                                                    |
+  | Bộ môn        | `majorName` (null → "—")                                                                |
+  | Lớp           | `className`                                                                             |
+  | Khóa          | `batch`                                                                                 |
+  | Tài khoản     | `accountStatus`: `true` → "Được đăng nhập" (xanh) · `false` → "Bị khóa đăng nhập" (xám) |
 
-- Khối mờ "Đề tài & Giảng viên hướng dẫn – Sẽ cập nhật khi có module đề tài." (giai đoạn 2 BE sẽ bổ sung).
-- Đang tải: `Skeleton` theo lưới. Lỗi 404 (`3008`): interceptor đã toast, popup hiện "Không tải được thông tin sinh viên"
-  (không toast lại).
-- Footer: nút "Đóng". (Nút "Kích hoạt" cho sinh viên `status = false` để khi nối `PATCH .../activate`.)
+- Khối "Đồ án học kì này": lấy luôn từ **dòng đang bấm** trên bảng (`topicName`, `lecturerName`, `coLecturerName`, `statusLabel`),
+  không cần gọi thêm API.
+- Đang tải: `Skeleton` theo lưới. Lỗi 404 (`3008`): interceptor đã toast, popup hiện "Không tải được thông tin sinh viên".
+- Footer: "Xóa khỏi học kì" (Mục 6.5, chỉ hiện khi đủ điều kiện xóa) · "Sửa" (Mục 6.4) · "Đóng".
 
 ### 5.3. Popup Import file
 
-- Tiêu đề "Import danh sách sinh viên"; khi đã có kết quả đổi thành "Kết quả import sinh viên" và popup rộng ra (`max-w-6xl`).
-- Khung kéo-thả / chọn file (`FileDropZone`): chỉ nhận **`.xlsx`**, tối đa **50MB**, 1 file. Chọn file xong hiện tên +
-  dung lượng (`formatBytes`) + nút "x" bỏ chọn (xóa luôn cả lỗi đang hiện để chọn file khác).
-  Sai đuôi / quá dung lượng → chữ đỏ dưới khung ("File import phải có định dạng .xlsx",
-  "File import vượt quá dung lượng cho phép (50MB)") — trùng message của BE.
-- Link "Tải file mẫu": tạm `toast.info('Sẽ hỗ trợ sau')` (file mẫu ở BE
-  `src/main/resources/templates/student_import_template.xlsx`, chưa có API tải về).
-- Khối hướng dẫn ngắn: 8 cột theo thứ tự **Mã sinh viên · Họ · Tên · Email · Số điện thoại · Khóa · Lớp · Ngành**,
-  dòng 1 là tiêu đề, không gộp ô.
-- Nút "Import" (disabled khi chưa chọn file, "Đang import..." khi đang gửi; timeout 5 phút). Gọi `POST /student/import`
-  với `skipErrorToast`: lỗi mức toàn file (`4000`) hiện chữ đỏ ngay dưới khung chọn file.
-- Import xong:
-  - Không có dòng lỗi/cảnh báo → `toast.success('Đã import thành công N sinh viên')`.
-  - Hiện kết quả theo **tab Lỗi / Cảnh báo / Thành công** (kèm số lượng; mở sẵn tab đầu tiên có dữ liệu) + dòng tóm tắt.
-    Bảng mỗi tab: Dòng, Mã SV, Họ tên, Lớp, Ngành, "Lý do lỗi" / "Thông báo".
-  - Dòng **Lỗi** có nút sửa: mở form ngay dưới dòng (`RetryImportRowForm`, cùng 8 ô và schema với popup Thêm),
-    bấm "Gửi lại" → `POST /student`. `1000` → dòng chuyển sang Thành công; `11xx` → chuyển sang Cảnh báo;
-    lỗi → hiện ở đầu form và cập nhật lý do của dòng.
-  - Footer: "Import file khác" (quay lại chọn file) / "Đóng".
-- Xong import hoặc gửi lại thành công → tải lại danh sách (`invalidateQueries(departmentStudentKeys.all)`).
+- Như cũ (chỉ nhận `.xlsx`, tối đa 50MB, kết quả theo tab Lỗi / Cảnh báo / Thành công, sửa & gửi lại dòng lỗi).
+- **Mới:** hiện dòng "Import vào: _Học kỳ 1 năm học 2026-2027_" lấy từ `GET /semester/current` (**không** phải học kì đang chọn
+  trên bộ lọc). **Không** gửi `semesterId` (Mục 6.1); gửi lại dòng lỗi qua `POST /student` cũng không gửi.
+- Xong import hoặc gửi lại thành công → `invalidateQueries(departmentStudentKeys.all)` (gồm cả danh sách khóa).
 
 ### 5.4. Popup Export file (chỉ giao diện)
 
-- Tiêu đề "Export danh sách sinh viên", mô tả "Xuất danh sách sinh viên ra file Excel."
-- Chọn phạm vi: radio "Theo bộ lọc hiện tại" (mặc định, hiện tóm tắt filter đang chọn) / "Tất cả sinh viên".
-- Định dạng: `.xlsx` (chỉ 1 lựa chọn).
-- Nút "Export": `toast.info('Chức năng export sẽ được hỗ trợ sau')` rồi đóng. **BE chưa có API export**
-  (khi làm sẽ cần thêm, ví dụ `GET /student/export` nhận cùng bộ lọc với `GET /student`).
+- Như cũ. **BE chưa có API export** (khi làm sẽ nhận cùng bộ lọc với `GET /student`, gồm `semesterId`).
 
 ### 5.5. Popup Thêm sinh viên
 
-Form theo skill `build-form` (`react-hook-form` + `zod`, `<form noValidate>`, lỗi đỏ `#DC2626` dưới ô qua `FormField`).
-Field khớp `StudentCreationRequest` của BE (Mục 6.2). Lưới 2 cột (`StudentFormFields`, dùng chung với form sửa dòng lỗi import):
+Form theo skill `build-form` (`react-hook-form` + `zod`). 8 ô như cũ, **không** có học kì (BE tự thêm vào học kì hiện tại; có thể hiện dòng chữ "Thêm vào: _<học kì hiện tại>_"):
 
-| Label | Field | Ràng buộc zod (trùng BE) | Message lỗi (trùng BE) |
-| :--- | :--- | :--- | :--- |
-| Mã sinh viên * | `studentCode` | `^\d{10}$` | Mã sinh viên phải gồm đúng 10 chữ số |
-| Họ và tên đệm * | `firstName` | chữ cái, các từ cách nhau 1 khoảng trắng: `^\p{L}+( \p{L}+)*$` (flag `u`) | Họ chỉ được chứa chữ cái và khoảng trắng |
-| Tên * | `lastName` | 1 từ chữ cái: `^\p{L}+$` (flag `u`) | Tên chỉ được chứa chữ cái |
-| Email * | `email` | (1) `^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$` sau khi lowercase; (2) đúng định dạng rồi mới xét: `.endsWith('@gmail.com')` (`STUDENT_EMAIL_DOMAIN`; chỉ form sinh viên, form giáo viên không áp dụng) | (1) Email không đúng định dạng; (2) Email sinh viên phải có đuôi @gmail.com |
-| Số điện thoại * | `phone` | `^0\d{9}$` | Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0 |
-| Khóa * | `batch` | `^K\d{2}$` sau khi uppercase | Khóa học không đúng định dạng (VD: K64) |
-| Lớp * | `className` | `^[\p{L}\p{N}]+( [\p{L}\p{N}]+)*$` (flag `u`) | Tên lớp không được chứa ký tự đặc biệt |
-| Ngành * | `major` | bắt buộc, `Select` từ `GET /major` (gửi **tên ngành**) | Ngành học không được để trống |
+| Label            | Field         | Ràng buộc zod (trùng BE)                                         | Message lỗi (trùng BE)                                               |
+| :--------------- | :------------ | :--------------------------------------------------------------- | :------------------------------------------------------------------- |
+| Mã sinh viên \*  | `studentCode` | `^\d{10}$`                                                       | Mã sinh viên phải gồm đúng 10 chữ số                                 |
+| Họ và tên đệm \* | `firstName`   | `^\p{L}+( \p{L}+)*$` (flag `u`)                                  | Họ chỉ được chứa chữ cái và khoảng trắng                             |
+| Tên \*           | `lastName`    | `^\p{L}+$` (flag `u`)                                            | Tên chỉ được chứa chữ cái                                            |
+| Email \*         | `email`       | định dạng email sau khi lowercase, rồi `.endsWith('@gmail.com')` | Email không đúng định dạng / Email sinh viên phải có đuôi @gmail.com |
+| Số điện thoại \* | `phone`       | `^0\d{9}$`                                                       | Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0                |
+| Khóa \*          | `batch`       | `^K\d{2}$` sau khi uppercase                                     | Khóa học không đúng định dạng (VD: K64)                              |
+| Lớp \*           | `className`   | `^[\p{L}\p{N}]+( [\p{L}\p{N}]+)*$` (flag `u`)                    | Tên lớp không được chứa ký tự đặc biệt                               |
+| Bộ môn \*        | `major`       | bắt buộc, `Select` từ `GET /major` (gửi **tên ngành**)           | Ngành học không được để trống                                        |
 
-- Ô trống → message "… không được để trống" tương ứng (ví dụ "Mã sinh viên không được để trống").
-- Trim + gộp khoảng trắng trước khi validate.
-- Email sai định dạng chỉ báo 1 lỗi định dạng, không báo thêm lỗi đuôi email.
-- Placeholder ví dụ: `2251172489`, `Lê Trung`, `Đức`, `2251172489@gmail.com`, `0911111111`, `K63`, `63KTPM1`.
-- Ghi chú nhỏ dưới form: "Nếu sinh viên đã có trong hệ thống, chỉ Lớp và Số điện thoại được cập nhật."
-- Nút "Hủy" / "Lưu" ("Đang lưu..." khi đang gửi; không cho đóng popup lúc đang gửi). Gọi `POST /student` với `skipErrorToast`:
-  - `1000` → `toast.success(message của BE)`, đóng và reset form.
-  - `11xx` (ví dụ `1101`) → interceptor hiện toast vàng, đóng popup.
-  - Lỗi (`4000`, `3004`, `3010`, `3011`, `3005`, mất mạng) → hiện message của BE ở đầu form (`setError('root.server')`).
+- Ghi chú dưới form: "Nếu sinh viên đã có trong hệ thống, chỉ Lớp và Số điện thoại được cập nhật."
+- Kết quả: `1000` → toast xanh, đóng; `1101` / `1102` → toast vàng (interceptor), đóng; lỗi → hiện ở đầu form.
 
 ---
 
 ## 6. API ghi dữ liệu
 
-### 6.1. `POST /student/import` (đã nối)
+### 6.1. `POST /student/import`
 
-`multipart/form-data`, part tên **`file`** (service gửi kèm header `Content-Type: multipart/form-data` để axios không
-serialize FormData thành JSON). Luôn trả HTTP 200, `code 1000`, message "Xử lý file import hoàn tất", kèm:
+`multipart/form-data`, chỉ part **`file`**. Sinh viên luôn được thêm vào năm học + học kì hiện tại (BE tự xác định).
+Luôn trả HTTP 200, `code 1000`, message "Xử lý file import hoàn tất", `data` = `StudentImportResponse` (không đổi):
 
 ```ts
-export type RowImportStatus = 'SUCCESS' | 'WARNING' | 'ERROR'
+export type RowImportStatus = "SUCCESS" | "WARNING" | "ERROR";
 
 export interface StudentImportRowResult {
-  rowNumber: number        // dòng thật trên Excel (tiêu đề = 1)
-  // Giữ nguyên giá trị đọc từ file; ô trống có thể là null
-  studentCode: string | null
-  firstName: string | null
-  lastName: string | null
-  email: string | null
-  phone: string | null
-  batch: string | null
-  className: string | null
-  majorName: string | null
-  status: RowImportStatus  // SUCCESS xanh · WARNING vàng · ERROR đỏ
-  message: string          // lý do / kết quả của dòng
+  rowNumber: number;
+  studentCode: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  batch: string | null;
+  className: string | null;
+  majorName: string | null;
+  status: RowImportStatus;
+  message: string;
 }
 
 export interface StudentImportResponse {
-  totalRows: number
-  successCount: number
-  warningCount: number
-  errorCount: number
-  rowResults: StudentImportRowResult[]
+  totalRows: number;
+  successCount: number;
+  warningCount: number;
+  errorCount: number;
+  rowResults: StudentImportRowResult[];
 }
 ```
 
-Lỗi mức toàn file (HTTP 400, `code 4000`): "File import không được để trống", "File import phải có định dạng .xlsx",
-"Dòng tiêu đề không đúng với file mẫu", "File import không được chứa ô bị gộp", "File import không có dòng dữ liệu nào",
-"File import vượt quá dung lượng cho phép (50MB)".
+Lỗi mức toàn file (HTTP 400, `code 4000`) như cũ. Lỗi theo học kì: `409 3030` "Hiện chưa có học kỳ nào đang diễn ra, không thể thêm sinh viên",
+`409 3023` "Học kỳ đã kết thúc, không thể thêm sinh viên" (học kì hiện tại thực tế đã qua ngày kết thúc).
 
-Lỗi đối chiếu DB của từng dòng (`status = ERROR`) dùng cùng message với `POST /student` (bảng Mục 6.2), ví dụ
-"Mã sinh viên đã thuộc về một tài khoản khác trong hệ thống". FE chỉ hiển thị `message`, không cần đổi code khi BE đổi message.
-
-### 6.2. `POST /student` (đã nối – thêm thủ công & gửi lại dòng import lỗi)
-
-Body JSON:
+### 6.2. `POST /student` – thêm thủ công & gửi lại dòng import lỗi
 
 ```json
 {
@@ -400,43 +553,69 @@ Body JSON:
 }
 ```
 
-API ghi không có `data`, nên service trả `StudentWriteResult { code, message }` để màn hình phân biệt thành công / cảnh báo.
+| Kết quả                                                                   | HTTP | `code`   | Message                                                                              |
+| :------------------------------------------------------------------------ | :--- | :------- | :----------------------------------------------------------------------------------- |
+| Thêm mới                                                                  | 200  | 1000     | Thêm sinh viên thành công                                                            |
+| SV đã có, chưa có trong kì → thêm vào kì                                  | 200  | 1000     | Đã thêm sinh viên vào học kỳ                                                         |
+| Đổi lớp / SĐT                                                             | 200  | 1000     | Đã cập nhật: Lớp, Số điện thoại                                                      |
+| **Y hệt, đã có trong kì – vàng**                                          | 200  | **1101** | Sinh viên đã có trong học kỳ, thông tin không thay đổi                               |
+| **Đã hoàn thành đồ án trong kì – vàng**                                   | 200  | **1102** | Sinh viên đã hoàn thành đồ án trong học kỳ này                                       |
+| Lỗi định dạng (1 lỗi / ≥ 2 lỗi)                                           | 400  | 4000     | Message lỗi cụ thể / `<các trường> không hợp lệ, vui lòng kiểm tra lại`              |
+| Trùng mã SV / email / SĐT với tài khoản khác, hoặc lệch họ tên/khóa/ngành | 409  | 3014     | `<Mã sinh viên, Email, Số điện thoại> trùng với tài khoản đã tồn tại trong hệ thống` |
+| Chưa có học kì hiện tại                                                   | 409  | 3030     | Hiện chưa có học kỳ nào đang diễn ra, không thể thêm sinh viên                       |
+| Học kì hiện tại thực tế đã qua ngày kết thúc                              | 409  | 3023     | Học kỳ đã kết thúc, không thể thêm sinh viên                                         |
+| Đã hoàn thành đồ án ở kì trước                                            | 409  | 3024     | Sinh viên đã hoàn thành đồ án ở học kỳ trước, không thể thêm vào học kỳ mới          |
+| Đang làm đồ án ở kì khác                                                  | 409  | 3025     | Sinh viên đang làm đồ án ở học kỳ khác                                               |
 
-| Kết quả | HTTP | `code` | Message |
-| :--- | :--- | :--- | :--- |
-| Thêm mới | 200 | 1000 | Thêm sinh viên thành công |
-| Đang hoạt động, đổi lớp/SĐT | 200 | 1000 | Đã cập nhật: Lớp, Số điện thoại |
-| Bị tắt, kích hoạt lại (± cập nhật) | 200 | 1000 | Đã kích hoạt lại … |
-| **Đang hoạt động, y hệt – cảnh báo vàng** | 200 | **1101** | Sinh viên đã có trong hệ thống, thông tin không thay đổi |
-| 1 lỗi định dạng | 400 | 4000 | Message lỗi cụ thể (bảng Mục 5.5) |
-| Email đúng định dạng nhưng không có đuôi `@gmail.com` | 400 | 4000 | Email sinh viên phải có đuôi @gmail.com |
-| ≥ 2 lỗi định dạng | 400 | 4000 | Thông tin nhập không hợp lệ, vui lòng kiểm tra lại |
-| Mã SV chưa có, email đã thuộc tài khoản khác (SV khác, giáo viên, admin) | 409 | 3010 | Email đã thuộc về một tài khoản khác trong hệ thống |
-| Mã SV đã có (gắn với email khác), email nhập vào chưa có trong hệ thống | 409 | 3011 | Mã sinh viên đã thuộc về một tài khoản khác trong hệ thống |
-| Mã SV và email đều đã có nhưng thuộc 2 tài khoản khác nhau | 409 | 3004 | Mã sinh viên và Email thuộc về hai tài khoản khác nhau trong hệ thống |
-| Đúng mã + email nhưng lệch họ tên/khóa/ngành | 409 | 3005 | Thông tin không khớp với hồ sơ gốc trong hệ thống |
+### 6.3. ~~`PATCH /student/{publicId}/activate`~~ – đã xóa
 
-### 6.3. `PATCH /student/{publicId}/activate` (chưa nối)
+BE đã bỏ API này cùng `Student.status`. FE xóa endpoint `activate` và nút "Kích hoạt".
 
-Không body. `1000` "Đã kích hoạt lại tài khoản sinh viên" · **`1100`** (HTTP 200, vàng) "Sinh viên đã tồn tại/đang hoạt động trong kì này" ·
-404 `3008` "Sinh viên không tồn tại". Endpoint đã khai báo sẵn (`API_ENDPOINTS.departmentStudent.activate`);
-mã `1100` sẽ tự hiện toast vàng nhờ interceptor xử lý dải `11xx`.
+### 6.4. `PUT /student/{publicId}` – Sửa sinh viên (chưa nối)
+
+Body: đúng 8 trường của form Thêm (`studentCode`, `firstName`, `lastName`, `email`, `phone`, `batch`, `className`, `major`),
+**không** có `semesterId`. Form Sửa dùng lại `StudentFormFields` + schema của popup Thêm, điền sẵn từ `GET /student/{publicId}`
+(tách `name` thành Họ / Tên: từ cuối là Tên).
+
+| Kết quả                                      | HTTP | `code`   | Message                                                       |
+| :------------------------------------------- | :--- | :------- | :------------------------------------------------------------ |
+| Có thay đổi                                  | 200  | 1000     | Đã cập nhật: Tên, Số điện thoại, Lớp _(liệt kê field đã đổi)_ |
+| Không đổi gì – vàng                          | 200  | **1103** | Thông tin sinh viên không thay đổi                            |
+| SV không có / ngoài phạm vi ngành            | 404  | 3008     | Sinh viên không tồn tại                                       |
+| Lỗi định dạng                                | 400  | 4000     | như POST                                                      |
+| Ngành mới ngoài phạm vi                      | 403  | 3018     | Bạn không có quyền thao tác trên ngành này                    |
+| Trùng mã SV / email / SĐT với tài khoản khác | 409  | 3014     | như POST                                                      |
+
+Thành công → `invalidateQueries(departmentStudentKeys.all)` + detail của SV đó.
+
+### 6.5. `DELETE /student/{publicId}?semesterId=` – Xóa SV import nhầm khỏi học kì (chưa nối)
+
+- Xóa **theo học kì đang chọn**. SV không còn đồ án ở kì nào khác → BE xóa luôn hồ sơ + tài khoản
+  ("Xóa sinh viên thành công"); còn lịch sử ở kì khác → chỉ xóa khỏi kì ("Đã xóa sinh viên khỏi học kỳ"). FE hiện `message` của BE.
+- Chỉ xóa được khi SV **chưa đăng ký GVHD / chưa có đề tài**. FE chỉ hiện nút khi dòng có `status = STAGE_1_REGISTERING_ADVISOR`
+  và không có `lecturerName` / `topicName`; BE vẫn kiểm tra lại (kể cả đơn đăng ký GVHD đã bị từ chối → `3028`).
+- Hỏi xác nhận trước khi gọi: "Xóa sinh viên _Lê Trung Đức (2251172489)_ khỏi _Học kỳ 1 năm học 2026-2027_?"
+
+| Lỗi                               | HTTP | `code` | Message                                                             |
+| :-------------------------------- | :--- | :----- | :------------------------------------------------------------------ |
+| SV không có / ngoài phạm vi ngành | 404  | 3008   | Sinh viên không tồn tại                                             |
+| Thiếu `semesterId`                | 400  | 3022   | Vui lòng chọn học kỳ                                                |
+| SV không có trong kì này          | 404  | 3027   | Sinh viên không có trong học kỳ này                                 |
+| Đã đăng ký GVHD / có đề tài       | 409  | 3028   | Sinh viên đã đăng ký giáo viên hướng dẫn hoặc đề tài, không thể xóa |
+| Học kì đã kết thúc                | 409  | 3029   | Học kỳ đã kết thúc, không thể xóa sinh viên                         |
 
 ---
 
 ## 7. Checklist
 
-- [x] `/department/student-management` mở được từ menu, page nạp lazy.
-- [x] Bảng hiển thị dữ liệu thật từ `GET /student`, mặc định `status=ACTIVE`, `size=15`, `page=0`.
-- [x] Tìm kiếm (debounce), lọc Ngành (từ `GET /major`), Khóa, Trạng thái, Xóa lọc; đổi filter về trang 0.
-- [x] Sort 4 cột đúng key `studentCode | name | majorName | className`; phân trang đúng (0-based), STT nối tiếp theo trang,
-      đọc được cả `Page` phẳng lẫn `PagedModel`.
-- [x] Bấm dòng → popup "Thông tin sinh viên" gọi `GET /student/{publicId}`, có skeleton khi tải, xử lý 404.
-- [x] Import gọi `POST /student/import`, kết quả theo tab, sửa & gửi lại dòng lỗi qua `POST /student`; nút "x" bỏ chọn file lỗi.
-- [x] Popup Thêm sinh viên gọi `POST /student`, validate zod đúng message BE (gồm đuôi `@gmail.com`).
-- [x] Mở/đóng popup không làm trang nền giãn ra / co lại.
-- [ ] Export file (chờ BE có API).
-- [ ] Kích hoạt lại sinh viên đã tắt (`PATCH /student/{publicId}/activate`).
-- [ ] Tải file mẫu import (chờ BE có API).
-- [x] Không deep import, service trả `res.data.data` (riêng API ghi trả `{ code, message }`), không `toast.error` thủ công.
-- [x] `npx tsc -b`, `npm run lint`, `npm test`, `npm run build` đều qua.
+- [ ] Bộ lọc Năm học + Học kì từ `GET /semester` / `GET /semester/current`, gửi `semesterId`.
+- [ ] Bảng 6 cột: Họ và tên (kèm mã SV bên dưới) · Lớp / Khóa · Bộ môn · Đề tài · GVHD (+ đồng hướng dẫn) · Trạng thái (`statusLabel`).
+- [ ] Bộ lọc Khóa từ `GET /student/batch` (bỏ `BATCH_OPTIONS` tĩnh), Bộ môn từ `GET /major`, Trạng thái theo Mục 4.1.3.
+- [ ] Bỏ `status: boolean` / `ACTIVE | INACTIVE | ALL` / nút Kích hoạt / endpoint `activate`.
+- [ ] Sort đúng key `studentCode | name | className | batch | majorName`; phân trang 0-based, đọc được cả `Page` lẫn `PagedModel`.
+- [ ] Popup chi tiết dùng `accountStatus`.
+- [ ] `POST /student` và `POST /student/import` **không** gửi `semesterId` (BE tự vào học kì hiện tại); xử lý `1102`, `3023` – `3025`, `3030`.
+- [ ] Sửa sinh viên (`PUT`), xử lý `1103`.
+- [ ] Xóa sinh viên khỏi học kì (`DELETE`), có hộp xác nhận.
+- [ ] Export file (chờ BE có API). Tải file mẫu import (chờ BE có API).
+- [ ] `npx tsc -b`, `npm run lint`, `npm test`, `npm run build` đều qua.

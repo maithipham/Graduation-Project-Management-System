@@ -17,7 +17,9 @@ import {
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
 import { useImportStudents } from '../hooks/useStudents'
+import type { SemesterOption } from '../types'
 import { StudentImportResult } from './StudentImportResult'
+import { TargetSemesterNote } from './TargetSemesterNote'
 
 const MAX_IMPORT_SIZE = 50 * 1024 * 1024 // 50MB, trùng giới hạn của BE
 
@@ -46,9 +48,11 @@ type ImportFormValues = z.infer<typeof importSchema>
 interface ImportStudentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Học kì hiện tại — chỉ để hiển thị, không gửi lên BE */
+  targetSemester: SemesterOption | undefined
 }
 
-export function ImportStudentDialog({ open, onOpenChange }: ImportStudentDialogProps) {
+export function ImportStudentDialog({ open, onOpenChange, targetSemester }: ImportStudentDialogProps) {
   const formId = useId()
   const importStudents = useImportStudents()
   // Có kết quả (data) → chuyển sang màn kết quả; reset() mutation → quay lại bước chọn file
@@ -86,7 +90,8 @@ export function ImportStudentDialog({ open, onOpenChange }: ImportStudentDialogP
           toast.success(`Đã import thành công ${data.successCount} sinh viên`)
         }
       },
-      // Lỗi mức toàn file (sai mẫu, file trống, sai định dạng...) hiện ngay dưới ô chọn file
+      // Lỗi mức toàn file (4000: sai mẫu, file trống...) và lỗi học kì
+      // (3030 chưa có kì hiện tại, 3023 kì hiện tại đã kết thúc) hiện ngay dưới ô chọn file
       onError: (error) => setError('file', { message: error.message }),
     })
   }
@@ -111,6 +116,7 @@ export function ImportStudentDialog({ open, onOpenChange }: ImportStudentDialogP
         ) : (
           <form id={formId} noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <fieldset disabled={importStudents.isPending} className="space-y-4">
+              <TargetSemesterNote label="Import vào" semester={targetSemester} />
               <FormField label="File import" required error={errors.file?.message}>
                 <FileDropZone
                   file={file}

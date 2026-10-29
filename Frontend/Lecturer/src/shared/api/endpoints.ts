@@ -23,11 +23,13 @@ export const API_ENDPOINTS = {
   },
   // Quản lý sinh viên (Trưởng bộ môn / Admin). Khác nhóm `student` ở trên (portal của sinh viên)
   departmentStudent: {
-    // GET: danh sách (Page) · POST: thêm thủ công
+    // GET: danh sách theo học kì (Page) · POST: thêm thủ công
     base: '/student',
+    // GET: chi tiết · PUT: sửa · DELETE: xóa khỏi học kì
     detail: (publicId: string) => `/student/${publicId}`,
     import: '/student/import',
-    activate: (publicId: string) => `/student/${publicId}/activate`,
+    // GET: các khóa đang có sinh viên trong học kì (dropdown Khóa)
+    batch: '/student/batch',
   },
   // Quản lý giáo viên hướng dẫn (Trưởng bộ môn / Admin)
   departmentTeacher: {
@@ -41,6 +43,11 @@ export const API_ENDPOINTS = {
   },
   major: {
     base: '/major',
+  },
+  // Học kì cho dropdown Năm học / Học kì (quyền VIEW_SEMESTER). Khác nhóm admin.semesters
+  semester: {
+    base: '/semester',
+    current: '/semester/current',
   },
   lecturer: {
     dashboard: '/lecturer/dashboard',

@@ -2,13 +2,21 @@ import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/shared/utils/cn'
 
-export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  /**
+   * Class cho khung bọc ngoài (chứa cả mũi tên). Đặt độ rộng (`w-44`, `lg:w-60`) ở đây,
+   * không đặt ở `className`: khung mặc định rộng 100% nên mũi tên sẽ nằm lệch khỏi ô
+   */
+  containerClassName?: string
+}
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, containerClassName, children, ...props }, ref) => {
     const isAuto = className?.includes('w-auto')
     return (
-      <div className={cn('relative inline-block', isAuto ? 'w-auto' : 'w-full')}>
+      <div
+        className={cn('relative inline-block', isAuto ? 'w-auto' : 'w-full', containerClassName)}
+      >
         <select
           ref={ref}
           className={cn(
