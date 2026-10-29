@@ -58,14 +58,18 @@ let savedBodyStyle = { overflow: '', paddingRight: '' }
 /**
  * Khóa cuộn trang nền khi mở popup.
  * Ẩn thanh cuộn làm trang rộng thêm đúng bề rộng thanh cuộn (nội dung bị giãn ra rồi co lại khi đóng),
- * nên bù lại bằng padding-right đúng bằng bề rộng đó.
+ * nên bù lại bằng padding-right đúng bằng bề rộng đó (trừ khi trang đã giữ sẵn chỗ thanh cuộn).
  */
 function lockBodyScroll() {
   const { body } = document
   if (scrollLockCount === 0) {
     savedBodyStyle = { overflow: body.style.overflow, paddingRight: body.style.paddingRight }
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
-    if (scrollbarWidth > 0) {
+    const root = document.documentElement
+    const scrollbarWidth = window.innerWidth - root.clientWidth
+    // html đã `scrollbar-gutter: stable` (global.css) thì chỗ thanh cuộn vẫn được giữ khi khóa cuộn → không bù nữa
+    // (`?? ''`: jsdom trong test chưa hỗ trợ thuộc tính này)
+    const gutterStable = (window.getComputedStyle(root).scrollbarGutter ?? '').startsWith('stable')
+    if (scrollbarWidth > 0 && !gutterStable) {
       const currentPadding = parseFloat(window.getComputedStyle(body).paddingRight) || 0
       body.style.paddingRight = `${currentPadding + scrollbarWidth}px`
     }

@@ -19,6 +19,7 @@ import { StudentStatusBadge } from './StudentStatusBadge'
 
 const COLUMN_COUNT = 8
 
+// Độ rộng cột cố định (bảng `table-fixed`), cột Đề tài lấy phần còn lại.
 // Kiểu chữ tiêu đề cột theo mockup: chữ nhỏ, in hoa, giãn chữ, không xuống dòng.
 // Cột sắp xếp được: chữ nằm trong <button> nên phải in hoa cả button;
 // icon mũi tên chỉ hiện khi đang sắp xếp theo cột đó hoặc rê chuột vào
@@ -29,9 +30,9 @@ const HEAD_CLASS =
 const ROW_ACTION_CLASS = 'h-7 w-7 rounded-lg text-slate-500 [&_svg]:size-3.5'
 
 const SORTABLE_COLUMNS: { field: StudentSortField; label: string; className?: string }[] = [
-  { field: 'name', label: 'Họ và tên', className: 'min-w-56' },
-  { field: 'className', label: 'Lớp / Khóa' },
-  { field: 'majorName', label: 'Bộ môn' },
+  { field: 'name', label: 'Họ và tên', className: 'w-[20%]' },
+  { field: 'className', label: 'Lớp / Khóa', className: 'w-32' },
+  { field: 'majorName', label: 'Bộ môn', className: 'w-[13%]' },
 ]
 
 // Màu avatar chữ cái đầu, chọn theo MSSV để mỗi sinh viên luôn cùng một màu
@@ -162,7 +163,7 @@ export function StudentTable({
               {getInitials(student.name)}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+              <div className="flex items-center gap-1.5 font-semibold break-words text-slate-900">
                 {student.name}
                 {!student.accountStatus && (
                   <Lock className="h-3.5 w-3.5 text-slate-400" aria-label="Tài khoản bị khóa đăng nhập" />
@@ -183,7 +184,7 @@ export function StudentTable({
           </div>
         </TableCell>
         <TableCell className="px-4 py-4 text-slate-800">{student.majorName ?? '—'}</TableCell>
-        <TableCell className="max-w-64 px-4 py-4">
+        <TableCell className="px-4 py-4">
           {student.topicName ? (
             <span className="line-clamp-2 text-slate-700" title={student.topicName}>
               {student.topicName}
@@ -194,9 +195,9 @@ export function StudentTable({
         </TableCell>
         <TableCell className="px-4 py-4">
           {student.lecturerName ? (
-            <div className="space-y-0.5 whitespace-nowrap text-slate-800">
-              <div>{student.lecturerName}</div>
-              {student.coLecturerName && <div>{student.coLecturerName}</div>}
+            <div className="space-y-0.5 text-slate-800 [&>div]:truncate">
+              <div title={student.lecturerName}>{student.lecturerName}</div>
+              {student.coLecturerName && <div title={student.coLecturerName}>{student.coLecturerName}</div>}
             </div>
           ) : (
             <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
@@ -204,7 +205,8 @@ export function StudentTable({
             </span>
           )}
         </TableCell>
-        <TableCell className="px-4 py-4">
+        {/* Nhãn dài (VD "Bị đình chỉ / Không đủ điều kiện đi tiếp") xuống dòng trong cột cố định */}
+        <TableCell className="px-4 py-4 [&>span]:whitespace-normal">
           <StudentStatusBadge status={student.status} label={student.statusLabel} />
         </TableCell>
         <TableCell className="px-4 py-4">
@@ -251,11 +253,16 @@ export function StudentTable({
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
       <div className={cn('transition-opacity', isPlaceholderData && 'opacity-60')}>
-        {/* Cuộn trong khung, tiêu đề cột dính trên cùng */}
-        <Table containerClassName="max-h-[calc(100vh-17rem)] min-h-64">
+        {/* Khung cao cố định (ít dòng thì để trống phía dưới), cuộn bên trong, tiêu đề cột dính trên cùng */}
+        <Table
+          containerClassName="h-[calc(100vh-17rem)] min-h-64"
+          // Cố định độ rộng cột: đổi bộ lọc (tên / đề tài dài ngắn khác nhau) cột không tự dãn ra co vào.
+          // Màn hình hẹp hơn min-w thì cuộn ngang trong khung
+          className="min-w-[1100px] table-fixed"
+        >
           <TableHeader className="sticky top-0 z-10 bg-slate-50">
             <TableRow className="hover:bg-transparent">
-              <TableHead className={cn(HEAD_CLASS, 'w-16')}>STT</TableHead>
+              <TableHead className={cn(HEAD_CLASS, 'w-14')}>STT</TableHead>
               {SORTABLE_COLUMNS.map((column) => (
                 <SortableTableHead
                   key={column.field}
@@ -267,16 +274,17 @@ export function StudentTable({
                 />
               ))}
               <TableHead className={HEAD_CLASS}>Đề tài</TableHead>
-              <TableHead className={HEAD_CLASS}>GVHD</TableHead>
-              <TableHead className={HEAD_CLASS}>Trạng thái</TableHead>
-              <TableHead className={cn(HEAD_CLASS, 'text-right')}>Thao tác</TableHead>
+              <TableHead className={cn(HEAD_CLASS, 'w-[14%]')}>GVHD</TableHead>
+              <TableHead className={cn(HEAD_CLASS, 'w-48')}>Trạng thái</TableHead>
+              <TableHead className={cn(HEAD_CLASS, 'w-24 text-right')}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>{renderBody()}</TableBody>
         </Table>
       </div>
 
-      {data && !data.empty && (
+      {/* Luôn hiện chân bảng (kể cả khi rỗng) để bảng không bị hụt chiều cao */}
+      {data && (
         <TablePagination
           data={data}
           disabled={isPlaceholderData}

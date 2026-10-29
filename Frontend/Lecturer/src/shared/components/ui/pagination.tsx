@@ -30,7 +30,8 @@ export function TablePagination({
   pageSizeOptions,
   onPageSizeChange,
 }: TablePaginationProps) {
-  const from = data.number * data.size + 1;
+  // Trang rỗng → "Hiển thị 0–0 trên 0 ..." thay vì "1–0"
+  const from = data.empty ? 0 : data.number * data.size + 1;
   const to = data.number * data.size + data.numberOfElements;
 
   return (

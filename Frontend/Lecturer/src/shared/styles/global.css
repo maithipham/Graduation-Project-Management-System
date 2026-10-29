@@ -9,6 +9,12 @@
   font-weight: 400;
 }
 
+/* Luôn chừa chỗ cho thanh cuộn dọc: trang dài/ngắn hơn màn hình (đổi bộ lọc, mở popup)
+   thì nội dung không bị xê dịch ngang */
+html {
+  scrollbar-gutter: stable;
+}
+
 * {
   box-sizing: border-box;
 }
