@@ -26,6 +26,11 @@ const COLUMN_COUNT = 8
 const HEAD_CLASS =
   'h-9.5 bg-slate-100 px-4 text-left text-[11px] font-bold uppercase tracking-wider whitespace-nowrap text-slate-700 [&_button]:uppercase [&_button]:tracking-wider [&_svg.text-slate-400]:opacity-0 [&:hover_svg]:opacity-100'
 
+// Mỗi dòng cao cố định 60px; khung bảng cao đúng tiêu đề (38px + 1px viền) + 7 dòng = 459px
+// → hiện tối đa 7 dòng, dòng thứ 8 trở đi phải cuộn mới thấy. Đổi ROW_HEIGHT_CLASS thì tính lại số này
+const ROW_HEIGHT_CLASS = 'h-15'
+const VISIBLE_ROWS_HEIGHT_CLASS = 'h-[459px]'
+
 // Nút thao tác từng dòng theo đặc tả: 28px, bo 8px, icon 14px
 const ROW_ACTION_CLASS = 'h-7 w-7 rounded-lg text-slate-500 [&_svg]:size-3.5'
 
@@ -95,9 +100,9 @@ export function StudentTable({
   const renderBody = () => {
     if (isPending) {
       return Array.from({ length: pageSize }, (_, i) => (
-        <TableRow key={i} className="hover:bg-transparent">
+        <TableRow key={i} className={cn(ROW_HEIGHT_CLASS, 'hover:bg-transparent')}>
           {Array.from({ length: COLUMN_COUNT }, (_, j) => (
-            <TableCell key={j} className="py-4">
+            <TableCell key={j}>
               <Skeleton className="h-5 w-full" />
             </TableCell>
           ))}
@@ -146,7 +151,11 @@ export function StudentTable({
           if (e.key === 'Enter') onRowClick(student)
         }}
         aria-label={`Xem chi tiết sinh viên ${student.name}`}
-        className="cursor-pointer hover:bg-blue-50/40 focus-visible:bg-blue-50/60 focus-visible:outline-none"
+        // py-2 (thay py-2.5 mặc định) để nội dung 2 dòng (tên + MSSV, đề tài) vừa trong chiều cao dòng cố định
+        className={cn(
+          ROW_HEIGHT_CLASS,
+          'cursor-pointer hover:bg-blue-50/40 focus-visible:bg-blue-50/60 focus-visible:outline-none [&>td]:py-2',
+        )}
       >
         <TableCell className="text-[12.5px] font-semibold text-slate-500 tabular-nums">
           {data.number * data.size + index + 1}
@@ -163,13 +172,13 @@ export function StudentTable({
               {getInitials(student.name)}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+              <div className="flex items-center gap-1.5 text-[13px] leading-5 font-semibold text-slate-800">
                 <span className="truncate">{student.name}</span>
                 {!student.accountStatus && (
                   <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-label="Tài khoản bị khóa đăng nhập" />
                 )}
               </div>
-              <div className="mt-0.5 font-mono text-[12px] font-medium text-slate-500">{student.studentCode}</div>
+              <div className="mt-0.5 font-mono text-[12px] leading-4 font-medium text-slate-500">{student.studentCode}</div>
             </div>
           </div>
         </TableCell>
@@ -251,11 +260,13 @@ export function StudentTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
-      <div className={cn('transition-opacity', isPlaceholderData && 'opacity-60')}>
-        {/* Khung cao cố định (ít dòng thì để trống phía dưới), cuộn bên trong, tiêu đề cột dính trên cùng */}
+    // Card cao vừa đủ tiêu đề + 7 dòng + chân phân trang (ít dòng thì để trống phía dưới, bảng không nhảy),
+    // bảng cuộn bên trong. Màn hình thấp quá thì co lại (shrink), nhưng không thấp hơn min-h-80
+    <div className="flex min-h-80 shrink flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+      <div className={cn('flex min-h-0 flex-1 flex-col transition-opacity', isPlaceholderData && 'opacity-60')}>
+        {/* Tiêu đề cột dính trên cùng khi cuộn */}
         <Table
-          containerClassName="h-[calc(100vh-14.5rem)] min-h-64"
+          containerClassName={cn(VISIBLE_ROWS_HEIGHT_CLASS, 'min-h-0 shrink')}
           // Màn hình hẹp hơn min-w thì cuộn ngang trong khung
           className="min-w-[1180px] text-[13px]"
         >

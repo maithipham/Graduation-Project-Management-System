@@ -35,7 +35,7 @@ const NO_CURRENT_SEMESTER_HINT =
 
 // Ô Năm học / Học kỳ đầu trang (theo đặc tả: cao 36px, chữ 13px đậm)
 const SCOPE_SELECT_CLASS =
-  "h-9 rounded-lg border-slate-300 pl-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-2 focus-visible:ring-blue-100";
+  "h-9 rounded-lg border-slate-300 bg-white pl-3 pr-8 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-2 focus-visible:ring-blue-100 shadow-none";
 
 type OpenDialog = "import" | "create" | null;
 
@@ -165,9 +165,10 @@ export default function StudentManagementPage() {
       ? "Không tìm thấy sinh viên phù hợp"
       : "Chưa có sinh viên nào trong học kì này";
 
-  // -mt-2: kéo hàng nút lên gần header hơn (main của layout đang p-6)
+  // -mt-2 / -mb-4: kéo hàng nút lên gần header, cho bảng giãn xuống sát đáy hơn (main của layout đang p-6).
+  // flex-1 min-h-0: chiếm hết chiều cao còn lại của <main> để bảng giãn lấp đầy màn hình
   return (
-    <div className="-mt-2 space-y-3">
+    <div className="-mt-2 -mb-4 flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <Select
@@ -182,7 +183,7 @@ export default function StudentManagementPage() {
                 : undefined
             }
             className={SCOPE_SELECT_CLASS}
-            containerClassName="w-36"
+            containerClassName="w-auto"
           >
             {academicYears.length === 0 && (
               <option value="">
@@ -201,7 +202,7 @@ export default function StudentManagementPage() {
             disabled={termsOfYear.length === 0}
             aria-label="Học kỳ"
             className={SCOPE_SELECT_CLASS}
-            containerClassName="w-32"
+            containerClassName="w-auto"
           >
             {termsOfYear.length === 0 && (
               <option value="">

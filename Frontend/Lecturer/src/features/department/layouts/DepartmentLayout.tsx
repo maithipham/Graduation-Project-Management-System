@@ -17,7 +17,8 @@ export const DepartmentLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] text-[#1E293B]">
+    // data-own-scroll: trang tự cuộn trong <main>, html không cần giữ chỗ thanh cuộn (global.css)
+    <div data-own-scroll className="min-h-screen bg-[#F5F7FB] text-[#1E293B]">
       {/* 1. Backdrop Overlay cho Mobile Drawer */}
       {mobileOpen && (
         <div
@@ -35,9 +36,11 @@ export const DepartmentLayout: React.FC = () => {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      {/* 3. Khung nội dung chính với margin đồng bộ theo trạng thái Sidebar */}
+      {/* 3. Khung nội dung chính với margin đồng bộ theo trạng thái Sidebar.
+          Cao đúng 1 màn hình: header đứng yên, chỉ <main> cuộn. Nhờ vậy trang nào muốn
+          lấp đầy phần còn lại (VD bảng sinh viên) chỉ cần `flex-1 min-h-0` */}
       <div
-        className={`flex flex-col min-h-screen min-w-0 transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
+        className={`flex flex-col h-screen h-dvh min-w-0 transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
           collapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'
         } ml-0`}
       >
@@ -45,7 +48,7 @@ export const DepartmentLayout: React.FC = () => {
           onToggleSidebar={() => setCollapsed(!collapsed)}
           onMobileToggle={() => setMobileOpen(!mobileOpen)}
         />
-        <main className="flex-1 p-6">
+        <main className="flex flex-1 flex-col min-h-0 overflow-y-auto p-6 [scrollbar-gutter:stable]">
           <Outlet />
         </main>
       </div>

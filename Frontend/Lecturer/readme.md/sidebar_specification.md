@@ -26,7 +26,7 @@
     theme: {
       extend: {
         fontFamily: {
-          sans: ["Inter", "Be Vietnam Pro", "system-ui", "sans-serif"],
+          sans: ["Inter", "system-ui", "sans-serif"],
         },
         colors: {
           navy: "#0D47A1",
@@ -61,7 +61,7 @@
 
 ## 3. Typography & Chi tiết thông số chữ (Font Specifications)
 
-* **Font-family chung:** `"Inter", "Be Vietnam Pro", system-ui, -apple-system, sans-serif`
+* **Font-family chung:** `"Inter", system-ui, -apple-system, sans-serif`
 
 | Phần tử hiển thị | Font Size | Font Weight | Line Height / Tracking | Màu chữ |
 | :--- | :--- | :--- | :--- | :--- |

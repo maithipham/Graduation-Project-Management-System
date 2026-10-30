@@ -15,6 +15,12 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Layout tự cuộn bên trong (DepartmentLayout: chỉ <main> cuộn, main đã tự giữ chỗ thanh cuộn)
+   → html không bao giờ cuộn, bỏ giữ chỗ để không thừa một dải trống bên phải */
+html:has([data-own-scroll]) {
+  scrollbar-gutter: auto;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -25,9 +31,13 @@ body {
   margin: 0;
 }
 
-button,
-select {
-  font: inherit;
+/* Đặt trong @layer base: CSS ngoài layer luôn thắng class Tailwind (nằm trong @layer utilities),
+   nếu để ngoài thì font-semibold / text-[13px] đặt trên <button>, <select> bị `font: inherit` đè mất */
+@layer base {
+  button,
+  select {
+    font: inherit;
+  }
 }
 
 button,
