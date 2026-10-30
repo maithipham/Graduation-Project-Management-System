@@ -19,20 +19,20 @@ import { StudentStatusBadge } from './StudentStatusBadge'
 
 const COLUMN_COUNT = 8
 
-// Độ rộng cột cố định (bảng `table-fixed`), cột Đề tài lấy phần còn lại.
+// Bảng tự co giãn độ rộng cột theo nội dung (không `table-fixed`), giống mockup quanlysinhvien.html.
 // Kiểu chữ tiêu đề cột theo mockup: chữ nhỏ, in hoa, giãn chữ, không xuống dòng.
 // Cột sắp xếp được: chữ nằm trong <button> nên phải in hoa cả button;
 // icon mũi tên chỉ hiện khi đang sắp xếp theo cột đó hoặc rê chuột vào
 const HEAD_CLASS =
-  'h-12 px-4 text-xs font-bold uppercase tracking-wider whitespace-nowrap text-slate-700 [&_button]:uppercase [&_button]:tracking-wider [&_svg.text-slate-400]:opacity-0 [&:hover_svg]:opacity-100'
+  'h-9.5 bg-slate-100 px-4 text-left text-[11px] font-bold uppercase tracking-wider whitespace-nowrap text-slate-700 [&_button]:uppercase [&_button]:tracking-wider [&_svg.text-slate-400]:opacity-0 [&:hover_svg]:opacity-100'
 
 // Nút thao tác từng dòng theo đặc tả: 28px, bo 8px, icon 14px
 const ROW_ACTION_CLASS = 'h-7 w-7 rounded-lg text-slate-500 [&_svg]:size-3.5'
 
 const SORTABLE_COLUMNS: { field: StudentSortField; label: string; className?: string }[] = [
-  { field: 'name', label: 'Họ và tên', className: 'w-[20%]' },
-  { field: 'className', label: 'Lớp / Khóa', className: 'w-32' },
-  { field: 'majorName', label: 'Bộ môn', className: 'w-[13%]' },
+  { field: 'name', label: 'Họ và tên', className: 'min-w-[190px]' },
+  { field: 'className', label: 'Lớp / Khóa' },
+  { field: 'majorName', label: 'Bộ môn' },
 ]
 
 // Màu avatar chữ cái đầu, chọn theo MSSV để mỗi sinh viên luôn cùng một màu
@@ -97,7 +97,7 @@ export function StudentTable({
       return Array.from({ length: pageSize }, (_, i) => (
         <TableRow key={i} className="hover:bg-transparent">
           {Array.from({ length: COLUMN_COUNT }, (_, j) => (
-            <TableCell key={j} className="px-4 py-3.5">
+            <TableCell key={j} className="py-4">
               <Skeleton className="h-5 w-full" />
             </TableCell>
           ))}
@@ -148,14 +148,14 @@ export function StudentTable({
         aria-label={`Xem chi tiết sinh viên ${student.name}`}
         className="cursor-pointer hover:bg-blue-50/40 focus-visible:bg-blue-50/60 focus-visible:outline-none"
       >
-        <TableCell className="px-4 py-4 text-slate-600 tabular-nums">
+        <TableCell className="text-[12.5px] font-semibold text-slate-500 tabular-nums">
           {data.number * data.size + index + 1}
         </TableCell>
-        <TableCell className="px-4 py-4">
-          <div className="flex items-center gap-3">
+        <TableCell>
+          <div className="flex items-center gap-2.5">
             <div
               className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br text-xs font-bold text-white',
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br text-[10.5px] font-bold text-white',
                 getAvatarColor(student.studentCode),
               )}
               aria-hidden
@@ -163,54 +163,54 @@ export function StudentTable({
               {getInitials(student.name)}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 font-semibold break-words text-slate-900">
-                {student.name}
+              <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+                <span className="truncate">{student.name}</span>
                 {!student.accountStatus && (
-                  <Lock className="h-3.5 w-3.5 text-slate-400" aria-label="Tài khoản bị khóa đăng nhập" />
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-label="Tài khoản bị khóa đăng nhập" />
                 )}
               </div>
-              <div className="font-mono text-xs text-slate-500">{student.studentCode}</div>
+              <div className="mt-0.5 font-mono text-[12px] font-medium text-slate-500">{student.studentCode}</div>
             </div>
           </div>
         </TableCell>
-        <TableCell className="px-4 py-4">
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="text-slate-800">{student.className}</span>
-            {student.batch && (
-              <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
-                {student.batch}
-              </span>
-            )}
-          </div>
+        <TableCell className="whitespace-nowrap">
+          <span className="text-[13px] font-medium text-slate-700">{student.className}</span>
+          {student.batch && (
+            <span className="ml-1.5 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10.5px] font-bold text-blue-700">
+              {student.batch}
+            </span>
+          )}
         </TableCell>
-        <TableCell className="px-4 py-4 text-slate-800">{student.majorName ?? '—'}</TableCell>
-        <TableCell className="px-4 py-4">
+        <TableCell className="text-[12.5px] font-medium whitespace-nowrap text-slate-700">
+          {student.majorName ?? '—'}
+        </TableCell>
+        <TableCell>
           {student.topicName ? (
-            <span className="line-clamp-2 text-slate-700" title={student.topicName}>
+            // max-w đặt trên span: trình duyệt bỏ qua max-width của ô <td> khi bảng tự co giãn
+            <span className="line-clamp-2 max-w-[260px] text-[12.5px] text-slate-700" title={student.topicName}>
               {student.topicName}
             </span>
           ) : (
-            <span className="text-slate-400 italic">(chưa đăng ký)</span>
+            <span className="text-[12.5px] text-slate-400 italic">(chưa đăng ký)</span>
           )}
         </TableCell>
-        <TableCell className="px-4 py-4">
+        <TableCell>
           {student.lecturerName ? (
-            <div className="space-y-0.5 text-slate-800 [&>div]:truncate">
-              <div title={student.lecturerName}>{student.lecturerName}</div>
-              {student.coLecturerName && <div title={student.coLecturerName}>{student.coLecturerName}</div>}
+            <div className="space-y-0.5 text-[12.5px] leading-snug font-medium whitespace-nowrap text-slate-800">
+              <div>{student.lecturerName}</div>
+              {student.coLecturerName && <div>{student.coLecturerName}</div>}
             </div>
           ) : (
-            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
               Chưa gán
             </span>
           )}
         </TableCell>
-        {/* Nhãn dài (VD "Bị đình chỉ / Không đủ điều kiện đi tiếp") xuống dòng trong cột cố định */}
-        <TableCell className="px-4 py-4 [&>span]:whitespace-normal">
+        <TableCell className="whitespace-nowrap">
           <StudentStatusBadge status={student.status} label={student.statusLabel} />
         </TableCell>
-        <TableCell className="px-4 py-4">
-          <div className="flex items-center justify-end gap-1">
+        <TableCell className="text-right whitespace-nowrap">
+          <div className="inline-flex items-center justify-end gap-1">
             <Button
               variant="ghost"
               size="icon"
@@ -255,14 +255,13 @@ export function StudentTable({
       <div className={cn('transition-opacity', isPlaceholderData && 'opacity-60')}>
         {/* Khung cao cố định (ít dòng thì để trống phía dưới), cuộn bên trong, tiêu đề cột dính trên cùng */}
         <Table
-          containerClassName="h-[calc(100vh-17rem)] min-h-64"
-          // Cố định độ rộng cột: đổi bộ lọc (tên / đề tài dài ngắn khác nhau) cột không tự dãn ra co vào.
+          containerClassName="h-[calc(100vh-14.5rem)] min-h-64"
           // Màn hình hẹp hơn min-w thì cuộn ngang trong khung
-          className="min-w-[1100px] table-fixed"
+          className="min-w-[1180px] text-[13px]"
         >
-          <TableHeader className="sticky top-0 z-10 bg-slate-50">
+          <TableHeader className="sticky top-0 z-10 bg-slate-100">
             <TableRow className="hover:bg-transparent">
-              <TableHead className={cn(HEAD_CLASS, 'w-14')}>STT</TableHead>
+              <TableHead className={cn(HEAD_CLASS, 'w-16')}>STT</TableHead>
               {SORTABLE_COLUMNS.map((column) => (
                 <SortableTableHead
                   key={column.field}
@@ -273,9 +272,9 @@ export function StudentTable({
                   className={cn(HEAD_CLASS, column.className)}
                 />
               ))}
-              <TableHead className={HEAD_CLASS}>Đề tài</TableHead>
-              <TableHead className={cn(HEAD_CLASS, 'w-[14%]')}>GVHD</TableHead>
-              <TableHead className={cn(HEAD_CLASS, 'w-48')}>Trạng thái</TableHead>
+              <TableHead className={cn(HEAD_CLASS, 'max-w-[260px]')}>Đề tài</TableHead>
+              <TableHead className={HEAD_CLASS}>GVHD</TableHead>
+              <TableHead className={HEAD_CLASS}>Trạng thái</TableHead>
               <TableHead className={cn(HEAD_CLASS, 'w-24 text-right')}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>

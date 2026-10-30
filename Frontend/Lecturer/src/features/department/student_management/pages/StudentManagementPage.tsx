@@ -167,7 +167,7 @@ export default function StudentManagementPage() {
 
   // -mt-2: kéo hàng nút lên gần header hơn (main của layout đang p-6)
   return (
-    <div className="-mt-2 space-y-5">
+    <div className="-mt-2 space-y-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <Select
