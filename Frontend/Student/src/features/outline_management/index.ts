@@ -1,0 +1,11 @@
+// Public API của sub-feature: outline_management
+export * from './types/outline.types'
+export * from './services/outline.service'
+export * from './store/outline.store'
+export * from './hooks/useOutlineManagement'
+export * from './utils/docxBuilder'
+export * from './components/OnlineOutlineEditorModal'
+export * from './components/OutlinePaperPreview'
+export * from './components/SubmitOutlineFileModal'
+export { default as StudentOutlinePage } from './pages/StudentOutlinePage'
+export { default as StudentOutlinePreviewPage } from './pages/StudentOutlinePreviewPage'

@@ -4,3 +4,353 @@
 @import '../shared/styles/premium.css';
 @import '../shared/styles/responsive.css';
 @import '../shared/styles/print.css';
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Custom scrollbars matching gv_ui exactly */
+#tableScrollContainer::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+#tableScrollContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+#tableScrollContainer::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+#tableScrollContainer::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ============================================================
+   TLU THESIS - GIẢNG VIÊN SIDEBAR STYLES (Chuẩn 100% gv_ui / sidebar.js)
+   ============================================================ */
+.sidebar {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.nav-item,
+.accordion-btn {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #dbeafe !important; /* text-blue-100 */
+}
+
+.nav-item:hover,
+.accordion-btn:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.nav-sub {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: #bfdbfe !important; /* text-blue-200 chuẩn gv_ui */
+  transition: all 0.15s ease-in-out !important;
+}
+
+.nav-sub:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.nav-item.active,
+.nav-sub.active {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3.5px;
+  height: 20px;
+  border-radius: 0 4px 4px 0;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+.accordion-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.accordion-body.open {
+  max-height: 280px;
+}
+
+.accordion-chev {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.accordion-chev.open {
+  transform: rotate(90deg);
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Button Duyệt & Từ chối matching gv_ui / dangkygvhd.html 100% */
+.btn-approve {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 32px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+  border-radius: 8px !important;
+  background-color: #10B981 !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.15s ease-in-out !important;
+  user-select: none !important;
+}
+
+.btn-approve:hover:not(:disabled) {
+  background-color: #059669 !important;
+}
+
+.btn-reject {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 32px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  border-radius: 8px !important;
+  background-color: #ffffff !important;
+  color: #E11D48 !important;
+  border: 1px solid #FECDD3 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.15s ease-in-out !important;
+  user-select: none !important;
+}
+
+.btn-reject:hover:not(:disabled) {
+  background-color: #FFF1F2 !important;
+  border-color: #FDA4AF !important;
+}
+
+/* Role Tabs matching duyetdecuong.html 100% */
+.role-tab {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 16px !important;
+  border-radius: 12px !important;
+  font-family: 'Inter', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif !important;
+  font-size: 13.5px !important;
+  line-height: 1.25 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease-in-out !important;
+  user-select: none !important;
+}
+
+.role-tab.active {
+  font-weight: 700 !important;
+  background-color: #ffffff !important;
+  color: #1565C0 !important;
+  border: 1px solid #BFDBFE !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+}
+
+.role-tab:not(.active) {
+  font-weight: 600 !important;
+  background-color: transparent !important;
+  color: #475569 !important;
+  border: 1px solid transparent !important;
+}
+
+.role-tab:not(.active):hover {
+  color: #0F172A !important;
+  background-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+/* Status Tabs matching gv_ui / dangkygvhd.html 100% */
+#statusTabs .tab-btn,
+.tab-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 12px 16px !important;
+  font-family: 'Inter', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif !important;
+  font-size: 13.5px !important;
+  line-height: 1.25 !important;
+  color: #64748B !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: 2px solid transparent !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.15s ease-in-out !important;
+  user-select: none !important;
+  text-decoration: none !important;
+}
+
+#statusTabs .tab-btn:hover,
+.tab-btn:hover {
+  color: #1E293B !important;
+  border-bottom-color: #CBD5E1 !important;
+}
+
+#statusTabs .tab-btn.active,
+.tab-btn.active,
+#statusTabs .tab-btn[data-active="true"],
+.tab-btn[data-active="true"] {
+  color: #1565C0 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #1565C0 !important;
+}
+
+/* Tab Badges matching gv_ui / dangkygvhd.html 100% */
+.tab-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px 8px !important;
+  border-radius: 9999px !important;
+  font-family: 'Inter', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  user-select: none !important;
+}
+
+.tab-badge-pending,
+.tab-badge.badge-pending {
+  background-color: #FEF3C7 !important;
+  color: #92400E !important;
+}
+
+.tab-badge-default,
+.tab-badge.badge-default {
+  background-color: #F1F5F9 !important;
+  color: #475569 !important;
+}
+
+/* Header Year and Semester Select matching gv_ui / header.js 100% */
+.header-filter-select,
+#headerYearSelect,
+#headerSemesterSelect {
+  height: 36px !important;
+  padding-left: 12px !important;
+  padding-right: 32px !important;
+  background-color: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 8px !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  outline: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  cursor: pointer !important;
+  line-height: 1.25 !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.header-filter-select:hover,
+#headerYearSelect:hover,
+#headerSemesterSelect:hover {
+  background-color: #F1F5F9 !important;
+}
+
+.header-filter-select:focus,
+#headerYearSelect:focus,
+#headerSemesterSelect:focus {
+  border-color: #1565C0 !important;
+  box-shadow: 0 0 0 2px rgba(219, 234, 254, 1) !important;
+}
+
+/* Container & tên file đề cương in đậm có màu xanh chuẩn gv_ui */
+.file-name-cell-wrap {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.375rem !important;
+  white-space: nowrap !important;
+}
+
+.btn-preview-file,
+a.btn-preview-file,
+button.btn-preview-file {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #2563eb !important;
+  line-height: 1.375 !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  text-align: left !important;
+}
+
+.btn-preview-file:hover,
+a.btn-preview-file:hover,
+button.btn-preview-file:hover {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+
+.btn-preview-eye {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px !important;
+  border-radius: 6px !important;
+  color: #94a3b8 !important;
+  transition: all 0.15s ease-in-out !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.btn-preview-eye:hover {
+  color: #2563eb !important;
+  background-color: #eff6ff !important;
+}
+

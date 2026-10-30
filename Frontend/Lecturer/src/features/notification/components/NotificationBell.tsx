@@ -10,7 +10,7 @@ import { useNotificationStream } from '../hooks/useNotificationStream'
  * Mở chuông khi còn thông báo chưa đọc → tự đánh dấu tất cả là đã đọc (PATCH /notification).
  * Đồng thời giữ kết nối SSE để nhận thông báo mới trong lúc đang dùng.
  */
-export function NotificationBell() {
+export function NotificationBell({ fallbackCount }: { fallbackCount?: number } = {}) {
   useNotificationStream()
   const { data: notifications = [], isPending, isError } = useNotifications()
   const markAllRead = useMarkAllNotificationsRead()
@@ -21,6 +21,8 @@ export function NotificationBell() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const unreadCount = notifications.filter((item) => !item.isRead).length
+  const displayCount =
+    unreadCount > 0 ? unreadCount : fallbackCount && notifications.length === 0 ? fallbackCount : 0
 
   const close = () => {
     setOpen(false)
@@ -129,9 +131,9 @@ export function NotificationBell() {
         title="Thông báo"
       >
         <Bell size={19} />
-        {unreadCount > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
+        {displayCount > 0 && (
+          <span className="absolute right-0.5 top-0.5 min-w-[17px] h-[17px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center leading-none">
+            {displayCount > 9 ? '9+' : displayCount}
           </span>
         )}
       </button>

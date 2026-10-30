@@ -1,0 +1,10 @@
+// Public API của sub-feature: registration_management
+export * from './types/registration.types'
+export * from './services/registration.service'
+export * from './store/registration.store'
+export * from './hooks/useRegistrationManagement'
+export * from './components/RegistrationDemoPanel'
+export * from './components/RegistrationFormModal'
+export * from './components/RegistrationHistoryTable'
+export * from './components/RegistrationOverviewCard'
+export { default as StudentRegistrationPage } from './pages/StudentRegistrationPage'

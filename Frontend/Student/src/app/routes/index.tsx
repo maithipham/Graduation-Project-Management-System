@@ -7,6 +7,9 @@ import { withSuspense } from './withSuspense'
 
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
 const AuthenticatePage = lazy(() => import('@/features/auth/pages/AuthenticatePage'))
+const StudentOutlinePreviewPage = lazy(
+  () => import('@/features/outline_management/pages/StudentOutlinePreviewPage'),
+)
 
 const routes: RouteObject[] = [
   {
@@ -24,7 +27,16 @@ const routes: RouteObject[] = [
     children: [
       // "/" → dashboard /student
       { index: true, element: <HomeRedirect /> },
-      { element: <ProtectedRoute allowedRoles={['STUDENT']} />, children: [studentRoutes] },
+      {
+        element: <ProtectedRoute allowedRoles={['STUDENT']} />,
+        children: [
+          studentRoutes,
+          {
+            path: 'student/outline/preview',
+            element: withSuspense(<StudentOutlinePreviewPage />),
+          },
+        ],
+      },
     ],
   },
   {
