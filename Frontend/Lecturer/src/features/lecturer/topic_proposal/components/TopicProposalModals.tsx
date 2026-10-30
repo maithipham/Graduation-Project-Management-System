@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { X } from 'lucide-react'
 import type { TopicProposalItem } from '../types/topicProposal.types'
 
@@ -106,7 +106,7 @@ export const ApproveTopicModal: React.FC<ApproveTopicModalProps> = ({
 interface RejectTopicModalProps {
   item: TopicProposalItem | null
   onClose: () => void
-  onConfirm: (id: string, reason: string) => void
+  onConfirm: (id: string, reason?: string) => void
 }
 
 export const RejectTopicModal: React.FC<RejectTopicModalProps> = ({
@@ -114,44 +114,26 @@ export const RejectTopicModal: React.FC<RejectTopicModalProps> = ({
   onClose,
   onConfirm,
 }) => {
-  const [reason, setReason] = useState('')
-
   if (!item) return null
 
   const hasOld = Boolean(item.oldTopic && item.oldTopic.trim())
   const oldTopicText = hasOld ? item.oldTopic.trim() : 'không có'
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onConfirm(item.id, reason)
-    setReason('')
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          setReason('')
-          onClose()
-        }
+        if (e.target === e.currentTarget) onClose()
       }}
     >
-      <form
-        noValidate
-        onSubmit={handleSubmit}
-        className="bg-white rounded-2xl w-full max-w-[620px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
-      >
+      <div className="bg-white rounded-2xl w-full max-w-[580px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="px-6 py-4.5 border-b border-slate-200 flex items-center justify-between">
           <h3 className="text-[17px] font-bold text-slate-900">
             Xác nhận từ chối đề tài
           </h3>
           <button
             type="button"
-            onClick={() => {
-              setReason('')
-              onClose()
-            }}
+            onClick={onClose}
             aria-label="Đóng"
             className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
           >
@@ -177,45 +159,26 @@ export const RejectTopicModal: React.FC<RejectTopicModalProps> = ({
               </span>
             </div>
           </div>
-
-          <div>
-            <label
-              htmlFor="rejectTopicReasonInput"
-              className="block text-slate-800 font-bold mb-2 text-[13.5px]"
-            >
-              Góp ý chỉnh sửa cho sinh viên:
-            </label>
-            <textarea
-              id="rejectTopicReasonInput"
-              rows={5}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Nêu rõ lý do cần điều chỉnh hoặc gợi ý hướng nghiên cứu khác..."
-              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-[13.5px] text-slate-800 placeholder-slate-400 outline-none focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-100 transition resize-y min-h-[130px] leading-relaxed"
-            />
-          </div>
         </div>
 
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex justify-end gap-2.5">
           <button
             type="button"
-            onClick={() => {
-              setReason('')
-              onClose()
-            }}
+            onClick={onClose}
             className="h-8 px-4 rounded-lg bg-white border border-slate-300 text-slate-700 text-[12px] font-bold hover:bg-slate-50 transition cursor-pointer"
           >
             Hủy
           </button>
           <button
-            type="submit"
+            type="button"
             id="btnConfirmReject"
+            onClick={() => onConfirm(item.id)}
             className="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[12px] font-bold transition cursor-pointer shadow-xs"
           >
             Xác nhận
           </button>
         </div>
-      </form>
+      </div>
     </div>
   )
 }

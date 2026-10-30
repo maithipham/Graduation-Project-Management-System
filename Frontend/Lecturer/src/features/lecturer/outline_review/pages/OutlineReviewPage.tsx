@@ -546,7 +546,7 @@ export default function OutlineReviewPage() {
                               onClick={() => setPreviewTarget(item)}
                               title="Xem trước tài liệu (Google Classroom Preview)"
                               aria-label="Xem trước tài liệu"
-                              className="btn-preview-file p-0.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                              className="btn-preview-eye p-0.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -721,68 +721,26 @@ export default function OutlineReviewPage() {
         </p>
 
         {filtered.length > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1" id="paginationControls">
-              {totalPages <= 1 ? (
-                <button
-                  type="button"
-                  disabled
-                  className="h-8 min-w-8 px-2.5 rounded-lg bg-[#1565C0] text-white text-[12px] font-bold shadow-2xs"
-                >
-                  1
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    disabled={safePage === 1}
-                    onClick={() => handlePageChange(safePage - 1)}
-                    className="btn-prev h-8 px-2.5 rounded-lg border border-slate-200 text-slate-700 text-[12px] font-bold hover:bg-slate-100 transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                  >
-                    Trước
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-                    if (p === 1 || p === totalPages || (p >= safePage - 1 && p <= safePage + 1)) {
-                      const active = p === safePage
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          data-page={p}
-                          onClick={() => handlePageChange(p)}
-                          className={`page-num h-8 min-w-8 px-2 rounded-lg text-[12px] font-bold transition cursor-pointer ${
-                            active
-                              ? 'bg-[#1565C0] text-white shadow-2xs'
-                              : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      )
-                    }
-                    if (p === safePage - 2 || p === safePage + 2) {
-                      return (
-                        <span
-                          key={p}
-                          className="h-8 px-1 flex items-center text-slate-400 text-[12px] font-bold"
-                        >
-                          ...
-                        </span>
-                      )
-                    }
-                    return null
-                  })}
-                  <button
-                    type="button"
-                    disabled={safePage === totalPages}
-                    onClick={() => handlePageChange(safePage + 1)}
-                    className="btn-next h-8 px-2.5 rounded-lg border border-slate-200 text-slate-700 text-[12px] font-bold hover:bg-slate-100 transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                  >
-                    Sau
-                  </button>
-                </>
-              )}
-            </div>
+          <div className="flex items-center gap-1.5" id="paginationControls">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => handlePageChange(Math.max(1, safePage - 1))}
+              className="btn-prev px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              Trước
+            </button>
+            <span className="px-3 py-1 text-slate-700 font-bold text-[12px]">
+              {safePage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => handlePageChange(Math.min(totalPages, safePage + 1))}
+              className="btn-next px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              Sau
+            </button>
           </div>
         )}
       </div>

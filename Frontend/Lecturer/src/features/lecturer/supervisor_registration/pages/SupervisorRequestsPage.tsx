@@ -29,6 +29,9 @@ export default function SupervisorRequestsPage() {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  const showStatusCol = tabStatus === 'approved' || tabStatus === 'rejected' || tabStatus === ''
+  const showActionCol = tabStatus === 'pending' || tabStatus === ''
+
   return (
     <div
       className="h-full flex flex-col min-h-0 bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden select-none"
@@ -45,9 +48,9 @@ export default function SupervisorRequestsPage() {
         <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl shrink-0 overflow-x-auto">
           {(
             [
-              { key: 'pending', label: 'Chờ duyệt', count: counts.pending },
+              { key: 'pending', label: 'Chưa duyệt', count: counts.pending },
               { key: 'approved', label: 'Đã nhận', count: counts.approved },
-              { key: 'rejected', label: 'Từ chối', count: counts.rejected },
+              { key: 'rejected', label: 'Đã từ chối', count: counts.rejected },
               { key: '', label: 'Tất cả', count: counts.all },
             ] as const
           ).map((tab) => {
@@ -84,7 +87,7 @@ export default function SupervisorRequestsPage() {
         </div>
 
         {/* Ô Tìm kiếm MSSV, tên, đề tài */}
-        <div className="relative w-full sm:w-80">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
@@ -96,6 +99,14 @@ export default function SupervisorRequestsPage() {
             placeholder="Tìm theo tên, MSSV, đề tài..."
             className="w-full text-xs pl-10 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] transition"
           />
+        </div>
+
+        {/* Hạn đăng ký GVHD */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs font-semibold shrink-0 whitespace-nowrap">
+          <Clock className="w-3.5 h-3.5 text-amber-600" />
+          <span>
+            Hạn đăng ký GVHD: <b className="font-bold text-amber-900">15/11/2026 23:59</b>
+          </span>
         </div>
       </div>
 
@@ -126,8 +137,12 @@ export default function SupervisorRequestsPage() {
                 <th className="py-3 px-4 min-w-[200px]">Sinh viên</th>
                 <th className="py-3 px-4 min-w-[220px]">Đề tài nguyện vọng</th>
                 <th className="py-3 px-4 min-w-[130px]">Thời gian nộp</th>
-                <th className="py-3 px-4 min-w-[120px] text-center">Trạng thái</th>
-                <th className="py-3 px-4 min-w-[160px] text-right">Thao tác</th>
+                {showStatusCol && (
+                  <th className="py-3 px-4 min-w-[140px] text-center">Trạng thái</th>
+                )}
+                {showActionCol && (
+                  <th className="py-3 px-4 min-w-[160px] text-right">Thao tác</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -176,54 +191,61 @@ export default function SupervisorRequestsPage() {
                     </td>
 
                     {/* Trạng thái duyệt */}
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      {item.status === 'pending' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Chờ duyệt
-                        </span>
-                      )}
-                      {item.status === 'approved' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Đã tiếp nhận
-                        </span>
-                      )}
-                      {item.status === 'rejected' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          Từ chối
-                        </span>
-                      )}
-                    </td>
+                    {showStatusCol && (
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        {item.status === 'approved' && (
+                          <div className="inline-flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Đã duyệt
+                            </span>
+                            {item.approvedAt && (
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                {item.approvedAt}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {item.status === 'rejected' && (
+                          <div className="inline-flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              Đã từ chối
+                            </span>
+                            {item.rejectedAt && (
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                {item.rejectedAt}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {item.status === 'pending' && null}
+                      </td>
+                    )}
 
-                    {/* Cột Hành động */}
-                    <td className="py-3 px-4 text-right whitespace-nowrap">
-                      {item.status === 'pending' ? (
-                        <div className="inline-flex items-center gap-2 justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setApproveTarget(item)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1565C0] text-white hover:bg-[#0D47A1] transition shadow-xs cursor-pointer active:scale-95"
-                          >
-                            Duyệt
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRejectTarget(item)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer active:scale-95"
-                          >
-                            Từ chối
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic">
-                          {item.status === 'approved'
-                            ? `Đã nhận (${item.approvedAt ?? 'gần đây'})`
-                            : 'Đã từ chối'}
-                        </span>
-                      )}
-                    </td>
+                    {/* Cột Thao tác */}
+                    {showActionCol && (
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        {item.status === 'pending' ? (
+                          <div className="inline-flex items-center gap-2 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setApproveTarget(item)}
+                              className="px-3 py-1.5 rounded-lg text-[12px] font-bold bg-[#1565C0] text-white hover:bg-[#0D47A1] transition shadow-xs cursor-pointer active:scale-95"
+                            >
+                              Duyệt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRejectTarget(item)}
+                              className="px-3 py-1.5 rounded-lg text-[12px] font-bold bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer active:scale-95"
+                            >
+                              Từ chối
+                            </button>
+                          </div>
+                        ) : null}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -258,11 +280,11 @@ export default function SupervisorRequestsPage() {
                 setCurrentPage((p) => Math.max(1, p - 1))
                 scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
               }}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               Trước
             </button>
-            <span className="px-3 py-1 text-slate-700 font-bold">
+            <span className="px-3 py-1 text-slate-700 font-bold text-[12px]">
               {currentPage} / {totalPages}
             </span>
             <button
@@ -272,7 +294,7 @@ export default function SupervisorRequestsPage() {
                 setCurrentPage((p) => Math.min(totalPages, p + 1))
                 scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
               }}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               Sau
             </button>
