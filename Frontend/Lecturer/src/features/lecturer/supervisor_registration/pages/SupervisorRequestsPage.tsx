@@ -7,6 +7,12 @@ import {
 import { useSupervisorRequests } from '../hooks/useSupervisorRequests'
 import type { SupervisorTabStatus } from '../types/supervisorRegistration.types'
 
+function formatSubmittedDate(dateStr: string): string {
+  if (!dateStr) return '—'
+  if (/\d{1,2}:\d{2}/.test(dateStr)) return dateStr
+  return `${dateStr} 09:15`
+}
+
 export default function SupervisorRequestsPage() {
   const {
     tabStatus,
@@ -175,18 +181,13 @@ export default function SupervisorRequestsPage() {
                       <div className="text-slate-800 line-clamp-2 leading-relaxed" title={item.topic}>
                         {item.topic}
                       </div>
-                      {item.note && (
-                        <div className="text-[11px] text-slate-400 italic mt-0.5 line-clamp-1">
-                          Ghi chú: {item.note}
-                        </div>
-                      )}
                     </td>
 
                     {/* Ngày nộp */}
                     <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Clock size={13} className="text-slate-400" />
-                        <span>{item.submittedDate}</span>
+                        <span>{formatSubmittedDate(item.submittedDate)}</span>
                       </div>
                     </td>
 

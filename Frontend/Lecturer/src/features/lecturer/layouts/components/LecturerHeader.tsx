@@ -32,6 +32,7 @@ function getHeaderBreadcrumbTitle(pathname: string): string {
   if (pathname.includes('/defense/reviews')) return 'Bảo vệ đồ án › Đánh giá phản biện'
   if (pathname.includes('/defense')) return 'Bảo vệ đồ án'
   if (pathname.includes('/templates')) return 'Tài liệu mẫu'
+  if (pathname.includes('/profile')) return 'Thông tin cá nhân'
   const crumbs = getNavBreadcrumbs(lecturerNavItems, pathname)
   return crumbs.join(' › ') || 'Tổng quan'
 }
@@ -243,7 +244,11 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
                     {displayName}
                   </div>
                   <div className="text-[11.5px] text-slate-500 truncate">
-                    Bộ môn Kỹ thuật phần mềm
+                    {teacher.isExternal
+                      ? teacher.workplace || 'Giảng viên ngoài trường'
+                      : teacher.department
+                        ? `Bộ môn ${teacher.department}`
+                        : 'Trường Đại học Thủy lợi'}
                   </div>
                 </div>
               </div>
@@ -254,7 +259,7 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
                   type="button"
                   onClick={() => {
                     setProfileOpen(false)
-                    navigate('/lecturer')
+                    navigate('/lecturer/profile')
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                 >

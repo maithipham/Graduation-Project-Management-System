@@ -50,6 +50,12 @@ const LecturerTemplatesPage = lazy(
       '@/features/lecturer/template_management/pages/LecturerTemplatesPage'
     ),
 )
+const LecturerProfilePage = lazy(
+  () =>
+    import(
+      '@/features/lecturer/profile_management/pages/LecturerProfilePage'
+    ),
+)
 
 export const lecturerRoutes: RouteObject = {
   path: 'lecturer',
@@ -106,6 +112,10 @@ export const lecturerRoutes: RouteObject = {
     {
       path: 'templates',
       element: withSuspense(<LecturerTemplatesPage />),
+    },
+    {
+      path: 'profile',
+      element: withSuspense(<LecturerProfilePage />),
     },
   ],
 }

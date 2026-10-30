@@ -112,13 +112,6 @@ export const StudentProfilePage: React.FC = () => {
                 {profile.academicYear}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 items-center">
-              <span className="text-slate-400 font-semibold">Trạng thái:</span>
-              <span className="col-span-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 w-fit">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                {profile.status}
-              </span>
-            </div>
           </div>
         </div>
 
@@ -127,7 +120,7 @@ export const StudentProfilePage: React.FC = () => {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3 text-[#1565C0]">
             <Mail className="w-5 h-5" />
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Thông tin liên hệ & Hướng dẫn
+              Thông tin liên hệ
             </h2>
           </div>
 
@@ -142,18 +135,6 @@ export const StudentProfilePage: React.FC = () => {
               <span className="text-slate-400 font-semibold">Số điện thoại:</span>
               <span id="profilePhone" className="col-span-2 font-semibold text-slate-800">
                 {profile.phone}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <span className="text-slate-400 font-semibold">GVHD:</span>
-              <span className="col-span-2 font-bold text-[#1565C0]">
-                {profile.mentor}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <span className="text-slate-400 font-semibold">Đề tài đồ án:</span>
-              <span className="col-span-2 font-semibold text-slate-800 leading-snug">
-                {profile.topic}
               </span>
             </div>
           </div>

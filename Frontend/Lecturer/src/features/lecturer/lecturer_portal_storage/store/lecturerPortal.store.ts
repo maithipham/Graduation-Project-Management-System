@@ -325,6 +325,11 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
             rev.id === id ? { ...rev, status: 'rejected' } : rev,
           ),
         })),
+
+      updateTeacherProfile: (profile) =>
+        set((state) => ({
+          teacher: { ...state.teacher, ...profile },
+        })),
     }),
     {
       name: 'gv_thesis_portal_react_v1',

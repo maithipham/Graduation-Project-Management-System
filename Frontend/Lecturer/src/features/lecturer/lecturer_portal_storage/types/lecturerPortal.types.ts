@@ -25,6 +25,8 @@ export interface TeacherProfile {
   currentLoad: number
   year: string
   semester: string
+  workplace?: string
+  isExternal?: boolean
 }
 
 export interface LecturerNavBadges {
@@ -74,4 +76,5 @@ export interface LecturerPortalState {
   updateDefenseReviewScore: (id: string, score: number | null) => void
   approveDefenseReview: (id: string) => void
   rejectDefenseReview: (id: string) => void
+  updateTeacherProfile: (profile: Partial<TeacherProfile>) => void
 }
