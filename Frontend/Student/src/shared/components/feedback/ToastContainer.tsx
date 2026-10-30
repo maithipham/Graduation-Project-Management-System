@@ -20,31 +20,31 @@ const TOAST_CONFIGS: Record<
 > = {
   success: {
     icon: CheckCircle2,
-    bgClass: 'bg-emerald-50',
-    borderClass: 'border-emerald-200',
-    textClass: 'text-emerald-900',
-    iconClass: 'text-emerald-600',
+    bgClass: 'bg-emerald-100',
+    borderClass: 'border-emerald-300',
+    textClass: 'text-emerald-950',
+    iconClass: 'text-emerald-700',
   },
   error: {
     icon: AlertCircle,
-    bgClass: 'bg-rose-50',
-    borderClass: 'border-rose-200',
-    textClass: 'text-rose-900',
-    iconClass: 'text-rose-600',
+    bgClass: 'bg-rose-100',
+    borderClass: 'border-rose-300',
+    textClass: 'text-rose-950',
+    iconClass: 'text-rose-700',
   },
   warning: {
     icon: AlertTriangle,
-    bgClass: 'bg-amber-50',
-    borderClass: 'border-amber-200',
-    textClass: 'text-amber-900',
-    iconClass: 'text-amber-600',
+    bgClass: 'bg-amber-100',
+    borderClass: 'border-amber-300',
+    textClass: 'text-amber-950',
+    iconClass: 'text-amber-700',
   },
   info: {
     icon: Info,
-    bgClass: 'bg-sky-50',
-    borderClass: 'border-sky-200',
-    textClass: 'text-sky-900',
-    iconClass: 'text-sky-600',
+    bgClass: 'bg-sky-100',
+    borderClass: 'border-sky-300',
+    textClass: 'text-sky-950',
+    iconClass: 'text-sky-700',
   },
 }
 
@@ -63,21 +63,24 @@ function ToastSingleItem({
       role="alert"
       className={`pointer-events-auto flex items-start gap-3 w-full max-w-sm rounded-xl border p-4 shadow-lg backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-top-3 ${config.bgClass} ${config.borderClass}`}
     >
-      <div className={`mt-0.5 shrink-0 ${config.iconClass}`}>
+      {/* Icon, chữ và nút đóng cùng cao 20px (= leading-5 của chữ) → thẳng hàng với dòng chữ đầu tiên,
+          thông báo nhiều dòng thì icon vẫn đứng ở dòng đầu */}
+      <div className={`flex h-5 shrink-0 items-center ${config.iconClass}`}>
         <Icon className="h-5 w-5" />
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium leading-snug break-words ${config.textClass}`}>
+        <p className={`text-sm font-semibold leading-5 break-words ${config.textClass}`}>
           {item.message}
         </p>
       </div>
 
+      {/* p-1.5 + -m-1: vùng bấm 28px nhưng chỉ chiếm 20px trong bố cục, dấu X nằm giữa dòng chữ đầu tiên */}
       <button
         type="button"
         onClick={() => onDismiss(item.id)}
         aria-label="Đóng thông báo"
-        className="shrink-0 rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-black/5 transition-colors cursor-pointer"
+        className="-m-1 flex shrink-0 items-center rounded-lg p-1.5 text-slate-500 hover:text-slate-800 hover:bg-black/5 transition-colors"
       >
         <X className="h-4 w-4" />
       </button>

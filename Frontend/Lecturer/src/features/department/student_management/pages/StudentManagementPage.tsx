@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Download, Plus, Upload } from "lucide-react";
 import { Button, Select } from "@/shared/components/ui";
-import { toast } from "@/shared/components/feedback/toast.store";
 import { useDebounce } from "@/shared/hooks";
 import { CreateStudentDialog } from "../components/CreateStudentDialog";
 import { DeleteStudentDialog } from "../components/DeleteStudentDialog";
+import { EditStudentDialog } from "../components/EditStudentDialog";
+import { ExportStudentDialog } from "../components/ExportStudentDialog";
 import { ImportStudentDialog } from "../components/ImportStudentDialog";
 import { StudentDetailDialog } from "../components/StudentDetailDialog";
 import { StudentTable } from "../components/StudentTable";
@@ -37,7 +38,7 @@ const NO_CURRENT_SEMESTER_HINT =
 const SCOPE_SELECT_CLASS =
   "h-9 rounded-lg border-slate-300 bg-white pl-3 pr-8 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-2 focus-visible:ring-blue-100 shadow-none";
 
-type OpenDialog = "import" | "create" | null;
+type OpenDialog = "import" | "create" | "export" | null;
 
 export default function StudentManagementPage() {
   const [filters, setFilters] = useState<StudentFilters>(
@@ -54,6 +55,7 @@ export default function StudentManagementPage() {
   const [selected, setSelected] = useState<StudentListItem | undefined>();
   const [openDialog, setOpenDialog] = useState<OpenDialog>(null);
   const [deleting, setDeleting] = useState<StudentListItem | undefined>();
+  const [editing, setEditing] = useState<StudentListItem | undefined>();
 
   const { data: semesterList, isPending: semestersLoading } = useSemesters();
   const current = useCurrentSemester();
@@ -130,7 +132,6 @@ export default function StudentManagementPage() {
     setPage(0);
   };
 
-
   const changeSemester = (publicId: string) => {
     setPickedSemesterId(publicId);
     setFilters((prev) => ({ ...prev, batch: "" }));
@@ -156,8 +157,6 @@ export default function StudentManagementPage() {
   const closeDialog = (open: boolean) => {
     if (!open) setOpenDialog(null);
   };
-
-  const downloadTemplate = () => toast.info("Chức năng này sẽ được hỗ trợ sau");
 
   const emptyMessage = noSemester
     ? "Chưa có học kì nào"
@@ -220,10 +219,11 @@ export default function StudentManagementPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
-            onClick={downloadTemplate}
+            onClick={() => setOpenDialog("export")}
+            disabled={!semesterResolved}
             className="h-9 rounded-lg border-slate-300 px-4 text-[13px] font-semibold text-slate-700 shadow-none hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700"
           >
-            <Download /> Tải file mẫu Excel
+            <Download /> Export file
           </Button>
           <Button
             variant="ghost"
@@ -267,6 +267,7 @@ export default function StudentManagementPage() {
         onPageChange={setPage}
         onPageSizeChange={changePageSize}
         onRowClick={setSelected}
+        onEdit={setEditing}
         emptyMessage={emptyMessage}
         // Đang xem kì cũ thì không hiện nút "Thêm sinh viên" ở bảng rỗng:
         // bấm vào sẽ thêm vào kì hiện tại chứ không phải kì đang xem
@@ -279,6 +280,10 @@ export default function StudentManagementPage() {
         student={selected}
         onClose={() => setSelected(undefined)}
       />
+      <EditStudentDialog
+        student={editing}
+        onClose={() => setEditing(undefined)}
+      />
       <DeleteStudentDialog
         student={deleting}
         semester={semester}
@@ -288,6 +293,16 @@ export default function StudentManagementPage() {
         open={openDialog === "import"}
         onOpenChange={closeDialog}
         targetSemester={currentSemester}
+      />
+      <ExportStudentDialog
+        open={openDialog === "export"}
+        onOpenChange={closeDialog}
+        semester={semester}
+        filters={{ ...filters, batch }}
+        majors={majors}
+        sort={sort}
+        // Đang tải trang mới (placeholder) thì số cũ chưa đúng bộ lọc → không hiện
+        filteredCount={isPlaceholderData ? undefined : data?.totalElements}
       />
       <CreateStudentDialog
         open={openDialog === "create"}

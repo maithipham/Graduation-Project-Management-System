@@ -66,7 +66,7 @@ describe('ImportStudentDialog — bỏ chọn file', () => {
     renderDialog()
 
     await u.upload(fileInput(), new File(['x'], 'sai_mau.xlsx'))
-    await u.click(screen.getByRole('button', { name: 'Import' }))
+    await u.click(screen.getByRole('button', { name: 'Xác nhận Import' }))
     expect(await screen.findByText('File import không đúng mẫu')).toBeInTheDocument()
 
     await u.click(screen.getByRole('button', { name: 'Bỏ chọn file' }))
@@ -91,7 +91,7 @@ describe('ImportStudentDialog — học kì hiện tại', () => {
     renderDialog()
 
     await user.upload(fileInput(), new File(['x'], 'ds.xlsx'))
-    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await user.click(screen.getByRole('button', { name: 'Xác nhận Import' }))
 
     expect(await screen.findByText(message)).toBeInTheDocument()
   })

@@ -1,6 +1,12 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse, SpringPage } from '@/shared/types'
-import { compactParams, toSpringPage, type RawSpringPage } from '@/shared/utils'
+import {
+  compactParams,
+  getFilenameFromDisposition,
+  toSpringPage,
+  type DownloadedFile,
+  type RawSpringPage,
+} from '@/shared/utils'
 import type {
   MajorOption,
   SemesterOption,
@@ -8,9 +14,11 @@ import type {
   StudentCreationRequest,
   StudentDeleteParams,
   StudentDetail,
+  StudentExportParams,
   StudentImportResponse,
   StudentListItem,
   StudentListParams,
+  StudentUpdateParams,
   StudentWriteResult,
 } from '../types'
 
@@ -21,6 +29,11 @@ const SEMESTER_OPTION_SIZE = 100
 
 // BE đọc file Excel tối đa 50MB, có thể lâu hơn timeout mặc định 30 giây của apiClient
 const IMPORT_TIMEOUT_MS = 5 * 60 * 1000
+
+// BE sinh file Excel cho cả học kì, có thể lâu hơn timeout mặc định
+const EXPORT_TIMEOUT_MS = 2 * 60 * 1000
+// Dùng khi trình duyệt không đọc được Content-Disposition (BE chưa expose header này qua CORS)
+const EXPORT_FALLBACK_FILENAME = 'Danh_sach_sinh_vien.xlsx'
 
 // Giống một @Service: chỉ gọi API và bóc wrapper ApiResponse, không xử lý giao diện
 export const studentService = {
@@ -33,6 +46,24 @@ export const studentService = {
     })
     // BE có thể trả Page phẳng hoặc PagedModel ({ content, page: {...} }) → đưa về một dạng
     return toSpringPage(res.data.data, params)
+  },
+
+  // GET /student/export?semesterId=...&keyword=...&batch=...&majorId=...&status=...&sort=name,asc
+  // BE trả thẳng file .xlsx (ResponseEntity<byte[]>), không bọc APIResponse → không có res.data.data
+  async exportStudents(params: StudentExportParams): Promise<DownloadedFile> {
+    const res = await apiClient.get<Blob>(STUDENT.export, {
+      params: compactParams(params),
+      paramsSerializer: { indexes: null },
+      responseType: 'blob',
+      timeout: EXPORT_TIMEOUT_MS,
+    })
+    return {
+      blob: res.data,
+      filename: getFilenameFromDisposition(
+        res.headers['content-disposition'] as string | undefined,
+        EXPORT_FALLBACK_FILENAME,
+      ),
+    }
   },
 
   async getStudentDetail(publicId: string): Promise<StudentDetail> {
@@ -101,6 +132,15 @@ export const studentService = {
   // Không gửi semesterId: BE tự thêm vào học kì hiện tại (chưa có → 409 3030)
   async createStudent(body: StudentCreationRequest): Promise<StudentWriteResult> {
     const res = await apiClient.post<ApiResponse<unknown>>(STUDENT.base, body, {
+      // Lỗi hiện ngay trong form. Cảnh báo 11xx vẫn để interceptor hiện toast vàng
+      skipErrorToast: true,
+    })
+    return { code: res.data.code, message: res.data.message }
+  },
+
+  // PUT /student/{publicId} — popup "Sửa thông tin sinh viên". BE trả data rỗng, chỉ có code + message
+  async updateStudent({ publicId, body }: StudentUpdateParams): Promise<StudentWriteResult> {
+    const res = await apiClient.put<ApiResponse<unknown>>(STUDENT.detail(publicId), body, {
       // Lỗi hiện ngay trong form. Cảnh báo 11xx vẫn để interceptor hiện toast vàng
       skipErrorToast: true,
     })

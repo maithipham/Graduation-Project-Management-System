@@ -62,6 +62,9 @@ export interface StudentListParams {
   sort?: StudentSort
 }
 
+// Tham số GET /student/export — giống danh sách nhưng không phân trang (xuất hết)
+export type StudentExportParams = Omit<StudentListParams, 'page' | 'size'>
+
 // Tham số GET /student/batch
 export interface StudentBatchParams {
   semesterId?: string
@@ -105,8 +108,25 @@ export interface StudentCreationRequest {
   major: string // tên ngành, không phải publicId
 }
 
+// Body PUT /student/{publicId} (StudentUpdateRequest) — không có ngành: trưởng ngành không được đổi ngành
+export interface StudentUpdateRequest {
+  studentCode: string
+  firstName: string // Họ và tên đệm
+  lastName: string // Tên
+  email: string
+  phone: string
+  batch: string // Khóa
+  className: string
+  accountStatus: boolean // true = tài khoản đang hoạt động, false = không hoạt động
+}
+
+export interface StudentUpdateParams {
+  publicId: string
+  body: StudentUpdateRequest
+}
+
 /**
- * Kết quả POST /student. Màn hình cần phân biệt thành công / cảnh báo và hiện đúng câu của BE,
+ * Kết quả POST /student và PUT /student/{publicId}. Màn hình cần phân biệt thành công / cảnh báo và hiện đúng câu của BE,
  * nên service trả `code` + `message` thay vì `data`:
  * 1000 = thêm mới / cập nhật / kích hoạt lại · 1101 = đã có trong hệ thống, thông tin không đổi
  */

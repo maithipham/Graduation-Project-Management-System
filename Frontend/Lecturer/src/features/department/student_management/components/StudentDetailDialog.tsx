@@ -105,9 +105,6 @@ export function StudentDetailDialog({
                       <span className="font-mono text-[12px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs">
                         {student.studentCode}
                       </span>
-                      <span className="text-[12.5px] text-slate-600 font-medium">
-                        {student.className}
-                      </span>
                       {student.batch && (
                         <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10.5px] font-bold text-blue-700">
                           {student.batch}

@@ -7,7 +7,9 @@ import {
   type QueryClient,
 } from '@tanstack/react-query'
 import { referenceDataQueryOptions } from '@/shared/api'
+import { toast } from '@/shared/components/feedback/toast.store'
 import { isApiError } from '@/shared/types'
+import { saveBlob } from '@/shared/utils'
 import { studentService } from '../services/student.service'
 import type { StudentBatchParams, StudentListParams } from '../types'
 
@@ -102,6 +104,20 @@ export function useMajors() {
 }
 
 /**
+ * Export danh sách ra Excel rồi cho trình duyệt lưu file. Chỉ đọc dữ liệu nên không invalidate cache.
+ * Lỗi đã được interceptor toast.
+ */
+export function useExportStudents() {
+  return useMutation({
+    mutationFn: studentService.exportStudents,
+    onSuccess: (file) => {
+      saveBlob(file)
+      toast.success('Đã xuất file danh sách sinh viên')
+    },
+  })
+}
+
+/**
  * Import file Excel. Kết quả từng dòng do popup hiển thị nên hook không toast.
  * Xong thì tải lại danh sách (kể cả khi chỉ một phần dòng được lưu).
  */
@@ -136,5 +152,17 @@ export function useCreateStudent() {
     mutationFn: studentService.createStudent,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: departmentStudentKeys.all }),
     onError: (error) => refreshCurrentSemesterOn3030(queryClient, error),
+  })
+}
+
+/**
+ * Sửa thông tin + trạng thái tài khoản của sinh viên (PUT /student/{publicId}).
+ * Invalidate `all` → bảng, dropdown Khóa và chi tiết sinh viên đều tải lại
+ */
+export function useUpdateStudent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: studentService.updateStudent,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: departmentStudentKeys.all }),
   })
 }

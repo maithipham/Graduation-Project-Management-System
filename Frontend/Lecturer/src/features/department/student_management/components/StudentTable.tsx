@@ -1,4 +1,4 @@
-import { Eye, Lock, Plus, Trash2, Users } from 'lucide-react'
+import { Lock, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import type { SpringPage } from '@/shared/types'
 import {
   Button,
@@ -73,6 +73,8 @@ interface StudentTableProps {
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
   onRowClick: (student: StudentListItem) => void
+  /** Bấm nút bút chì → mở popup sửa. Không truyền → ẩn nút */
+  onEdit?: (student: StudentListItem) => void
   /** Câu hiện khi không có dòng nào (trang tự chọn theo bộ lọc / học kì) */
   emptyMessage: string
   /** Không truyền → ẩn nút "Thêm sinh viên" ở trạng thái rỗng (ví dụ học kì đã kết thúc) */
@@ -93,6 +95,7 @@ export function StudentTable({
   onPageChange,
   onPageSizeChange,
   onRowClick,
+  onEdit,
   emptyMessage,
   onCreate,
   onDelete,
@@ -220,20 +223,22 @@ export function StudentTable({
         </TableCell>
         <TableCell className="text-right whitespace-nowrap">
           <div className="inline-flex items-center justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(ROW_ACTION_CLASS, 'hover:bg-slate-100 hover:text-[#1565C0]')}
-              onClick={(e) => {
-                // Không để click lan lên dòng (tránh mở popup 2 lần)
-                e.stopPropagation()
-                onRowClick(student)
-              }}
-              aria-label={`Xem ${student.name}`}
-              title="Xem chi tiết"
-            >
-              <Eye />
-            </Button>
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(ROW_ACTION_CLASS, 'hover:bg-slate-100 hover:text-[#1565C0]')}
+                onClick={(e) => {
+                  // Không để click lan lên dòng (tránh mở thêm popup chi tiết)
+                  e.stopPropagation()
+                  onEdit(student)
+                }}
+                aria-label={`Sửa ${student.name}`}
+                title="Sửa thông tin"
+              >
+                <Pencil />
+              </Button>
+            )}
             {onDelete &&
               (canDeleteStudent(student) ? (
                 <Button
@@ -250,7 +255,7 @@ export function StudentTable({
                   <Trash2 />
                 </Button>
               ) : (
-                // Giữ chỗ để nút Xem ở các dòng thẳng hàng nhau
+                // Giữ chỗ để nút Sửa ở các dòng thẳng hàng nhau
                 <span className="h-7 w-7" aria-hidden />
               ))}
           </div>

@@ -28,6 +28,8 @@ export const API_ENDPOINTS = {
     // GET: chi tiết · PUT: sửa · DELETE: xóa khỏi học kì
     detail: (publicId: string) => `/student/${publicId}`,
     import: '/student/import',
+    // GET: tải file Excel danh sách sinh viên (cùng bộ lọc với danh sách, không phân trang)
+    export: '/student/export',
     // GET: các khóa đang có sinh viên trong học kì (dropdown Khóa)
     batch: '/student/batch',
   },
