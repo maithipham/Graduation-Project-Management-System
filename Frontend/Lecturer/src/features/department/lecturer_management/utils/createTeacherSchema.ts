@@ -82,6 +82,17 @@ const readEmailRule = (values: { email: unknown }) => getTeacherEmailRule(String
 const readText = (value: unknown) => normalizeTeacherText(String(value ?? ''))
 
 // Ràng buộc và message trùng với bảng lỗi Mục 6.5 (api_addLecturer.md)
+export const ACADEMIC_TITLES = [
+  { value: 'ThS.', label: 'ThS. (Thạc sĩ)' },
+  { value: 'TS.', label: 'TS. (Tiến sĩ)' },
+  { value: 'PGS.TS.', label: 'PGS.TS. (Phó Giáo sư)' },
+  { value: 'GS.TS.', label: 'GS.TS. (Giáo sư)' },
+  { value: 'KS.', label: 'KS. (Kỹ sư)' },
+  { value: 'CN.', label: 'CN. (Cử nhân)' },
+] as const
+
+export type AcademicTitleValue = (typeof ACADEMIC_TITLES)[number]['value']
+
 export const createTeacherSchema = z
   .object({
     firstName: textField(
@@ -113,6 +124,13 @@ export const createTeacherSchema = z
     ),
     // Gửi tên ngành (BE nhận tên hoặc mã ngành). Bắt buộc hay phải trống tùy email → kiểm tra ở refine bên dưới
     major: z.string().transform(normalizeTeacherText),
+    // Học hàm / Học vị (POST /teacher: academicTitleId từ bảng academic_title hoặc academicTitle viết tắt)
+    academicTitleId: z.coerce.number().optional().nullable(),
+    academicTitle: z
+      .string()
+      .optional()
+      .nullable()
+      .transform((val) => (val ? normalizeTeacherText(val) : null)),
     // Không bắt buộc: bỏ trống → null để BE tự gán. Chỉ nhận chữ số (không 5.5, -1, +5), tối đa 18 chữ số
     amount: z
       .string()
@@ -170,4 +188,6 @@ export const EMPTY_CREATE_TEACHER_VALUES: CreateTeacherFormInput = {
   organization: '',
   major: '',
   amount: '',
+  academicTitleId: null,
+  academicTitle: '',
 }

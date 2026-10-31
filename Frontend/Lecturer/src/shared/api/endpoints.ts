@@ -42,6 +42,23 @@ export const API_ENDPOINTS = {
     activate: (publicId: string) => `/teacher/${publicId}/activate`,
     // PATCH: thiết lập hạn mức sinh viên được nhận
     amount: (publicId: string) => `/teacher/${publicId}/amount`,
+    // POST: phân công danh sách giáo viên làm GVHD trong học kỳ
+    advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
+    // POST: import file Excel danh sách GVHD trong học kỳ
+    importAdvisorsExcel: (semesterId: string) => `/semesters/${semesterId}/advisors/import-excel`,
+    // GET: danh mục học hàm, học vị (id, code, name, abbreviation)
+    academicTitles: '/teacher/academic-titles',
+    // GET: danh sách GV khả dụng chưa làm GVHD trong kỳ
+    available: '/teacher/available',
+  },
+  // Hạn mức theo chức danh khoa học (GVHD) & Hạn mức từng GVHD
+  advisor: {
+    // GET: lấy danh sách hạn mức theo chức danh · PUT: cập nhật
+    quotas: '/advisor/quotas',
+    // PUT / PATCH: Cập nhật hạn mức sinh viên tối đa cho 1 GVHD trong kỳ
+    updateQuota: (semesterId: string, teacherId: string | number) =>
+      `/semesters/${semesterId}/advisors/${teacherId}/quota`,
+    singleQuota: (advisorId: string | number) => `/advisors/${advisorId}/quota`,
   },
   major: {
     base: '/major',

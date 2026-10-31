@@ -14,7 +14,8 @@ import {
 } from "@/shared/components/ui";
 import { API_SUCCESS_CODE } from "@/shared/types";
 import type { MajorOption } from "@/features/department/student_management";
-import { useCreateTeacher } from "../hooks/useTeachers";
+import { useAcademicTitles, useCreateTeacher } from "../hooks/useTeachers";
+import { DEFAULT_ACADEMIC_TITLES } from "../services/teacher.service";
 import { useTeacherEmailAutoFill } from "../hooks/useTeacherEmailAutoFill";
 import {
   createTeacherSchema,
@@ -31,6 +32,7 @@ interface CreateTeacherDialogProps {
   onOpenChange: (open: boolean) => void;
   majors: MajorOption[] | undefined;
   majorsLoading: boolean;
+  lockedMajor?: string;
 }
 
 export function CreateTeacherDialog({
@@ -38,8 +40,11 @@ export function CreateTeacherDialog({
   onOpenChange,
   majors,
   majorsLoading,
+  lockedMajor,
 }: CreateTeacherDialogProps) {
   const createTeacher = useCreateTeacher();
+  const { data: academicTitles } = useAcademicTitles();
+  const activeMajor = lockedMajor || '';
 
   const {
     register,
@@ -60,15 +65,19 @@ export function CreateTeacherDialog({
     subscribe,
     setValue,
     isSubmitted,
+    defaultMajor: activeMajor,
   });
 
   // Mỗi lần mở popup: làm trống form
   useEffect(() => {
     if (open) {
-      reset(EMPTY_CREATE_TEACHER_VALUES);
+      reset({
+        ...EMPTY_CREATE_TEACHER_VALUES,
+        major: activeMajor,
+      });
       resetAutoFill();
     }
-  }, [open, reset, resetAutoFill]);
+  }, [open, reset, resetAutoFill, activeMajor]);
 
   // Đang lưu thì không cho đóng, tránh tưởng đã hủy trong khi BE vẫn ghi
   const handleOpenChange = (value: boolean) => {
@@ -77,7 +86,18 @@ export function CreateTeacherDialog({
   };
 
   const onSubmit = (values: CreateTeacherFormValues) => {
-    createTeacher.mutate(values, {
+    const isExternal = values.email.toLowerCase().endsWith('@gmail.com');
+    const allTitles = academicTitles && academicTitles.length > 0 ? academicTitles : DEFAULT_ACADEMIC_TITLES;
+    const matchedTitle = allTitles.find(
+      (t) => t.abbreviation === values.academicTitle || String(t.id) === String(values.academicTitleId),
+    );
+    const payload: CreateTeacherFormValues = {
+      ...values,
+      major: isExternal ? '' : (activeMajor || values.major || ''),
+      academicTitleId: matchedTitle ? matchedTitle.id : (values.academicTitleId ?? null),
+      academicTitle: matchedTitle ? matchedTitle.abbreviation : (values.academicTitle || null),
+    };
+    createTeacher.mutate(payload, {
       onSuccess: (result) => {
         // 1000: thêm mới / kích hoạt lại → toast xanh với đúng câu của BE (BE không trả câu thì dùng câu mặc định).
         // 1100 (đang hoạt động sẵn, không đổi gì): interceptor đã hiện toast vàng
@@ -114,6 +134,7 @@ export function CreateTeacherDialog({
             errors={errors}
             majors={majors}
             majorsLoading={majorsLoading}
+            lockedMajor={activeMajor || undefined}
           />
 
           {errors.root?.server && (

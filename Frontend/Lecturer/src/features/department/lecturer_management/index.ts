@@ -1,4 +1,12 @@
-// Public API của sub-feature: lecturer_management (danh sách giảng viên – BE gọi là teacher)
-// Không export pages: page được nạp bằng lazy() trong app/routes.
+// Public API của feature: lecturer_management (Quản lý giáo viên gồm 3 pages: Giảng viên, Hướng dẫn, Nhận xét)
 export * from './types'
 export * from './hooks/useTeachers'
+export * from './hooks/useSemesterScope'
+export * from './services/teacher.service'
+export * from './services/supervisor.service'
+export * from './services/reviewer.service'
+export { default as LecturerManagementPage } from './pages/LecturerManagementPage'
+export { default as SupervisorAssignmentPage } from './pages/SupervisorAssignmentPage'
+export { default as ReviewerAssignmentPage } from './pages/ReviewerAssignmentPage'
+export { ImportAdvisorsDialog } from './components/ImportAdvisorsDialog'
+export { AdvisorImportResult } from './components/AdvisorImportResult'

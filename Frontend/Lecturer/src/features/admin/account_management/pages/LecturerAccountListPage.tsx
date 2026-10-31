@@ -1,6 +1,6 @@
-import { AccountListView } from '../components/AccountListView'
+import { LecturerAccountListView } from '../components/LecturerAccountListView'
 
-// Trang /admin/accounts-lecturer: quản lý tài khoản Giảng viên
+// Trang /admin/accounts-lecturer: quản lý tài khoản Giảng viên (kết nối API thật)
 export default function LecturerAccountListPage() {
-  return <AccountListView role="Giảng viên" />
+  return <LecturerAccountListView />
 }

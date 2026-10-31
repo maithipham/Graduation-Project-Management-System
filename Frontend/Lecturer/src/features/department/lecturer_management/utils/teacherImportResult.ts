@@ -22,6 +22,7 @@ export function importRowToFormValues(row: TeacherImportRowResult): CreateTeache
     organization: row.organization,
     major: external ? '' : row.majorName, // POST /teacher nhận tên hoặc mã ngành ở field `major`
     amount: '',
+    academicTitle: '',
   }
 }
 

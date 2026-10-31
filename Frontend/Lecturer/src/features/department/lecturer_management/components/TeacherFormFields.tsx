@@ -1,6 +1,8 @@
 import { useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 import { FormField, Input, Select } from '@/shared/components/ui'
 import type { MajorOption } from '@/features/department/student_management'
+import { useAcademicTitles } from '../hooks/useTeachers'
+import { DEFAULT_ACADEMIC_TITLES } from '../services/teacher.service'
 import {
   getTeacherEmailRule,
   type CreateTeacherFormInput,
@@ -15,6 +17,8 @@ interface TeacherFormFieldsProps {
   majorsLoading: boolean
   /** Ngành hiện tại không có trong danh sách (VD mã ngành / tên gõ sai trong Excel) → vẫn hiện để người dùng thấy */
   currentMajor?: string
+  /** Ngành bị khóa (ví dụ TBM chỉ được thêm giáo viên thuộc bộ môn của mình) */
+  lockedMajor?: string
   className?: string
 }
 
@@ -30,7 +34,7 @@ function getCurrentMajorLabel(currentMajor: string | undefined, majors: MajorOpt
     : `${currentMajor} (không có trong danh sách)`
 }
 
-/** 7 ô thông tin giáo viên — dùng chung cho popup "Thêm giáo viên" và form sửa dòng import lỗi */
+/** 6 ô thông tin giáo viên — dùng chung cho popup "Thêm giáo viên" và form sửa dòng import lỗi */
 export function TeacherFormFields({
   register,
   control,
@@ -38,11 +42,15 @@ export function TeacherFormFields({
   majors,
   majorsLoading,
   currentMajor,
+  lockedMajor,
   className = 'grid gap-4 sm:grid-cols-2',
 }: TeacherFormFieldsProps) {
   // Email @gmail.com (ngoài trường) → ô Ngành bị khóa và để trống
   const email = useWatch({ control, name: 'email' })
   const external = getTeacherEmailRule(email)?.internal === false
+
+  const { data: apiTitles } = useAcademicTitles()
+  const titles = apiTitles && apiTitles.length > 0 ? apiTitles : DEFAULT_ACADEMIC_TITLES
 
   const currentMajorLabel = getCurrentMajorLabel(currentMajor, majors)
 
@@ -74,23 +82,47 @@ export function TeacherFormFields({
         label="Ngành"
         required={!external}
         error={errors.major?.message}
-        hint={external ? 'Giáo viên ngoài trường không điền mục này' : undefined}
+        hint={
+          external
+            ? 'Giáo viên ngoài trường không điền mục này'
+            : lockedMajor
+              ? 'Ngành được cố định theo bộ môn quản lý'
+              : undefined
+        }
       >
-        <Select disabled={majorsLoading || external} {...register('major')}>
-          <option value="">{majorsLoading ? 'Đang tải ngành...' : '-- Chọn ngành --'}</option>
-          {currentMajor && currentMajorLabel && (
-            <option value={currentMajor}>{currentMajorLabel}</option>
+        <Select
+          disabled={majorsLoading || external || Boolean(lockedMajor)}
+          {...register('major')}
+        >
+          {external ? (
+            <option value="">-- Không áp dụng cho giáo viên ngoài trường --</option>
+          ) : lockedMajor ? (
+            <option value={lockedMajor}>{lockedMajor}</option>
+          ) : (
+            <>
+              <option value="">{majorsLoading ? 'Đang tải ngành...' : '-- Chọn ngành --'}</option>
+              {currentMajor && currentMajorLabel && (
+                <option value={currentMajor}>{currentMajorLabel}</option>
+              )}
+              {majors?.map((major) => (
+                <option key={major.publicId} value={major.name}>
+                  {major.name}
+                </option>
+              ))}
+            </>
           )}
-          {majors?.map((major) => (
-            <option key={major.publicId} value={major.name}>
-              {major.name}
-            </option>
-          ))}
         </Select>
       </FormField>
 
-      <FormField label="Hạn mức sinh viên" error={errors.amount?.message}>
-        <Input inputMode="numeric" placeholder="VD: 20" {...register('amount')} />
+      <FormField label="Học hàm / Học vị" error={errors.academicTitle?.message}>
+        <Select {...register('academicTitle')}>
+          <option value="">-- Chọn học hàm / học vị --</option>
+          {titles.map((t) => (
+            <option key={t.id} value={t.abbreviation}>
+              {t.abbreviation} ({t.name})
+            </option>
+          ))}
+        </Select>
       </FormField>
     </div>
   )

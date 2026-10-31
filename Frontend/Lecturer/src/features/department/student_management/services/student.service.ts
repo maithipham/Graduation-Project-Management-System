@@ -38,14 +38,20 @@ const EXPORT_FALLBACK_FILENAME = 'Danh_sach_sinh_vien.xlsx'
 // Giống một @Service: chỉ gọi API và bóc wrapper ApiResponse, không xử lý giao diện
 export const studentService = {
   // GET /student?semesterId=...&keyword=...&batch=K63&majorId=...&status=STAGE_2_TOPIC_CONFIRMED&page=0&size=15&sort=name,asc
-  async getStudents(params: StudentListParams): Promise<SpringPage<StudentListItem>> {
+  async getStudents(
+    params: Partial<StudentListParams> & { page?: number; size?: number },
+    config?: { skipErrorToast?: boolean },
+  ): Promise<SpringPage<StudentListItem>> {
+    params.page = params.page ?? 0
+    params.size = params.size ?? 15
     const res = await apiClient.get<ApiResponse<RawSpringPage<StudentListItem>>>(STUDENT.base, {
+      skipErrorToast: config?.skipErrorToast,
       params: compactParams(params),
       // sort dạng mảng → ?sort=a,asc&sort=b,desc (đúng kiểu Spring Pageable), không phải sort[]=...
       paramsSerializer: { indexes: null },
     })
     // BE có thể trả Page phẳng hoặc PagedModel ({ content, page: {...} }) → đưa về một dạng
-    return toSpringPage(res.data.data, params)
+    return toSpringPage(res.data.data, params as StudentListParams)
   },
 
   // GET /student/export?semesterId=...&keyword=...&batch=...&majorId=...&status=...&sort=name,asc

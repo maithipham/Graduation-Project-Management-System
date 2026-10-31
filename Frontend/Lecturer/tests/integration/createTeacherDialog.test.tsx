@@ -57,7 +57,7 @@ describe('CreateTeacherDialog', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  it('email @tlu.edu.vn tự điền Trường Đại học Thủy lợi + 20; gửi body toàn chuỗi rồi đóng popup', async () => {
+  it('email @tlu.edu.vn tự điền Trường Đại học Thủy lợi; gửi body toàn chuỗi rồi đóng popup', async () => {
     const create = vi
       .spyOn(teacherService, 'createTeacher')
       .mockResolvedValue({ code: 1000, message: 'Thêm giáo viên thành công' })
@@ -66,21 +66,19 @@ describe('CreateTeacherDialog', () => {
 
     await fillValidForm(u)
     expect(field('Đơn vị công tác')).toHaveValue('Trường Đại học Thủy lợi')
-    expect(field('Hạn mức sinh viên')).toHaveValue('20')
     expect(field('Ngành')).toBeEnabled()
 
     await u.click(screen.getByRole('button', { name: 'Lưu' }))
 
     expect(create).toHaveBeenCalledWith(
-      {
+      expect.objectContaining({
         firstName: 'Nguyễn Văn',
         lastName: 'An',
         email: 'an.nv@tlu.edu.vn',
         phone: '0987654321',
         organization: 'Trường Đại học Thủy lợi',
         major: 'Kỹ thuật phần mềm',
-        amount: '20',
-      },
+      }),
       expect.anything(),
     )
     expect(onOpenChange).toHaveBeenCalledWith(false)
@@ -132,7 +130,7 @@ describe('CreateTeacherDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
-  it('đổi sang @gmail.com: xóa tên Thủy lợi tự điền, hạn mức 10, xóa và khóa ô Ngành, gửi major ""', async () => {
+  it('đổi sang @gmail.com: xóa tên Thủy lợi tự điền, xóa và khóa ô Ngành, gửi major ""', async () => {
     const create = vi
       .spyOn(teacherService, 'createTeacher')
       .mockResolvedValue({ code: 1000, message: 'Thêm giáo viên thành công' })
@@ -144,7 +142,6 @@ describe('CreateTeacherDialog', () => {
     await u.type(field('Email'), 'An.NV@Gmail.com')
 
     expect(field('Đơn vị công tác')).toHaveValue('')
-    expect(field('Hạn mức sinh viên')).toHaveValue('10')
     expect(field('Ngành')).toHaveValue('')
     expect(field('Ngành')).toBeDisabled()
 
@@ -161,25 +158,21 @@ describe('CreateTeacherDialog', () => {
         email: 'an.nv@gmail.com',
         organization: 'Trường Đại học Bách khoa Hà Nội',
         major: '',
-        amount: '10',
       }),
       expect.anything(),
     )
   })
 
-  it('đơn vị và hạn mức người dùng tự sửa thì không bị email ghi đè', async () => {
+  it('đơn vị người dùng tự sửa thì không bị email ghi đè', async () => {
     const u = userEvent.setup()
     renderDialog()
 
     await u.type(field('Email'), 'an@gmail.com')
     await u.type(field('Đơn vị công tác'), 'Trường Đại học Bách khoa Hà Nội')
-    await u.clear(field('Hạn mức sinh viên'))
-    await u.type(field('Hạn mức sinh viên'), '5')
     await u.clear(field('Email'))
     await u.type(field('Email'), 'an@tlu.edu.vn')
 
     expect(field('Đơn vị công tác')).toHaveValue('Trường Đại học Bách khoa Hà Nội')
-    expect(field('Hạn mức sinh viên')).toHaveValue('5')
     // Quay về trong trường → mở khóa ô Ngành
     expect(field('Ngành')).toBeEnabled()
   })
@@ -199,5 +192,48 @@ describe('CreateTeacherDialog', () => {
     )
     expect(field('Họ và tên đệm')).toHaveValue('Nguyễn Văn')
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
+  })
+
+  it('khi mở popup với lockedMajor (ngành TBM): ô Ngành tự điền ngành của TBM và bị khóa', async () => {
+    const create = vi
+      .spyOn(teacherService, 'createTeacher')
+      .mockResolvedValue({ code: 1000, message: 'Thêm giáo viên thành công' })
+    const u = userEvent.setup()
+    const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CreateTeacherDialog
+          open
+          onOpenChange={vi.fn()}
+          majors={MAJORS}
+          majorsLoading={false}
+          lockedMajor="Kỹ thuật phần mềm"
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(field('Ngành')).toHaveValue('Kỹ thuật phần mềm')
+    expect(field('Ngành')).toBeDisabled()
+
+    await u.type(field('Họ và tên đệm'), 'Trần Quốc')
+    await u.type(field('Tên'), 'Bảo')
+    await u.type(field('Email'), 'bao.tq@tlu.edu.vn')
+    await u.type(field('Số điện thoại'), '0987654321')
+    await u.selectOptions(field('Học hàm / Học vị'), 'PGS.TS.')
+
+    await u.click(screen.getByRole('button', { name: 'Lưu' }))
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstName: 'Trần Quốc',
+        lastName: 'Bảo',
+        email: 'bao.tq@tlu.edu.vn',
+        phone: '0987654321',
+        organization: 'Trường Đại học Thủy lợi',
+        major: 'Kỹ thuật phần mềm',
+        academicTitle: 'PGS.TS.',
+      }),
+      expect.anything(),
+    )
   })
 })

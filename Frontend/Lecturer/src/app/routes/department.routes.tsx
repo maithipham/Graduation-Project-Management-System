@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import type { RouteObject } from 'react-router-dom'
+import { Navigate, type RouteObject } from 'react-router-dom'
 import { DepartmentLayout } from '@/features/department'
 import { withSuspense } from './withSuspense'
 
@@ -8,6 +8,12 @@ const StudentManagementPage = lazy(
 )
 const LecturerManagementPage = lazy(
   () => import('@/features/department/lecturer_management/pages/LecturerManagementPage'),
+)
+const SupervisorAssignmentPage = lazy(
+  () => import('@/features/department/lecturer_management/pages/SupervisorAssignmentPage'),
+)
+const ReviewerAssignmentPage = lazy(
+  () => import('@/features/department/lecturer_management/pages/ReviewerAssignmentPage'),
 )
 
 export const departmentRoutes: RouteObject = {
@@ -28,7 +34,14 @@ export const departmentRoutes: RouteObject = {
       ),
     },
     { path: 'student-management', element: withSuspense(<StudentManagementPage />) },
+    // 3 Trang quản lý giáo viên:
+    // 1. Giảng viên (Danh sách khả dụng để phân công GVHD)
+    { path: 'teachers', element: <Navigate to="/department/lecturer-management" replace /> },
     { path: 'lecturer-management', element: withSuspense(<LecturerManagementPage />) },
+    // 2. Giáo viên Hướng dẫn (GVHD trong học kỳ, chỉ tiêu, sinh viên nhận)
+    { path: 'supervisors', element: withSuspense(<SupervisorAssignmentPage />) },
+    // 3. Giáo viên Nhận xét (GVPB đề cương, danh sách đề tài & phân công)
+    { path: 'reviewers', element: withSuspense(<ReviewerAssignmentPage />) },
   ],
 }
 

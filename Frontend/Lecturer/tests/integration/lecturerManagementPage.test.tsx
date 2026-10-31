@@ -10,14 +10,22 @@ import { toSpringPage } from '@/shared/utils'
 
 const MAJORS = [{ publicId: 'm1', code: '7480103', name: 'Kỹ thuật phần mềm' }]
 
-// 25 giáo viên, mỗi trang 10 → có 3 trang
-const rows: TeacherListItem[] = Array.from({ length: 10 }, (_, i) => ({
+// 25 giáo viên, mỗi trang 15 → có 2 trang
+const rows: TeacherListItem[] = Array.from({ length: 15 }, (_, i) => ({
+  id: i + 1,
+  teacherId: i + 1,
   publicId: `id-${i}`,
   name: `Giáo viên ${i + 1}`,
+  firstName: 'Giáo viên',
+  lastName: `${i + 1}`,
+  academicTitle: null,
+  email: `gv${i + 1}@tlu.edu.vn`,
   majorName: 'Kỹ thuật phần mềm',
   organization: 'Trường Đại học Thủy lợi',
-  phone: null,
-  amount: 20,
+  isInternal: true,
+  unitType: 'INTERNAL',
+  isAssigned: false,
+  assignmentStatus: 'Chưa phân công',
   status: true,
 }))
 
@@ -25,9 +33,28 @@ function renderPage() {
   const getTeachers = vi
     .spyOn(teacherService, 'getTeachers')
     .mockImplementation(async (params) =>
-      toSpringPage({ content: rows, number: params.page, size: params.size, totalElements: 25, totalPages: 3 }),
+      toSpringPage({ content: rows, number: params.page, size: params.size, totalElements: 25, totalPages: 2 }),
     )
   vi.spyOn(studentService, 'getMajors').mockResolvedValue(MAJORS)
+  vi.spyOn(studentService, 'getCurrentSemester').mockResolvedValue({
+    publicId: 'sem-curr',
+    name: 'Học kỳ 1 năm học 2026-2027',
+    academicYear: '2026-2027',
+    term: 'Học kỳ 1',
+    startDate: '01-09-2026',
+    endDate: '15-01-2027',
+  })
+  vi.spyOn(studentService, 'getSemesters').mockResolvedValue([
+    {
+      publicId: 'sem-curr',
+      name: 'Học kỳ 1 năm học 2026-2027',
+      academicYear: '2026-2027',
+      term: 'Học kỳ 1',
+      startDate: '01-09-2026',
+      endDate: '15-01-2027',
+    },
+  ])
+
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
@@ -43,80 +70,106 @@ beforeEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('LecturerManagementPage — bộ lọc, phân trang, sắp xếp', () => {
-  it('lần đầu: chỉ gửi page=0, size=10, không lọc, không sort', async () => {
+describe('LecturerManagementPage — bộ lọc, phân trang, phân công GVHD', () => {
+  it('lần đầu (kỳ này): gửi page=0, size=15, isAssigned=false để chỉ hiện GV có thể phân công', async () => {
     const { lastParams } = renderPage()
 
     await screen.findByText('Giáo viên 1')
-    expect(lastParams()).toEqual({ page: 0, size: 10 })
+    expect(lastParams()).toEqual(
+      expect.objectContaining({ page: 0, size: 15, isAssigned: false }),
+    )
   })
 
-  it('đổi bộ lọc đơn vị / ngành → gửi đúng tham số BE', async () => {
+  it('đổi bộ lọc đơn vị / ngành / trạng thái → gửi đúng tham số BE', async () => {
     const u = userEvent.setup()
     const { lastParams } = renderPage()
     await screen.findByText('Giáo viên 1')
 
     await u.selectOptions(screen.getByLabelText('Lọc theo đơn vị công tác'), 'Trong trường')
     await waitFor(() =>
-      expect(lastParams()).toEqual({ organizationType: 'internal', page: 0, size: 10 }),
+      expect(lastParams()).toEqual(
+        expect.objectContaining({ unitType: 'INTERNAL' }),
+      ),
     )
 
     await u.selectOptions(screen.getByLabelText('Lọc theo đơn vị công tác'), 'Ngoài trường')
-    await waitFor(() => expect(lastParams()).toEqual({ organizationType: 'external', page: 0, size: 10 }))
-
-    await u.selectOptions(await screen.findByLabelText('Lọc theo khoa'), 'Kỹ thuật phần mềm')
     await waitFor(() =>
-      expect(lastParams()).toEqual({
-        organizationType: 'external',
-        majorName: 'Kỹ thuật phần mềm',
-        page: 0,
-        size: 10,
-      }),
+      expect(lastParams()).toEqual(
+        expect.objectContaining({ unitType: 'EXTERNAL' }),
+      ),
+    )
+
+    await u.selectOptions(await screen.findByLabelText('Lọc theo ngành'), 'Kỹ thuật phần mềm')
+    await waitFor(() =>
+      expect(lastParams()).toEqual(
+        expect.objectContaining({
+          majorName: 'Kỹ thuật phần mềm',
+          majorId: 'm1',
+        }),
+      ),
+    )
+
+    await u.selectOptions(screen.getByLabelText('Lọc theo trạng thái phân công'), 'Chưa phân công')
+    await waitFor(() =>
+      expect(lastParams()).toEqual(
+        expect.objectContaining({
+          isAssigned: false,
+        }),
+      ),
     )
   })
 
-  it('ô tìm tên: chờ ngừng gõ mới gọi API, bỏ khoảng trắng hai đầu', async () => {
+  it('chọn Tất cả học kỳ → không gửi semesterId để lấy tất cả giáo viên luôn', async () => {
+    const u = userEvent.setup()
+    const { lastParams } = renderPage()
+    await screen.findByText('Giáo viên 1')
+
+    await u.selectOptions(screen.getByLabelText('Chọn học kỳ'), 'all')
+    await waitFor(() => {
+      expect(lastParams()?.semesterId).toBeUndefined()
+      expect(lastParams()?.isAssigned).toBeUndefined()
+    })
+  })
+
+  it('ô tìm kiếm: chờ ngừng gõ mới gọi API, bỏ khoảng trắng hai đầu', async () => {
     const u = userEvent.setup()
     const { getTeachers, lastParams } = renderPage()
     await screen.findByText('Giáo viên 1')
-    const callsBefore = getTeachers.mock.calls.length
 
-    await u.type(screen.getByLabelText('Tìm kiếm giáo viên'), '  An ')
+    const initialCalls = getTeachers.mock.calls.length
+    const input = screen.getByLabelText('Tìm kiếm giáo viên')
 
-    // Vừa gõ xong: chưa gọi API theo từng ký tự
-    expect(getTeachers.mock.calls.slice(callsBefore).some(([p]) => p.name)).toBe(false)
-    await waitFor(() => expect(lastParams()).toEqual({ name: 'An', page: 0, size: 10 }))
-    // Chỉ gọi đúng 1 lần với tên đã gõ xong, không gọi với "A"
-    expect(getTeachers.mock.calls.filter(([p]) => p.name).map(([p]) => p.name)).toEqual(['An'])
+    await u.type(input, '  Bảo  ')
+    expect(getTeachers.mock.calls.length).toBe(initialCalls)
+
+    await waitFor(() => expect(lastParams()?.name).toBe('Bảo'), { timeout: 1500 })
   })
 
-  it('đang ở trang 2 mà đổi bộ lọc → quay về trang đầu', async () => {
+  it('nút "Phân công làm GVHD (x)" hiển thị số lượng được chọn và bật khi có chọn dòng', async () => {
     const u = userEvent.setup()
-    const { lastParams } = renderPage()
+    renderPage()
+    await screen.findByText('Giáo viên 1')
 
-    await u.click(await screen.findByRole('button', { name: '2' }))
-    await waitFor(() => expect(lastParams()).toEqual({ page: 1, size: 10 }))
+    const assignButton = screen.getByRole('button', { name: /Phân công làm GVHD/i })
+    expect(assignButton).toBeDisabled()
 
-    await u.selectOptions(screen.getByLabelText('Lọc theo đơn vị công tác'), 'Ngoài trường')
-    await waitFor(() => expect(lastParams()).toEqual({ organizationType: 'external', page: 0, size: 10 }))
+    const checkboxes = screen.getAllByRole('checkbox')
+    // Chọn dòng đầu tiên (checkboxes[0] là header select-all, checkboxes[1] là dòng 1)
+    await u.click(checkboxes[1])
+
+    expect(assignButton).toBeEnabled()
+    expect(assignButton).toHaveTextContent('Phân công làm GVHD (1)')
   })
 
-  it('"Xóa lọc" xóa cả bộ lọc lẫn cột sắp xếp và quay về trang đầu', async () => {
+  it('"Xóa lọc" xóa bộ lọc và quay về trang đầu', async () => {
     const u = userEvent.setup()
     const { lastParams } = renderPage()
     await screen.findByText('Giáo viên 1')
 
-    await u.click(screen.getByRole('button', { name: 'Họ và tên' }))
-    await waitFor(() => expect(lastParams()).toEqual({ page: 0, size: 10, sort: 'name,asc' }))
-    await u.selectOptions(await screen.findByLabelText('Lọc theo khoa'), 'Kỹ thuật phần mềm')
-    await u.click(await screen.findByRole('button', { name: '2' }))
-    await waitFor(() =>
-      expect(lastParams()).toEqual({ majorName: 'Kỹ thuật phần mềm', page: 1, size: 10, sort: 'name,asc' }),
-    )
+    await u.selectOptions(screen.getByLabelText('Lọc theo đơn vị công tác'), 'Ngoài trường')
+    await waitFor(() => expect(lastParams()?.unitType).toBe('EXTERNAL'))
 
-    await u.click(screen.getByRole('button', { name: /Xóa lọc/ }))
-
-    await waitFor(() => expect(lastParams()).toEqual({ page: 0, size: 10 }))
-    expect(screen.queryByRole('button', { name: /Xóa lọc/ })).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: /Xóa lọc/i }))
+    await waitFor(() => expect(lastParams()?.unitType).toBeUndefined())
   })
 })

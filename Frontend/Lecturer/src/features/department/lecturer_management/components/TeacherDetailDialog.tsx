@@ -15,14 +15,15 @@ import { TeacherStatusBadge } from './TeacherStatusBadge'
 interface TeacherDetailDialogProps {
   /** publicId của giáo viên đang xem; undefined → popup đóng */
   publicId: string | undefined
-  onClose: () => void
+  onClose?: () => void
+  onOpenChange?: (open: boolean) => void
 }
 
-export function TeacherDetailDialog({ publicId, onClose }: TeacherDetailDialogProps) {
+export function TeacherDetailDialog({ publicId, onClose, onOpenChange }: TeacherDetailDialogProps) {
   const { data: teacher, isPending, isError } = useTeacherDetail(publicId)
 
   return (
-    <Dialog open={publicId !== undefined} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={publicId !== undefined} onOpenChange={(open) => !open && (onClose?.() ?? onOpenChange?.(false))}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">

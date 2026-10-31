@@ -17,6 +17,7 @@ interface UseTeacherEmailAutoFillOptions {
   isSubmitted: boolean
   /** Email có sẵn khi mở form (sửa dòng import) → coi đơn vị / hạn mức hiện tại như đã tự điền theo email đó */
   initialEmail?: string
+  defaultMajor?: string
 }
 
 /**
@@ -31,6 +32,7 @@ export function useTeacherEmailAutoFill({
   setValue,
   isSubmitted,
   initialEmail = '',
+  defaultMajor = '',
 }: UseTeacherEmailAutoFillOptions) {
   // Quy tắc theo đuôi email đã tự điền lần trước (để biết ô nào người dùng tự sửa thì không ghi đè)
   const autoFilledRef = useRef<TeacherEmailRule | undefined>(getTeacherEmailRule(initialEmail))
@@ -57,11 +59,15 @@ export function useTeacherEmailAutoFill({
             setValue('amount', String(rule.amount), options)
           }
           // Ngoài trường không có ngành (BE báo lỗi nếu có)
-          if (!rule.internal && values.major) setValue('major', '', options)
+          if (!rule.internal && values.major) {
+            setValue('major', '', options)
+          } else if (rule.internal && !values.major && defaultMajor) {
+            setValue('major', defaultMajor, options)
+          }
           autoFilledRef.current = rule
         },
       }),
-    [subscribe, setValue, isSubmitted],
+    [subscribe, setValue, isSubmitted, defaultMajor],
   )
 
   const resetAutoFill = useCallback(() => {
