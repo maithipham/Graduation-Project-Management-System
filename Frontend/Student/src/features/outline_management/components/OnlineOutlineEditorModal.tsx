@@ -17,12 +17,13 @@ import {
   createEmptyOutlineEditorData,
   loadSavedOutlineDraft,
 } from '../services/outline.service'
-import type { OutlineEditorData, OutlinePlanRow, OutlineSectionKey } from '../types/outline.types'
-import {
-  buildOutlineBlocks,
-  downloadOutlineDocx,
-  type StudentOutlineMeta,
-} from '../utils/docxBuilder'
+import type {
+  OutlineEditorData,
+  OutlinePlanRow,
+  OutlineSectionKey,
+  StudentOutlineMeta,
+} from '../types/outline.types'
+import { buildOutlineBlocks, downloadOutlineDocx } from '../utils/docxBuilder'
 import { OutlinePaperPreview } from './OutlinePaperPreview'
 
 interface OnlineOutlineEditorModalProps {
@@ -38,6 +39,12 @@ interface OnlineOutlineEditorModalProps {
 const INPUT_BASE_CLS =
   'w-full text-sm px-3.5 py-2.5 rounded-lg border bg-white focus:outline-hidden focus:ring-2 focus:ring-[#1565C0]/25 focus:border-[#1565C0] transition-colors'
 
+const EMPTY_PLAN_ROW: OutlinePlanRow = { task: '', time: '', result: '' }
+
+// plan là trường cũ (không bắt buộc), bản nháp mới không có → luôn có ít nhất 1 dòng để bảng kế hoạch hiển thị
+const withPlanRows = (data: OutlineEditorData): OutlineEditorData =>
+  data.plan && data.plan.length > 0 ? data : { ...data, plan: [{ ...EMPTY_PLAN_ROW }] }
+
 export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> = ({
   open,
   defaultTopicVi,
@@ -49,7 +56,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 }) => {
   const [tab, setTab] = useState<'form' | 'preview'>('form')
   const [data, setData] = useState<OutlineEditorData>(() =>
-    loadSavedOutlineDraft(defaultTopicVi),
+    withPlanRows(loadSavedOutlineDraft(defaultTopicVi)),
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [footerMsg, setFooterMsg] = useState<string>('')
@@ -58,7 +65,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
   if (prevOpen !== open) {
     setPrevOpen(open)
     if (open) {
-      setData(loadSavedOutlineDraft(defaultTopicVi))
+      setData(withPlanRows(loadSavedOutlineDraft(defaultTopicVi)))
       setErrors({})
       setFooterMsg('')
       setTab('form')
@@ -91,7 +98,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 
   const updatePlanCell = (index: number, key: keyof OutlinePlanRow, value: string) => {
     setData((prev) => {
-      const nextPlan = prev.plan.map((row, idx) =>
+      const nextPlan = (prev.plan ?? []).map((row, idx) =>
         idx === index ? { ...row, [key]: value } : row,
       )
       return { ...prev, plan: nextPlan }
@@ -108,23 +115,23 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
   const addPlanRow = () => {
     setData((prev) => ({
       ...prev,
-      plan: [...prev.plan, { task: '', time: '', result: '' }],
+      plan: [...(prev.plan ?? []), { ...EMPTY_PLAN_ROW }],
     }))
   }
 
   const removePlanRow = (index: number) => {
     setData((prev) => {
-      const nextPlan = prev.plan.filter((_, idx) => idx !== index)
+      const nextPlan = (prev.plan ?? []).filter((_, idx) => idx !== index)
       return {
         ...prev,
-        plan: nextPlan.length > 0 ? nextPlan : [{ task: '', time: '', result: '' }],
+        plan: nextPlan.length > 0 ? nextPlan : [{ ...EMPTY_PLAN_ROW }],
       }
     })
   }
 
   const handleReset = () => {
     if (window.confirm('Xóa toàn bộ nội dung đã nhập và bản nháp đã lưu?')) {
-      setData(createEmptyOutlineEditorData(defaultTopicVi))
+      setData(withPlanRows(createEmptyOutlineEditorData(defaultTopicVi)))
       setErrors({})
       setFooterMsg('')
       try {
@@ -143,7 +150,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 
   const handleSubmit = () => {
     const nextErrors: Record<string, string> = {}
-    if (!data.topicVi.trim()) {
+    if (!(data.topicVi ?? '').trim()) {
       nextErrors.topicVi = 'Vui lòng nhập tên đề tài.'
     }
     OUTLINE_SECTIONS.forEach((s) => {
@@ -151,7 +158,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
         nextErrors[s.key] = 'Vui lòng nhập nội dung mục này.'
       }
     })
-    if (!data.plan.some((r) => r.task.trim())) {
+    if (!(data.plan ?? []).some((r) => r.task.trim())) {
       nextErrors.plan = 'Cần ít nhất một công việc trong kế hoạch thực hiện.'
     }
 
@@ -300,7 +307,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
                 </label>
                 <input
                   type="text"
-                  value={data.topicVi}
+                  value={data.topicVi ?? ''}
                   onChange={(e) => updateField('topicVi', e.target.value)}
                   className={`${fieldCls('topicVi')} mt-1.5`}
                 />
@@ -316,7 +323,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
                 </label>
                 <input
                   type="text"
-                  value={data.topicEn}
+                  value={data.topicEn ?? ''}
                   onChange={(e) => updateField('topicEn', e.target.value)}
                   className={`${fieldCls('topicEn')} mt-1.5`}
                 />
@@ -371,7 +378,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
                     </tr>
                   </thead>
                   <tbody>
-                    {data.plan.map((row, idx) => (
+                    {(data.plan ?? []).map((row, idx) => (
                       <tr key={idx} className="align-top">
                         <td className="py-2 pr-2 text-xs font-bold text-slate-400 w-8 pt-3.5">
                           {idx + 1}

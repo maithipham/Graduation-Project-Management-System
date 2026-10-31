@@ -53,6 +53,9 @@ export const useAccountStore = create<AccountState>()(
           status: values.status,
           phone: values.phone || '—',
           unit: resolvedUnit,
+          major: values.major || undefined,
+          batch: values.batch || undefined,
+          className: values.className || undefined,
           createdAt: formattedDate,
           lastLogin: '—',
           activities: [

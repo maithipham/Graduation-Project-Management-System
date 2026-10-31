@@ -1,7 +1,7 @@
 export const API_ENDPOINTS = {
   auth: {
     login: '/login',
-    logout: '/logout',
+    logout: '/log-out',
     refreshToken: '/refresh-token',
     myInfo: '/my-info',
   },
@@ -61,6 +61,12 @@ export const API_ENDPOINTS = {
   },
   admin: {
     accounts: '/accounts',
+    // Tài khoản sinh viên (quyền *_ACCOUNT), không theo học kì
+    studentAccounts: '/student/account', // GET danh sách, POST thêm thủ công
+    studentAccountDetail: (publicId: string) => `/student/account/${publicId}`, // GET chi tiết, PUT sửa, DELETE xóa / khóa
+    studentAccountExport: '/student/account/export', // GET xuất Excel
+    studentAccountImport: '/student/account/import', // POST import file
+    studentBatchAll: '/student/batch/all',
     semesters: '/semesters',
     faculties: '/faculties',
     majors: '/majors',

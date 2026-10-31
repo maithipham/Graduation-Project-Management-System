@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { broadcastSignedOut } from '@/shared/api'
 import { authService } from '../services/auth.service'
 import type { UserInfo } from '../types'
 import { SIGNED_OUT_STATE } from '../utils/loginState'
@@ -37,7 +38,11 @@ export function useLogout() {
   const navigate = useNavigate()
   return useMutation({
     mutationFn: () => authService.logout(),
-    // Thành công hay lỗi đều đăng xuất ở frontend. Cache được xóa ở trang /login (xem SIGNED_OUT_STATE)
-    onSettled: () => navigate('/login', { replace: true, state: SIGNED_OUT_STATE }),
+    // Thành công hay lỗi đều đăng xuất ở frontend. Cache được xóa ở trang /login (xem SIGNED_OUT_STATE).
+    // Báo các tab khác cùng về /login, không đợi tới lần gọi API kế tiếp mới nhận 401
+    onSettled: () => {
+      broadcastSignedOut()
+      navigate('/login', { replace: true, state: SIGNED_OUT_STATE })
+    },
   })
 }

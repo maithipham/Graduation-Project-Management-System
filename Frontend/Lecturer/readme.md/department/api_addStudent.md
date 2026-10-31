@@ -20,8 +20,14 @@
 | 6   | Sort thêm key `batch`                                                                                                                                   |                                                                            |
 | 7   | API `PATCH /student/{publicId}/activate` **đã xóa**                                                                                                     | Bỏ endpoint `activate`, bỏ nút "Kích hoạt"                                 |
 | 8   | `POST /student`, `POST /student/import` **không nhận học kì**: BE tự thêm sinh viên vào năm học + học kì hiện tại                                      | **Không** gửi `semesterId`; chưa có học kì hiện tại → BE trả `409 3030`    |
-| 9   | Thêm `PUT /student/{publicId}` (sửa) và `DELETE /student/{publicId}?semesterId=` (xóa SV import nhầm)                                                   | Chưa nối (Mục 6.4, 6.5)                                                    |
+| 9   | Thêm `PUT /student/{publicId}` (sửa) và `DELETE /student/{publicId}?semesterId=` (xóa SV import nhầm)                                                   | Đã nối (Mục 6.4, 6.5)                                                      |
 | 10  | Mã lỗi trùng dữ liệu gộp về `3014` (thay `3004`, `3005`, `3010`, `3011`)                                                                                | FE chỉ hiện `message`, không cần đổi logic                                 |
+| 11  | Phạm vi ngành **chỉ áp cho thao tác ghi**: mọi Trưởng ngành xem được sinh viên **mọi ngành** (danh sách, popup, khóa, export)                          | Bộ lọc Bộ môn hiện đủ ngành; nút Sửa / Xóa với SV ngành khác sẽ bị BE trả `403 3032` (Mục 3) |
+| 12  | Có API xuất Excel `GET /student/export` (cùng bộ lọc với `GET /student`)                                                                               | Đã nối popup Export (Mục 4.6, 5.4)                                         |
+| 13  | Có API tất cả khóa `GET /student/batch/all` (không theo học kì)                                                                                         | Chưa nối; thêm `batchAll` vào endpoints khi cần dropdown khóa không phụ thuộc học kì (Mục 4.2) |
+| 14  | Body `PUT /student/{publicId}` **bỏ `major`** (không đổi ngành, không còn lỗi `3018`), **thêm `accountStatus`** (khóa / mở khóa); lỗi mới `3031` | Đã làm: ô Bộ môn chỉ đọc, có ô bật/tắt tài khoản (Mục 6.4) |
+| 15  | Sửa / xóa SV ngành khác đổi từ `404 3008` "Sinh viên không tồn tại" sang **`403 3032`** "Bạn không có quyền thao tác với sinh viên không thuộc ngành phụ trách"; `3008` chỉ còn cho SV không có | FE chỉ hiện `message`; nếu có xử lý riêng theo HTTP 404 khi sửa / xóa thì xét thêm 403 (Mục 3, 6.4, 6.5) |
+| 16  | Body `PUT /student/{publicId}` **bỏ `accountStatus`** (thay đổi #14 đã hủy một phần): form Sửa không còn khóa / mở khóa tài khoản; **xóa mã lỗi `3031`** | ✅ Đã làm: bỏ ô bật/tắt "Được đăng nhập" khỏi form Sửa, bỏ `accountStatus` khỏi schema / payload, bỏ xử lý `3031` (Mục 6.4) |
 
 ---
 
@@ -33,9 +39,9 @@
 | 2   | Bấm 1 dòng → popup "Thông tin sinh viên"                               | 🔄 Cần sửa: `status` → `accountStatus` (Mục 4.5)                 |
 | 3   | Nút **Import file** → popup, kết quả theo tab, sửa & gửi lại dòng lỗi  | 🔄 Hiện học kì hiện tại, xử lý `1102`, `3023` – `3025`, `3030`   |
 | 4   | Nút **Thêm sinh viên** → popup form                                    | 🔄 Hiện học kì hiện tại, xử lý `1102`, `3023` – `3025`, `3030`   |
-| 5   | Nút **Export file** → popup                                            | ⏳ Chỉ giao diện (BE **chưa có** API export)                     |
-| 6   | Sửa sinh viên                                                          | ⏳ Chưa làm – `PUT /student/{publicId}` (Mục 6.4)                |
-| 7   | Xóa sinh viên import nhầm khỏi học kì                                  | ⏳ Chưa làm – `DELETE /student/{publicId}?semesterId=` (Mục 6.5) |
+| 5   | Nút **Export file** → popup                                            | ✅ Đã nối `GET /student/export` (Mục 4.6)                        |
+| 6   | Sửa sinh viên                                                          | ✅ Đã nối `PUT /student/{publicId}` (Mục 6.4)                    |
+| 7   | Xóa sinh viên import nhầm khỏi học kì                                  | ✅ Đã nối `DELETE /student/{publicId}?semesterId=` (Mục 6.5)     |
 | 8   | Tải file mẫu import                                                    | ⏳ Chưa làm – BE chưa có API tải file mẫu                        |
 
 ---
@@ -81,7 +87,9 @@ departmentStudent: {
   base: '/student',                                     // GET danh sách · POST thêm thủ công
   detail: (publicId: string) => `/student/${publicId}`, // GET chi tiết · PUT sửa · DELETE xóa
   import: '/student/import',
-  batch: '/student/batch',                              // dropdown Khóa
+  export: '/student/export',                            // tải file Excel danh sách
+  batch: '/student/batch',                              // dropdown Khóa theo học kì
+  // batchAll: '/student/batch/all'                     // chưa thêm: tất cả khóa (không theo học kì), Mục 4.2
   // activate: đã xóa (BE bỏ API kích hoạt)
 },
 major: { base: '/major' },
@@ -99,8 +107,19 @@ semester: { base: '/semester', current: '/semester/current' },
   (tắt bằng `{ skipWarningToast: true }`).
 - Lỗi: HTTP 4xx/5xx kèm `code` nghiệp vụ → interceptor đã tự toast đỏ, component không toast lại.
   Request gọi từ form dùng `{ skipErrorToast: true }` để hiện lỗi ngay trong form.
-- Quyền: mọi API ở đây yêu cầu role `ADMIN` hoặc `HEAD_OF_MAJOR`, không đủ quyền → `403`, `code 2001`.
-  Trưởng bộ môn chỉ thấy / thao tác sinh viên thuộc các ngành mình phụ trách.
+- Quyền: BE kiểm tra theo **permission** (gán cho role `ADMIN` / `HEAD_OF_MAJOR`), không đủ quyền → `403`, `code 2001`:
+
+  | Permission       | API                                                                                     |
+  | :--------------- | :-------------------------------------------------------------------------------------- |
+  | `VIEW_STUDENT`   | `GET /student`, `GET /student/{publicId}`, `GET /student/batch`, `GET /student/batch/all` |
+  | `EXPORT_STUDENT` | `GET /student/export`                                                                   |
+  | `IMPORT_STUDENT` | `POST /student/import`, `POST /student`, `PUT /student/{publicId}`, `DELETE /student/{publicId}` |
+
+- **Phạm vi ngành chỉ áp cho thao tác ghi:**
+  - **Xem** (danh sách, popup chi tiết, khóa, export): mọi Trưởng ngành thấy sinh viên của **mọi ngành**; muốn xem 1 ngành thì chọn Bộ môn (`majorId`).
+  - **Ghi** (import, thêm, sửa, xóa): chỉ với ngành mình phụ trách. Ngành ngoài phạm vi khi import / thêm → `403 3018`;
+    sửa / xóa sinh viên ngành khác → `403 3032` "Bạn không có quyền thao tác với sinh viên không thuộc ngành phụ trách".
+  - BE **chưa có** API trả "các ngành tôi phụ trách", nên FE chưa ẩn được nút Sửa / Xóa theo ngành; hiện cứ hiện nút và để BE chặn.
 - Không expose `id` số, chỉ dùng `publicId` (UUID string).
 
 ---
@@ -274,7 +293,20 @@ Service khai báo `ApiResponse<RawSpringPage<StudentListItem>>` và trả `toSpr
 ```
 
 - Chỉ gồm các khóa **đang có sinh viên có đề tài trong kì**, không trùng, sắp tăng dần.
+- **Không lọc theo phạm vi ngành** (giống `GET /student`): ra khóa của sinh viên mọi ngành, chỉ thu hẹp khi gửi `majorId`.
 - Query key phụ thuộc `semesterId` + `majorId`: đổi học kì / bộ môn → gọi lại. Nếu khóa đang chọn không còn trong danh sách mới → reset về "Tất cả khóa".
+
+**Tất cả khóa trong hệ thống – `GET /student/batch/all`**
+
+- Không có param. Trả mọi `batch` của **tất cả sinh viên trong DB**, không trùng, bỏ giá trị rỗng, sắp tăng dần.
+- **Không** theo học kì, **không** lọc ngành.
+
+```json
+{ "code": 1000, "data": ["K62", "K63", "K64"] }
+```
+
+- Dùng khi cần dropdown khóa không phụ thuộc học kì đang chọn. Dropdown Khóa trên bộ lọc danh sách vẫn dùng `GET /student/batch`
+  (để không hiện khóa không có sinh viên trong kì). Có thể cache lâu (`referenceDataQueryOptions`), invalidate sau import / thêm / sửa.
 
 ### 4.3. `GET /semester` – Dropdown Năm học & Học kì
 
@@ -388,6 +420,33 @@ export interface StudentDetail {
 | :---------------------------------------------- | :--- | :----- | :---------------------- |
 | `publicId` sai định dạng hoặc không có trong DB | 404  | 3008   | Sinh viên không tồn tại |
 
+- Xem được chi tiết sinh viên **mọi ngành** (không giới hạn ngành phụ trách).
+
+### 4.6. `GET /student/export` – Xuất Excel danh sách
+
+- Param **giống hệt** `GET /student` (Mục 4.1.2): `semesterId`, `keyword`, `batch`, `majorId`, `status`, `sort` (lặp được, cùng whitelist 5 key).
+  **Không** có `page` / `size`: xuất toàn bộ kết quả khớp bộ lọc. Gửi đúng bộ lọc + sort đang chọn trên màn hình.
+- Không lọc theo phạm vi ngành (giống danh sách). Quyền `EXPORT_STUDENT`.
+- `semesterId` bỏ trống → học kì hiện tại; chưa có học kì hiện tại → file chỉ có dòng tiêu đề.
+- **Ngoại lệ của quy ước `{ code, data }`:** thành công trả thẳng file, không bọc JSON:
+  - `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+  - `Content-Disposition: attachment; filename="danh_sach_sinh_vien.xlsx"`
+- Sheet "Danh sách sinh viên", các cột: STT · Mã sinh viên · Họ tên · Lớp · Khóa · Ngành · Tên đề tài · Giáo viên hướng dẫn ·
+  Giáo viên đồng hướng dẫn · Trạng thái · Trạng thái tài khoản ("Đang hoạt động" / "Bị khóa").
+
+- FE đã nối: `studentService.exportStudents` gọi với `responseType: 'blob'`, `paramsSerializer: { indexes: null }`,
+  timeout 2 phút; lấy tên file từ `Content-Disposition` (`getFilenameFromDisposition`, BE đã expose header này qua CORS),
+  không đọc được thì dùng tên dự phòng. `useExportStudents` lưu file bằng `saveBlob`.
+- **Lỗi vẫn trả JSON** (`{ code, message }`) nhưng vì `responseType: 'blob'` nên body là `Blob`:
+  interceptor đã tự đổi lại thành JSON (`parseJsonBlob`) trước khi toast, component không cần xử lý thêm.
+
+| Lỗi                                      | HTTP | `code` | Message                     |
+| :--------------------------------------- | :--- | :----- | :-------------------------- |
+| `status` sai                             | 400  | 3026   | Trạng thái lọc không hợp lệ |
+| `sort` ngoài whitelist                   | 400  | 1008   | Trường sắp xếp không hợp lệ |
+| `semesterId` / `majorId` không phải UUID | 400  | 1006   | Yêu cầu không hợp lệ        |
+| Không có quyền `EXPORT_STUDENT`          | 403  | 2001   |                             |
+
 ---
 
 ## 5. Giao diện
@@ -478,9 +537,11 @@ Mọi popup dùng `Dialog` dùng chung: khi mở, trang nền bị khóa cuộn 
   trên bộ lọc). **Không** gửi `semesterId` (Mục 6.1); gửi lại dòng lỗi qua `POST /student` cũng không gửi.
 - Xong import hoặc gửi lại thành công → `invalidateQueries(departmentStudentKeys.all)` (gồm cả danh sách khóa).
 
-### 5.4. Popup Export file (chỉ giao diện)
+### 5.4. Popup Export file
 
-- Như cũ. **BE chưa có API export** (khi làm sẽ nhận cùng bộ lọc với `GET /student`, gồm `semesterId`).
+- Đã nối `GET /student/export` (Mục 4.6). Chọn phạm vi: **theo bộ lọc đang chọn** (gửi `keyword`, `majorId`, `batch`, `status`)
+  hoặc **toàn bộ** (bỏ các bộ lọc đó); cả hai đều gửi `semesterId` của học kì đang xem và `sort` đang chọn.
+- Xuất ra sinh viên **mọi ngành** khớp bộ lọc (không giới hạn ngành phụ trách).
 
 ### 5.5. Popup Thêm sinh viên
 
@@ -571,24 +632,42 @@ Lỗi mức toàn file (HTTP 400, `code 4000`) như cũ. Lỗi theo học kì: `
 
 BE đã bỏ API này cùng `Student.status`. FE xóa endpoint `activate` và nút "Kích hoạt".
 
-### 6.4. `PUT /student/{publicId}` – Sửa sinh viên (chưa nối)
+### 6.4. `PUT /student/{publicId}` – Sửa sinh viên
 
-Body: đúng 8 trường của form Thêm (`studentCode`, `firstName`, `lastName`, `email`, `phone`, `batch`, `className`, `major`),
-**không** có `semesterId`. Form Sửa dùng lại `StudentFormFields` + schema của popup Thêm, điền sẵn từ `GET /student/{publicId}`
-(tách `name` thành Họ / Tên: từ cuối là Tên).
+Body: 7 trường của form Thêm **trừ Ngành**, **không** có `semesterId`, **không** có `accountStatus`:
+
+```json
+{
+  "studentCode": "2251172489",
+  "firstName": "Lê Trung",
+  "lastName": "Đức",
+  "email": "duc@gmail.com",
+  "phone": "0912345678",
+  "batch": "K64",
+  "className": "64KTPM3"
+}
+```
+
+- **Không đổi ngành**: BE không nhận `major` (có gửi cũng bị bỏ qua), luôn giữ ngành hiện tại. Form Sửa hiện ô Bộ môn ở dạng
+  chỉ đọc (`majorName` từ `GET /student/{publicId}`), không gửi lên.
+- **Không đổi trạng thái tài khoản**: BE không nhận `accountStatus` (có gửi cũng bị bỏ qua), trạng thái đăng nhập giữ nguyên.
+  Form Sửa **không** có ô bật/tắt "Được đăng nhập". Tài khoản chỉ bị khóa khi xóa SV khỏi kì mà SV còn lịch sử ở kì khác (Mục 6.5),
+  và được mở lại khi import / thêm lại SV vào học kì hiện tại.
+- Form Sửa dùng lại `StudentFormFields` + schema của popup Thêm (bỏ ô Ngành khỏi phần gửi), điền sẵn từ `GET /student/{publicId}`
+  (tách `name` thành Họ / Tên: từ cuối là Tên).
 
 | Kết quả                                      | HTTP | `code`   | Message                                                       |
 | :------------------------------------------- | :--- | :------- | :------------------------------------------------------------ |
 | Có thay đổi                                  | 200  | 1000     | Đã cập nhật: Tên, Số điện thoại, Lớp _(liệt kê field đã đổi)_ |
 | Không đổi gì – vàng                          | 200  | **1103** | Thông tin sinh viên không thay đổi                            |
-| SV không có / ngoài phạm vi ngành            | 404  | 3008     | Sinh viên không tồn tại                                       |
+| SV không có                                  | 404  | 3008     | Sinh viên không tồn tại                                       |
+| SV thuộc ngành mình không phụ trách (dù vẫn thấy trên bảng) | 403  | 3032     | Bạn không có quyền thao tác với sinh viên không thuộc ngành phụ trách |
 | Lỗi định dạng                                | 400  | 4000     | như POST                                                      |
-| Ngành mới ngoài phạm vi                      | 403  | 3018     | Bạn không có quyền thao tác trên ngành này                    |
 | Trùng mã SV / email / SĐT với tài khoản khác | 409  | 3014     | như POST                                                      |
 
 Thành công → `invalidateQueries(departmentStudentKeys.all)` + detail của SV đó.
 
-### 6.5. `DELETE /student/{publicId}?semesterId=` – Xóa SV import nhầm khỏi học kì (chưa nối)
+### 6.5. `DELETE /student/{publicId}?semesterId=` – Xóa SV import nhầm khỏi học kì
 
 - Xóa **theo học kì đang chọn**. SV không còn đồ án ở kì nào khác → BE xóa luôn hồ sơ + tài khoản
   ("Xóa sinh viên thành công"); còn lịch sử ở kì khác → chỉ xóa khỏi kì ("Đã xóa sinh viên khỏi học kỳ"). FE hiện `message` của BE.
@@ -598,7 +677,8 @@ Thành công → `invalidateQueries(departmentStudentKeys.all)` + detail của S
 
 | Lỗi                               | HTTP | `code` | Message                                                             |
 | :-------------------------------- | :--- | :----- | :------------------------------------------------------------------ |
-| SV không có / ngoài phạm vi ngành | 404  | 3008   | Sinh viên không tồn tại                                             |
+| SV không có                       | 404  | 3008   | Sinh viên không tồn tại                                             |
+| SV thuộc ngành mình không phụ trách | 403  | 3032   | Bạn không có quyền thao tác với sinh viên không thuộc ngành phụ trách |
 | Thiếu `semesterId`                | 400  | 3022   | Vui lòng chọn học kỳ                                                |
 | SV không có trong kì này          | 404  | 3027   | Sinh viên không có trong học kỳ này                                 |
 | Đã đăng ký GVHD / có đề tài       | 409  | 3028   | Sinh viên đã đăng ký giáo viên hướng dẫn hoặc đề tài, không thể xóa |
@@ -615,7 +695,13 @@ Thành công → `invalidateQueries(departmentStudentKeys.all)` + detail của S
 - [ ] Sort đúng key `studentCode | name | className | batch | majorName`; phân trang 0-based, đọc được cả `Page` lẫn `PagedModel`.
 - [ ] Popup chi tiết dùng `accountStatus`.
 - [ ] `POST /student` và `POST /student/import` **không** gửi `semesterId` (BE tự vào học kì hiện tại); xử lý `1102`, `3023` – `3025`, `3030`.
-- [ ] Sửa sinh viên (`PUT`), xử lý `1103`.
-- [ ] Xóa sinh viên khỏi học kì (`DELETE`), có hộp xác nhận.
-- [ ] Export file (chờ BE có API). Tải file mẫu import (chờ BE có API).
+- [x] Sửa sinh viên (`PUT`), xử lý `1103`.
+- [x] Form Sửa: không gửi `major` (ô Bộ môn chỉ đọc).
+- [x] Form Sửa: bỏ ô bật/tắt `accountStatus` và bỏ field này khỏi payload (`utils/updateStudentSchema.ts`,
+      `EditStudentDialog.tsx`); bỏ xử lý lỗi `3031` (BE đã xóa).
+- [x] Xóa sinh viên khỏi học kì (`DELETE`), có hộp xác nhận.
+- [x] Export file (`GET /student/export`, Mục 4.6).
+- [ ] Tải file mẫu import (chờ BE có API).
+- [ ] Bộ lọc Bộ môn / danh sách hiển thị sinh viên **mọi ngành**; nút Sửa / Xóa với SV ngành khác để BE chặn (`403 3032`) cho tới khi BE có API "ngành tôi phụ trách".
+- [ ] (Tùy chọn) Nối `GET /student/batch/all` khi cần dropdown khóa không theo học kì.
 - [ ] `npx tsc -b`, `npm run lint`, `npm test`, `npm run build` đều qua.

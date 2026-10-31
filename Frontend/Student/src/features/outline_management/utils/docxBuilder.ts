@@ -1,4 +1,9 @@
-import type { DocxBlock, OutlineEditorData, SignSideBlock } from '../types/outline.types'
+import type {
+  DocxBlock,
+  OutlineEditorData,
+  SignSideBlock,
+  StudentOutlineMeta,
+} from '../types/outline.types'
 import { OUTLINE_SECTIONS } from '../services/outline.service'
 
 const TEXT_WIDTH = 9071 // dxa (A4 - lề trái 1701 - lề phải 1134)
@@ -147,6 +152,13 @@ function xmlSign(block: Extract<DocxBlock, { t: 'sign' }>): string {
 
 function blockToXml(block: DocxBlock): string {
   switch (block.t) {
+    case 'headerTable':
+      // Tên trường, tên khoa, rồi tiêu đề văn bản — căn giữa như phần đầu mẫu đề cương
+      return (
+        xmlPara(xmlRun(block.university, { bold: true }), { jc: 'center', after: 20 }) +
+        xmlPara(xmlRun(block.faculty, { bold: true }), { jc: 'center', after: 120 }) +
+        xmlPara(xmlRun(block.title, { bold: true, size: 32 }), { jc: 'center', after: 120 })
+      )
     case 'center':
       return splitLines(block.text)
         .map((ln) =>
@@ -330,14 +342,6 @@ function zipStore(files: { name: string; data: Uint8Array }[]): Uint8Array {
     pos += c.length
   })
   return out
-}
-
-export interface StudentOutlineMeta {
-  name: string
-  mssv: string
-  className: string
-  department: string
-  mentor: string
 }
 
 export function buildOutlineBlocks(

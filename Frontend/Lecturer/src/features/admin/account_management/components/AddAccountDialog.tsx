@@ -18,6 +18,7 @@ import { useMajors } from '@/features/department/student_management/hooks/useStu
 import {
   addAccountSchema,
   type AddAccountFormValues,
+  type ManagedAccountRole,
   type UserAccount,
 } from '../types/account.types'
 
@@ -26,6 +27,8 @@ interface AddAccountDialogProps {
   onOpenChange: (open: boolean) => void
   existingAccounts: UserAccount[]
   onAccountAdded: (values: AddAccountFormValues) => void
+  /** Có truyền: khóa loại tài khoản (trang Giảng viên / Sinh viên). Không truyền: cho chọn vai trò trong form */
+  role?: ManagedAccountRole
 }
 
 const defaultValues: AddAccountFormValues = {
@@ -37,6 +40,8 @@ const defaultValues: AddAccountFormValues = {
   unit: '',
   facultyId: '',
   major: '',
+  batch: '',
+  className: '',
   department: '',
   status: 'active',
 }
@@ -46,6 +51,7 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
   onOpenChange,
   existingAccounts,
   onAccountAdded,
+  role,
 }) => {
   const { data: apiMajors, isLoading: isLoadingMajors } = useMajors()
 
@@ -60,7 +66,7 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
     formState: { errors, isSubmitting },
   } = useForm<AddAccountFormValues>({
     resolver: zodResolver(addAccountSchema),
-    defaultValues,
+    defaultValues: { ...defaultValues, role: role ?? defaultValues.role },
   })
 
   const currentRole = watch('role')
@@ -79,9 +85,9 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
   // Reset form khi modal mở ra
   React.useEffect(() => {
     if (open) {
-      reset(defaultValues)
+      reset({ ...defaultValues, role: role ?? defaultValues.role })
     }
-  }, [open, reset])
+  }, [open, reset, role])
 
   const onSubmit = (values: AddAccountFormValues) => {
     // Kiểm tra trùng email (client-side)
@@ -100,6 +106,9 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
     let finalUnit = '—'
     let finalMajor = values.major || ''
     let finalDepartment = values.department || ''
+    // Khóa, lớp chỉ có ý nghĩa với sinh viên
+    const finalBatch = values.role === 'Sinh viên' ? values.batch || '' : ''
+    const finalClassName = values.role === 'Sinh viên' ? values.className || '' : ''
 
     if (values.role === 'Sinh viên') {
       finalUnit = values.major ? `Ngành ${values.major}` : '—'
@@ -120,6 +129,8 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
       onAccountAdded({
         ...values,
         major: finalMajor,
+        batch: finalBatch,
+        className: finalClassName,
         department: finalDepartment,
         unit: finalUnit,
       })
@@ -137,7 +148,7 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
       <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-5 pb-3 border-b border-slate-100 shrink-0">
           <DialogTitle className="text-base font-bold text-slate-900">
-            Thêm tài khoản người dùng
+            {role ? `Thêm tài khoản ${role}` : 'Thêm tài khoản người dùng'}
           </DialogTitle>
         </DialogHeader>
 
@@ -175,7 +186,7 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
               </FormField>
             </div>
 
-            <div>
+            <div className={role ? 'sm:col-span-2' : undefined}>
               <FormField
                 label="Số điện thoại"
                 error={errors.phone?.message}
@@ -188,33 +199,35 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
               </FormField>
             </div>
 
-            <div>
-              <FormField
-                label="Vai trò"
-                required
-                error={errors.role?.message}
-              >
-                <Select
-                  {...register('role', {
-                    onChange: (e) => {
-                      if (e.target.value === 'Sinh viên') {
-                        setValue('lecturerType', 'internal')
-                        setValue('department', 'Đại học Thủy Lợi')
-                      } else if (e.target.value === 'Giảng viên') {
-                        if (currentLecturerType === 'internal') {
-                          setValue('department', 'Đại học Thủy Lợi')
-                        } else {
-                          setValue('department', '')
-                        }
-                      }
-                    },
-                  })}
+            {!role && (
+              <div>
+                <FormField
+                  label="Vai trò"
+                  required
+                  error={errors.role?.message}
                 >
-                  <option value="Giảng viên">Giảng viên</option>
-                  <option value="Sinh viên">Sinh viên</option>
-                </Select>
-              </FormField>
-            </div>
+                  <Select
+                    {...register('role', {
+                      onChange: (e) => {
+                        if (e.target.value === 'Sinh viên') {
+                          setValue('lecturerType', 'internal')
+                          setValue('department', 'Đại học Thủy Lợi')
+                        } else if (e.target.value === 'Giảng viên') {
+                          if (currentLecturerType === 'internal') {
+                            setValue('department', 'Đại học Thủy Lợi')
+                          } else {
+                            setValue('department', '')
+                          }
+                        }
+                      },
+                    })}
+                  >
+                    <option value="Giảng viên">Giảng viên</option>
+                    <option value="Sinh viên">Sinh viên</option>
+                  </Select>
+                </FormField>
+              </div>
+            )}
 
             {/* Nếu là Giảng viên: Cho chọn Trong trường hoặc Ngoài trường */}
             {currentRole === 'Giảng viên' && (
@@ -283,6 +296,22 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
                   />
                 </FormField>
               </div>
+            )}
+
+            {/* Nếu là Sinh viên: Nhập lớp và khóa (khóa dùng cho bộ lọc "Tất cả khóa") */}
+            {currentRole === 'Sinh viên' && (
+              <>
+                <div>
+                  <FormField label="Lớp" error={errors.className?.message}>
+                    <Input placeholder="Ví dụ: 64HTTT2" {...register('className')} />
+                  </FormField>
+                </div>
+                <div>
+                  <FormField label="Khóa" error={errors.batch?.message}>
+                    <Input placeholder="Ví dụ: K65" {...register('batch')} />
+                  </FormField>
+                </div>
+              </>
             )}
 
             {/* Nếu là Giảng viên ngoài trường: Nhập cơ quan / trường ngoài */}

@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Building2, CheckCircle2, Pencil, ShieldAlert } from 'lucide-react'
+import { Building2, Pencil } from 'lucide-react'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { Button, Dialog, DialogContent, FormField, Input, Skeleton } from '@/shared/components/ui'
 import { API_SUCCESS_CODE } from '@/shared/types'
-import { cn } from '@/shared/utils/cn'
 import { useStudentDetail, useUpdateStudent } from '../hooks/useStudents'
 import type { StudentListItem } from '../types'
 import { STUDENT_EMAIL_DOMAIN } from '../utils/createStudentSchema'
@@ -30,7 +29,6 @@ export function EditStudentDialog({ student: row, onClose }: EditStudentDialogPr
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     setError,
@@ -89,7 +87,7 @@ export function EditStudentDialog({ student: row, onClose }: EditStudentDialogPr
           <div className="min-w-0 flex-1">
             <h3 className="text-[16px] font-bold tracking-tight text-slate-800">Sửa thông tin sinh viên</h3>
             <p className="mt-0.5 text-[12.5px] text-slate-500">
-              Cập nhật hồ sơ và trạng thái tài khoản của sinh viên
+              Cập nhật hồ sơ của sinh viên
             </p>
           </div>
         </div>
@@ -145,12 +143,6 @@ export function EditStudentDialog({ student: row, onClose }: EditStudentDialogPr
                   </FormField>
                 </div>
 
-                <Controller
-                  control={control}
-                  name="accountStatus"
-                  render={({ field }) => <AccountStatusSwitch value={field.value} onChange={field.onChange} />}
-                />
-
                 {errors.root?.server && (
                   <p role="alert" className="text-sm font-semibold text-[#DC2626]">
                     {errors.root.server.message}
@@ -185,50 +177,6 @@ export function EditStudentDialog({ student: row, onClose }: EditStudentDialogPr
   )
 }
 
-/** Công tắc trạng thái tài khoản: true = đang hoạt động, false = không hoạt động */
-function AccountStatusSwitch({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-between gap-4 rounded-xl border px-3.5 py-3 transition-colors',
-        value ? 'border-emerald-200 bg-emerald-50/60' : 'border-rose-200 bg-rose-50/60',
-      )}
-    >
-      <div className="flex min-w-0 items-start gap-2.5">
-        {value ? (
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-        ) : (
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-        )}
-        <div>
-          <div className="text-[13px] font-semibold text-slate-800">Trạng thái tài khoản</div>
-          <div className={cn('text-[12.5px] font-medium', value ? 'text-emerald-700' : 'text-rose-700')}>
-            {value ? 'Tài khoản đang hoạt động' : 'Tài khoản không hoạt động'}
-          </div>
-        </div>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        aria-label="Tài khoản đang hoạt động"
-        onClick={() => onChange(!value)}
-        className={cn(
-          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:ring-[3px] focus-visible:ring-sky-100 focus-visible:outline-none',
-          value ? 'bg-emerald-500' : 'bg-slate-300',
-        )}
-      >
-        <span
-          className={cn(
-            'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
-            value ? 'translate-x-5.5' : 'translate-x-0.5',
-          )}
-        />
-      </button>
-    </div>
-  )
-}
-
 /** Khung đang tải cùng bố cục form thật → dữ liệu về popup không đổi chiều cao */
 function EditStudentSkeleton() {
   return (
@@ -242,7 +190,6 @@ function EditStudentSkeleton() {
           </div>
         ))}
       </div>
-      <Skeleton className="h-16 w-full rounded-xl" />
     </>
   )
 }

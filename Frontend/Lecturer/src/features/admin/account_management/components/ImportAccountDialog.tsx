@@ -1,5 +1,5 @@
 import { useState, useId, type DragEvent } from 'react'
-import { FileSpreadsheet, Info, UploadCloud, X, GraduationCap, UserCheck } from 'lucide-react'
+import { FileSpreadsheet, Info, UploadCloud, X } from 'lucide-react'
 import { toast } from '@/shared/components/feedback/toast.store'
 import {
   Button,
@@ -38,11 +38,18 @@ const LECTURER_IMPORT_COLUMNS = [
 interface ImportAccountDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Loại tài khoản cần import (theo trang Giảng viên / Sinh viên đang mở) */
+  target: ImportAccountTarget
 }
 
-export function ImportAccountDialog({ open, onOpenChange }: ImportAccountDialogProps) {
+const TARGET_LABEL: Record<ImportAccountTarget, string> = {
+  student: 'sinh viên',
+  lecturer: 'giảng viên',
+}
+
+export function ImportAccountDialog({ open, onOpenChange, target }: ImportAccountDialogProps) {
   const formId = useId()
-  const [targetRole, setTargetRole] = useState<ImportAccountTarget>('student')
+  const targetLabel = TARGET_LABEL[target]
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -82,87 +89,22 @@ export function ImportAccountDialog({ open, onOpenChange }: ImportAccountDialogP
       setErrorMsg('Vui lòng chọn file trước khi import')
       return
     }
-    const roleLabel = targetRole === 'student' ? 'Sinh viên' : 'Giảng viên'
-    toast.success(`Đã nhận file danh sách ${roleLabel}: ${selectedFile.name}`)
+    toast.success(`Đã nhận file danh sách ${targetLabel}: ${selectedFile.name}`)
     handleOpenChange(false)
   }
 
-  const activeColumns = targetRole === 'student' ? STUDENT_IMPORT_COLUMNS : LECTURER_IMPORT_COLUMNS
+  const activeColumns = target === 'student' ? STUDENT_IMPORT_COLUMNS : LECTURER_IMPORT_COLUMNS
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import danh sách tài khoản</DialogTitle>
+          <DialogTitle>Import danh sách {targetLabel}</DialogTitle>
         </DialogHeader>
 
         <form id={formId} onSubmit={handleSubmit} className="space-y-4">
-          {/* Bước 1: Chọn đối tượng import (Sinh viên hoặc Giảng viên) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              1. Chọn loại tài khoản cần import *
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setTargetRole('student')
-                  setSelectedFile(null)
-                  setErrorMsg(null)
-                }}
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer',
-                  targetRole === 'student'
-                    ? 'border-blue-600 bg-blue-50/70 text-blue-950 ring-1 ring-blue-600'
-                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700',
-                )}
-              >
-                <div
-                  className={cn(
-                    'p-2 rounded-lg',
-                    targetRole === 'student' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500',
-                  )}
-                >
-                  <GraduationCap className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold">Tài khoản Sinh viên</div>
-                  <div className="text-xs text-slate-500">Mã SV, Lớp, Khóa, Ngành</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setTargetRole('lecturer')
-                  setSelectedFile(null)
-                  setErrorMsg(null)
-                }}
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer',
-                  targetRole === 'lecturer'
-                    ? 'border-blue-600 bg-blue-50/70 text-blue-950 ring-1 ring-blue-600'
-                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700',
-                )}
-              >
-                <div
-                  className={cn(
-                    'p-2 rounded-lg',
-                    targetRole === 'lecturer' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500',
-                  )}
-                >
-                  <UserCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold">Tài khoản Giảng viên</div>
-                  <div className="text-xs text-slate-500">Trong trường & Ngoài trường</div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Bước 2: Kéo thả file */}
-          <FormField label="2. Tải lên file dữ liệu" required error={errorMsg ?? undefined}>
+          {/* Kéo thả file */}
+          <FormField label={`Tải lên file danh sách ${targetLabel}`} required error={errorMsg ?? undefined}>
             {selectedFile ? (
               <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-emerald-100">
@@ -216,7 +158,7 @@ export function ImportAccountDialog({ open, onOpenChange }: ImportAccountDialogP
                   <p className="text-xs text-slate-500 mt-0.5">
                     Hỗ trợ file .xlsx, .xls, .csv (tối đa 50MB) cho danh sách{' '}
                     <span className="font-semibold text-blue-700">
-                      {targetRole === 'student' ? 'Sinh viên' : 'Giảng viên'}
+                      {targetLabel}
                     </span>
                   </p>
                 </div>
@@ -231,7 +173,7 @@ export function ImportAccountDialog({ open, onOpenChange }: ImportAccountDialogP
               <p>
                 Cấu trúc file mẫu cho{' '}
                 <span className="font-semibold text-blue-900">
-                  {targetRole === 'student' ? 'Sinh viên' : 'Giảng viên'}
+                  {targetLabel}
                 </span>{' '}
                 gồm <span className="font-semibold">{activeColumns.length} cột</span> theo thứ tự:
               </p>
@@ -253,7 +195,7 @@ export function ImportAccountDialog({ open, onOpenChange }: ImportAccountDialogP
               Hủy
             </Button>
             <Button type="submit" disabled={!selectedFile} className="bg-[#1565C0] hover:bg-[#0D47A1] text-white">
-              Import danh sách
+              Import {targetLabel}
             </Button>
           </DialogFooter>
         </form>

@@ -27,8 +27,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 }) => {
   const location = useLocation()
 
-  // Quản lý trạng thái mở/đóng của sub-menu Accordion (chưa có nhóm nào mở sẵn)
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({})
+  // Trạng thái mở/đóng do người dùng bấm. Nhóm chưa bấm lần nào thì tự mở khi đang ở trang con của nó
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean | undefined>>({})
 
   // Lắng nghe phím tắt Ctrl + B / Cmd + B để thu gọn menu
   useEffect(() => {
@@ -42,14 +42,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onToggle])
 
-  const handleAccordionToggle = (key: string) => {
+  const handleAccordionToggle = (key: string, isOpen: boolean) => {
     // Nếu sidebar đang thu gọn, click vào accordion sẽ tự động mở rộng sidebar ra trước
     if (collapsed) {
       onToggle()
       setOpenSubmenus((prev) => ({ ...prev, [key]: true }))
       return
     }
-    setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }))
+    setOpenSubmenus((prev) => ({ ...prev, [key]: !isOpen }))
   }
 
   return (
@@ -106,12 +106,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         {adminNavItems.map((item) => {
           const Icon = item.icon
           const hasChildren = Boolean(item.children && item.children.length > 0)
-          const isAccordionOpen = Boolean(openSubmenus[item.to])
-
           // Kiểm tra xem mục con có đang active không
-          const isChildActive =
+          const isChildActive = Boolean(
             hasChildren &&
-            item.children?.some((child) => location.pathname === child.to)
+            item.children?.some((child) => location.pathname === child.to),
+          )
+          const isAccordionOpen = openSubmenus[item.to] ?? isChildActive
 
           // Mục con đang hiện thì chỉ tô đậm mục con. Chỉ tô mục cha khi mục con bị ẩn
           // (sidebar thu gọn hoặc nhóm đang đóng), để người dùng vẫn biết mình đang ở nhóm nào
@@ -123,7 +123,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               <div key={item.to} className="w-full">
                 <button
                   type="button"
-                  onClick={() => handleAccordionToggle(item.to)}
+                  onClick={() => handleAccordionToggle(item.to, isAccordionOpen)}
                   title={collapsed ? item.label : undefined}
                   className={`group relative h-10 rounded-lg flex items-center text-[13px] transition-all duration-150 cursor-pointer select-none ${collapsed
                       ? 'w-11 mx-auto justify-center p-0'

@@ -43,8 +43,7 @@ function renderTable(
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
       onRowClick={() => {}}
-      emptyMessage="Chưa có sinh viên nào trong học kì này"
-      onCreate={() => {}}
+      emptyMessage="Không tìm thấy thông tin sinh viên trong học kì này"
       onDelete={onDelete}
     />,
   )

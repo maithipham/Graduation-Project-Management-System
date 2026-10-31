@@ -25,7 +25,7 @@ describe('updateStudentSchema', () => {
     accountStatus: false,
   }
 
-  it('không có ngành trong body, giữ accountStatus', () => {
+  it('body không có ngành, không có accountStatus', () => {
     const input = { ...toUpdateStudentFormInput(detail), phone: '0911111111', batch: 'k64' }
     const result = updateStudentSchema.parse(input)
     expect(result).toEqual({
@@ -36,9 +36,9 @@ describe('updateStudentSchema', () => {
       phone: '0911111111',
       batch: 'K64',
       className: '64KTPM1',
-      accountStatus: false,
     })
     expect(result).not.toHaveProperty('major')
+    expect(result).not.toHaveProperty('accountStatus')
   })
 
   it('SĐT trống (BE trả null) → báo lỗi dưới ô', () => {

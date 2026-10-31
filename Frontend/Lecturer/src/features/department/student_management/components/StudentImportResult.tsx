@@ -14,7 +14,12 @@ import {
   TabsTrigger,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
-import type { RowImportStatus, StudentImportResponse, StudentImportRowResult } from '../types'
+import type {
+  RowImportStatus,
+  StudentImportResponse,
+  StudentImportRowResult,
+  UseCreateStudentMutation,
+} from '../types'
 import { countRowsByStatus, IMPORT_TAB_ORDER, pickDefaultTab } from '../utils/importResult'
 import { RetryImportRowForm } from './RetryImportRowForm'
 
@@ -52,7 +57,17 @@ const COLUMN_COUNT = 7
  * Dòng lỗi sửa được ngay trên bảng rồi gửi lại; số đếm và tab đổi theo kết quả gửi lại.
  * Bấm "Import file khác" thì component bị gỡ ra, lần import sau bắt đầu lại từ đầu.
  */
-export function StudentImportResult({ result }: { result: StudentImportResponse }) {
+export function StudentImportResult({
+  result,
+  statuses = IMPORT_TAB_ORDER,
+  useCreate,
+}: {
+  result: StudentImportResponse
+  /** Các tab hiển thị (Admin không có Cảnh báo) */
+  statuses?: RowImportStatus[]
+  /** API gửi lại dòng lỗi, mặc định POST /student */
+  useCreate?: UseCreateStudentMutation
+}) {
   const [rows, setRows] = useState<StudentImportRowResult[]>(result.rowResults)
   const [activeTab, setActiveTab] = useState<RowImportStatus>(() =>
     pickDefaultTab(countRowsByStatus(result.rowResults)),
@@ -85,7 +100,7 @@ export function StudentImportResult({ result }: { result: StudentImportResponse 
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as RowImportStatus)}>
         <TabsList>
-          {IMPORT_TAB_ORDER.map((status) => {
+          {statuses.map((status) => {
             const { label, icon: Icon, iconClass } = TAB_CONFIG[status]
             return (
               <TabsTrigger key={status} value={status} className="gap-1.5">
@@ -99,7 +114,7 @@ export function StudentImportResult({ result }: { result: StudentImportResponse 
           })}
         </TabsList>
 
-        {IMPORT_TAB_ORDER.map((status) => {
+        {statuses.map((status) => {
           const tabRows = rows.filter((row) => row.status === status)
           const config = TAB_CONFIG[status]
           return (
@@ -158,6 +173,7 @@ export function StudentImportResult({ result }: { result: StudentImportResponse 
                                     row={row}
                                     onRowChange={updateRow}
                                     onCancel={() => setEditingRow(null)}
+                                    useCreate={useCreate}
                                   />
                                 </TableCell>
                               </TableRow>

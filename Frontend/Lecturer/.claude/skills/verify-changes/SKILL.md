@@ -28,6 +28,8 @@ description: Kiểm tra code trước khi báo hoàn thành — chạy kiểm tr
 - [ ] Form: có `noValidate`, lỗi hiện bằng `FormField` (chữ đỏ dưới ô).
 - [ ] Đang tải → `Skeleton`; nút submit `disabled={isPending}` + đổi chữ.
 - [ ] Trang mới: route trong `<role>.routes.tsx` bằng `lazy()` + `withSuspense`; mục menu trong `<role>Nav.config.ts` nếu cần.
+- [ ] Nhóm menu có mục con (`children`): mỗi mục con có file page + route riêng, phần chung nằm trong `components/`
+      (skill `create-feature`, bước 5) — không dùng chung một page qua prop.
 - [ ] Không chạm vào file ngoài phạm vi yêu cầu.
 
 ## 3. Kiểm tra trên trình duyệt (khi thay đổi có giao diện)

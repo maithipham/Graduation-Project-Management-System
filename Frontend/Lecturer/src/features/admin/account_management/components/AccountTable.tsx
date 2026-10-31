@@ -64,13 +64,13 @@ export const AccountTable: React.FC<AccountTableProps> = ({
         <TableHeader>
           <TableRow className="bg-slate-50/80">
             <TableHead className="w-14 text-center font-bold text-slate-600 text-xs uppercase">
-              No.
+              STT
             </TableHead>
             <TableHead className="font-bold text-slate-600 text-xs uppercase">
-              Tài khoản
+              Họ và tên
             </TableHead>
             <TableHead className="font-bold text-slate-600 text-xs uppercase">
-              Email
+              Bộ môn
             </TableHead>
             <TableHead className="font-bold text-slate-600 text-xs uppercase">
               Vai trò
@@ -114,8 +114,8 @@ export const AccountTable: React.FC<AccountTableProps> = ({
                     </div>
                   </TableCell>
 
-                  <TableCell className="text-slate-600 text-sm font-mono">
-                    {account.email}
+                  <TableCell className="text-slate-600 text-sm">
+                    {account.major || '—'}
                   </TableCell>
 
                   <TableCell>{getRoleBadge(account.role)}</TableCell>

@@ -1,5 +1,6 @@
 // Ánh xạ DTO của module quản lý sinh viên (BE: StudentController, MajorController)
 import type { SortValue } from '@/shared/types'
+import type { UseMutationResult } from '@tanstack/react-query'
 
 /**
  * Trạng thái đồ án của sinh viên trong học kì (cột Trạng thái, bộ lọc `status`).
@@ -108,7 +109,8 @@ export interface StudentCreationRequest {
   major: string // tên ngành, không phải publicId
 }
 
-// Body PUT /student/{publicId} (StudentUpdateRequest) — không có ngành: trưởng ngành không được đổi ngành
+// Body PUT /student/{publicId} (StudentUpdateRequest) — không có ngành, không có trạng thái tài khoản:
+// trưởng ngành không đổi ngành, không khóa / mở khóa đăng nhập
 export interface StudentUpdateRequest {
   studentCode: string
   firstName: string // Họ và tên đệm
@@ -117,7 +119,6 @@ export interface StudentUpdateRequest {
   phone: string
   batch: string // Khóa
   className: string
-  accountStatus: boolean // true = tài khoản đang hoạt động, false = không hoạt động
 }
 
 export interface StudentUpdateParams {
@@ -160,3 +161,16 @@ export interface StudentImportResponse {
   errorCount: number
   rowResults: StudentImportRowResult[]
 }
+
+/**
+ * Hook gửi "Thêm sinh viên" cho popup Thêm / gửi lại dòng import lỗi.
+ * Trưởng bộ môn: POST /student (useCreateStudent) · Admin: POST /student/account
+ */
+export type UseCreateStudentMutation = () => UseMutationResult<
+  StudentWriteResult,
+  Error,
+  StudentCreationRequest
+>
+
+/** Hook import file. Trưởng bộ môn: POST /student/import · Admin: POST /student/account/import */
+export type UseImportStudentsMutation = () => UseMutationResult<StudentImportResponse, Error, File>

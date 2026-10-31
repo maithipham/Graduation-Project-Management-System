@@ -6,7 +6,7 @@ import { toast } from "@/shared/components/feedback/toast.store";
 import { Button, Dialog, DialogContent } from "@/shared/components/ui";
 import { API_SUCCESS_CODE } from "@/shared/types";
 import { useCreateStudent } from "../hooks/useStudents";
-import type { MajorOption, SemesterOption } from "../types";
+import type { MajorOption, SemesterOption, UseCreateStudentMutation } from "../types";
 import {
   createStudentSchema,
   EMPTY_CREATE_STUDENT_VALUES,
@@ -21,8 +21,12 @@ interface CreateStudentDialogProps {
   onOpenChange: (open: boolean) => void;
   majors: MajorOption[] | undefined;
   majorsLoading: boolean;
-  /** Học kì hiện tại — chỉ để hiển thị, không gửi lên BE */
-  targetSemester: SemesterOption | undefined;
+  /** Học kì hiện tại — chỉ để hiển thị, không gửi lên BE. Admin không có (không gắn học kì) */
+  targetSemester?: SemesterOption;
+  /** API thêm, mặc định POST /student của Trưởng bộ môn */
+  useCreate?: UseCreateStudentMutation;
+  /** Dòng mô tả dưới tiêu đề popup */
+  description?: string;
 }
 
 export function CreateStudentDialog({
@@ -31,8 +35,10 @@ export function CreateStudentDialog({
   majors,
   majorsLoading,
   targetSemester,
+  useCreate = useCreateStudent,
+  description = "Nhập thông tin sinh viên làm đồ án tốt nghiệp trong học kỳ này",
 }: CreateStudentDialogProps) {
-  const createStudent = useCreateStudent();
+  const createStudent = useCreate();
 
   const {
     register,
@@ -59,7 +65,7 @@ export function CreateStudentDialog({
   const onSubmit = (values: CreateStudentFormValues) => {
     createStudent.mutate(values, {
       onSuccess: (result) => {
-        // 1000: thêm mới / thêm vào kì / cập nhật → toast xanh với đúng câu của BE.
+        // 1000: thêm mới / thêm vào kì / cập nhật (Admin: tạo tài khoản) → toast xanh với đúng câu của BE.
         // 11xx (1101 đã có trong kì, 1102 đã hoàn thành đồ án): interceptor đã hiện toast vàng
         if (result.code === API_SUCCESS_CODE) toast.success(result.message);
         onOpenChange(false);
@@ -85,7 +91,7 @@ export function CreateStudentDialog({
               Thêm sinh viên
             </h3>
             <p className="text-[12.5px] text-slate-500 mt-0.5">
-              Nhập thông tin sinh viên làm đồ án tốt nghiệp trong học kỳ này
+              {description}
             </p>
           </div>
         </div>

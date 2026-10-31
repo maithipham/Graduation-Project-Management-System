@@ -1,13 +1,16 @@
 import { lazy } from 'react'
-import type { RouteObject } from 'react-router-dom'
+import { Navigate, type RouteObject } from 'react-router-dom'
 import { AdminLayout } from '@/features/admin'
 import { withSuspense } from './withSuspense'
 
 const AdminDashboardPage = lazy(
   () => import('@/features/admin/dashboard/pages/AdminDashboardPage'),
 )
-const AccountListPage = lazy(
-  () => import('@/features/admin/account_management/pages/AccountListPage'),
+const LecturerAccountListPage = lazy(
+  () => import('@/features/admin/account_management/pages/LecturerAccountListPage'),
+)
+const StudentAccountListPage = lazy(
+  () => import('@/features/admin/account_management/pages/StudentAccountListPage'),
 )
 const SemesterListPage = lazy(
   () => import('@/features/admin/semester_management/pages/SemesterListPage'),
@@ -24,9 +27,18 @@ export const adminRoutes: RouteObject = {
       index: true,
       element: withSuspense(<AdminDashboardPage />),
     },
+    // URL cũ /admin/accounts (link ở Dashboard) → trang Giảng viên
     {
       path: 'accounts',
-      element: withSuspense(<AccountListPage />),
+      element: <Navigate to="/admin/accounts-lecturer" replace />,
+    },
+    {
+      path: 'accounts-lecturer',
+      element: withSuspense(<LecturerAccountListPage />),
+    },
+    {
+      path: 'accounts-students',
+      element: withSuspense(<StudentAccountListPage />),
     },
     {
       path: 'semesters',

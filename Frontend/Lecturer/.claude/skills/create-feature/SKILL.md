@@ -98,6 +98,41 @@ const SemesterListPage = lazy(
 - Trang gốc của role dùng `end: true`. Mục con đặt trong `children` của mục cha.
 - Trang chi tiết (ví dụ `/admin/semesters/12`) không cần thêm vào menu — breadcrumb tự khớp mục cha.
 
+#### Nhóm menu có mục con → mỗi mục con là một page riêng
+
+Khi một mục sidebar là nhóm thu gọn được (có `children` + chevron, ví dụ "Quản lý tài khoản" → "Giảng viên", "Sinh viên"):
+
+- **Mỗi mục con = 1 file page riêng + 1 route riêng**, đặt tên theo mục con
+  (`LecturerAccountListPage.tsx`, `StudentAccountListPage.tsx`). **Không** dùng chung một page rồi truyền prop
+  (`<AccountListPage role="..." />`) ở file route — người đọc phải nhìn cây thư mục là biết URL nào ứng với file nào.
+- Phần giao diện giống nhau giữa các mục con đưa vào `components/` của feature (ví dụ `AccountListView.tsx` nhận prop `role`);
+  mỗi page chỉ gọi component đó với tham số của mình. Không sao chép nguyên khối code sang từng page.
+  Khi một mục con cần thứ riêng (cột, API, nút) thì viết ngay trong page của nó.
+- Các mục con cùng nghiệp vụ vẫn nằm chung **một** feature (`account_management/pages/...`), không tách thành nhiều feature.
+- Mục cha chỉ để mở/đóng nhóm, không có trang riêng: `to` của mục cha chỉ làm khóa. Nếu URL của mục cha từng là một trang
+  (có link cũ trỏ tới), thêm route chuyển hướng `<Navigate to="<url mục con đầu tiên>" replace />`.
+- Sidebar tự mở nhóm và tô sáng mục con đang xem; breadcrumb tự hiện "Mục cha › Mục con" — không cần sửa header/sidebar.
+
+```ts
+// adminNav.config.ts
+{
+  to: '/admin/accounts',
+  label: 'Quản lý tài khoản',
+  icon: Users,
+  children: [
+    { to: '/admin/accounts-lecturer', label: 'Giảng viên', icon: UserCheck },
+    { to: '/admin/accounts-students', label: 'Sinh viên', icon: GraduationCap },
+  ],
+},
+```
+
+```tsx
+// admin.routes.tsx
+{ path: 'accounts', element: <Navigate to="/admin/accounts-lecturer" replace /> },
+{ path: 'accounts-lecturer', element: withSuspense(<LecturerAccountListPage />) },
+{ path: 'accounts-students', element: withSuspense(<StudentAccountListPage />) },
+```
+
 ### 6. Kiểm tra
 
 Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duyệt (`npm run dev`) xem route, menu, breadcrumb.
@@ -107,6 +142,7 @@ Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duy�
 - Import sâu vào feature khác (`@/features/admin/x/services/...`) — chỉ qua `index.ts`.
 - Đặt component có tên nghiệp vụ (`SemesterCard`) vào `src/shared/`.
 - Fetch dữ liệu bằng `useEffect + useState` — dùng skill `connect-api`.
+- Cho nhiều mục con của một nhóm menu dùng chung một page qua prop ở file route — mỗi mục con một page riêng (bước 5).
 - Tự viết chuỗi role (`'admin'`, `'lecturer'`…) — dùng `UserRole` (`ADMIN`, `HEAD_OF_MAJOR`, `SUPERVISOR`),
   `CanAccess`, `useMyInfo` từ `@/features/auth`. Trang mới không cần tự chặn role: route của portal đã nằm trong `ProtectedRoute`.
 - Tạo đủ 6 thư mục con "cho đúng chuẩn" khi chưa có file đặt vào, hoặc viết mock fallback trong service (`catch { return mock }`).

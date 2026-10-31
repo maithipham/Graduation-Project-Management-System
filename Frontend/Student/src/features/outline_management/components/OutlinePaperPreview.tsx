@@ -1,6 +1,6 @@
 import React, { Fragment } from 'react'
-import type { OutlineEditorData } from '../types/outline.types'
-import { buildOutlineBlocks, type StudentOutlineMeta } from '../utils/docxBuilder'
+import type { OutlineEditorData, StudentOutlineMeta } from '../types/outline.types'
+import { buildOutlineBlocks } from '../utils/docxBuilder'
 
 interface OutlinePaperPreviewProps {
   data: OutlineEditorData

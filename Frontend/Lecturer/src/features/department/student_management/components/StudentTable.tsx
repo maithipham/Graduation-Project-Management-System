@@ -1,4 +1,4 @@
-import { Lock, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { Lock, Pencil, Trash2 } from 'lucide-react'
 import type { SpringPage } from '@/shared/types'
 import {
   Button,
@@ -77,8 +77,6 @@ interface StudentTableProps {
   onEdit?: (student: StudentListItem) => void
   /** Câu hiện khi không có dòng nào (trang tự chọn theo bộ lọc / học kì) */
   emptyMessage: string
-  /** Không truyền → ẩn nút "Thêm sinh viên" ở trạng thái rỗng (ví dụ học kì đã kết thúc) */
-  onCreate?: () => void
   /** Không truyền → ẩn nút Xóa ở mọi dòng (ví dụ học kì đã kết thúc) */
   onDelete?: (student: StudentListItem) => void
 }
@@ -97,7 +95,6 @@ export function StudentTable({
   onRowClick,
   onEdit,
   emptyMessage,
-  onCreate,
   onDelete,
 }: StudentTableProps) {
   const renderBody = () => {
@@ -128,18 +125,8 @@ export function StudentTable({
     if (!data || data.empty) {
       return (
         <TableRow className="hover:bg-transparent">
-          <TableCell colSpan={COLUMN_COUNT} className="py-14">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <Users className="h-6 w-6 text-slate-400" />
-              </div>
-              <p className="text-sm font-medium text-slate-600">{emptyMessage}</p>
-              {onCreate && (
-                <Button size="sm" onClick={onCreate}>
-                  <Plus /> Thêm sinh viên
-                </Button>
-              )}
-            </div>
+          <TableCell colSpan={COLUMN_COUNT} className="py-14 text-center text-sm font-medium text-slate-600">
+            {emptyMessage}
           </TableCell>
         </TableRow>
       )

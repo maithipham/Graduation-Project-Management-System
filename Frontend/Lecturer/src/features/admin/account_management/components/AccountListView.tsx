@@ -4,26 +4,43 @@ import { Button } from '@/shared/components/ui/button'
 import { ChevronLeft, ChevronRight, Download, Plus, Upload } from 'lucide-react'
 import { exportTableToCsv } from '@/shared/utils/excel'
 import { useAccountStore } from '../store/account.store'
-import { AccountFilterToolbar } from '../components/AccountFilterToolbar'
-import { AccountTable } from '../components/AccountTable'
-import { AddAccountDialog } from '../components/AddAccountDialog'
-import { AccountDetailDialog } from '../components/AccountDetailDialog'
-import { AccountActivityDialog } from '../components/AccountActivityDialog'
-import { ImportAccountDialog } from '../components/ImportAccountDialog'
-import { ExportAccountDialog } from '../components/ExportAccountDialog'
-import type { UserAccount, AddAccountFormValues } from '../types/account.types'
+import { AccountFilterToolbar } from './AccountFilterToolbar'
+import { AccountTable } from './AccountTable'
+import { AddAccountDialog } from './AddAccountDialog'
+import { AccountDetailDialog } from './AccountDetailDialog'
+import { AccountActivityDialog } from './AccountActivityDialog'
+import { ImportAccountDialog } from './ImportAccountDialog'
+import { ExportAccountDialog } from './ExportAccountDialog'
+import type {
+  UserAccount,
+  AddAccountFormValues,
+  ManagedAccountRole,
+  AccountStatusFilter,
+} from '../types/account.types'
 
 const PAGE_SIZE = 10
 
 type OpenDialog = 'import' | 'export' | null
 
-export default function AccountListPage() {
-  const { accounts, addAccount, updateAccount } = useAccountStore()
+interface AccountListViewProps {
+  /** Chỉ hiển thị và quản lý tài khoản của vai trò này */
+  role: ManagedAccountRole
+}
+
+/**
+ * Phần giao diện dùng chung của trang Quản lý tài khoản (nút Import/Export/Thêm, bộ lọc, bảng, phân trang, dialog).
+ * Hiện chỉ trang Giảng viên dùng (dữ liệu mock); trang Sinh viên dùng StudentAccountListView (API thật).
+ */
+export function AccountListView({ role }: AccountListViewProps) {
+  const { accounts: allAccounts, addAccount, updateAccount } = useAccountStore()
+  const accounts = useMemo(
+    () => allAccounts.filter((account) => account.role === role),
+    [allAccounts, role],
+  )
 
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedRole, setSelectedRole] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState<AccountStatusFilter>('')
   const [currentPage, setCurrentPage] = useState(1)
 
   // Modal states
@@ -42,12 +59,20 @@ export default function AccountListPage() {
         account.email.toLowerCase().includes(term) ||
         (account.unit && account.unit.toLowerCase().includes(term))
 
-      const matchRole = !selectedRole || account.role === selectedRole
-      const matchStatus = !selectedStatus || account.status === selectedStatus
+      // 'true' = Hoạt động, 'false' = Không hoạt động
+      const matchStatus =
+        !selectedStatus || (account.status === 'active') === (selectedStatus === 'true')
 
-      return matchSearch && matchRole && matchStatus
+      return matchSearch && matchStatus
     })
-  }, [accounts, searchTerm, selectedRole, selectedStatus])
+  }, [accounts, searchTerm, selectedStatus])
+
+  const hasActiveFilters = Boolean(searchTerm || selectedStatus)
+  const resetFilters = () => {
+    setSearchTerm('')
+    setSelectedStatus('')
+    setCurrentPage(1)
+  }
 
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / PAGE_SIZE))
@@ -60,18 +85,20 @@ export default function AccountListPage() {
 
   const handleExportCsv = (scope: 'filtered' | 'all' = 'filtered') => {
     const listToExport = scope === 'all' ? accounts : filteredAccounts
-    const headers = ['Mã ID', 'Họ và tên', 'Email', 'Số điện thoại', 'Vai trò', 'Đơn vị / Khoa', 'Trạng thái', 'Ngày tạo']
+    // Mỗi trang chỉ có một vai trò nên không cần cột "Vai trò"; cột đơn vị đặt tên theo vai trò
+    const unitHeader = role === 'Giảng viên' ? 'Đơn vị công tác' : 'Ngành'
+    const headers = ['Mã ID', 'Họ và tên', 'Email', 'Số điện thoại', unitHeader, 'Trạng thái', 'Ngày tạo']
     const rows = listToExport.map((a) => [
       a.id,
       a.name,
       a.email,
       a.phone || '',
-      a.role,
       a.unit || '',
       a.status === 'active' ? 'Hoạt động' : 'Không hoạt động',
       a.createdAt || '',
     ])
-    exportTableToCsv(headers, rows, `danh_sach_tai_khoan_${Date.now()}`)
+    const fileSuffix = role === 'Giảng viên' ? 'giang_vien' : 'sinh_vien'
+    exportTableToCsv(headers, rows, `danh_sach_tai_khoan_${fileSuffix}_${Date.now()}`)
   }
 
 
@@ -86,7 +113,7 @@ export default function AccountListPage() {
           className="h-10 text-xs font-medium gap-1.5 bg-white shadow-xs"
         >
           <Upload className="h-4 w-4" />
-          <span>Import file</span>
+          <span>Import {role.toLowerCase()}</span>
         </Button>
 
         <Button
@@ -96,7 +123,7 @@ export default function AccountListPage() {
           className="h-10 text-xs font-medium gap-1.5 bg-white shadow-xs"
         >
           <Download className="h-4 w-4" />
-          <span>Export file</span>
+          <span>Export {role.toLowerCase()}</span>
         </Button>
 
         <Button
@@ -105,21 +132,16 @@ export default function AccountListPage() {
           className="h-10 bg-[#1565C0] hover:bg-[#0D47A1] text-white text-xs font-semibold gap-1.5 shadow-sm"
         >
           <Plus className="h-4 w-4" />
-          <span>Thêm tài khoản</span>
+          <span>Thêm {role.toLowerCase()}</span>
         </Button>
       </div>
 
       {/* Main Table Card */}
-      <Card className="overflow-visible border-slate-200 shadow-xs">
+      <Card className="overflow-visible rounded-lg border-slate-200 shadow-xs">
         <AccountFilterToolbar
           searchTerm={searchTerm}
           onSearchChange={(v) => {
             setSearchTerm(v)
-            setCurrentPage(1)
-          }}
-          selectedRole={selectedRole}
-          onRoleChange={(r) => {
-            setSelectedRole(r)
             setCurrentPage(1)
           }}
           selectedStatus={selectedStatus}
@@ -128,6 +150,8 @@ export default function AccountListPage() {
             setCurrentPage(1)
           }}
           totalCount={filteredAccounts.length}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={resetFilters}
         />
 
         <AccountTable
@@ -138,7 +162,7 @@ export default function AccountListPage() {
         />
 
         {/* Pagination Footer */}
-        <div className="flex items-center justify-center px-4 py-3 bg-white border-t border-slate-200">
+        <div className="flex items-center justify-center px-4 py-3 bg-white border-t border-slate-200 rounded-b-lg">
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
@@ -186,8 +210,9 @@ export default function AccountListPage() {
       <AddAccountDialog
         open={isAddOpen}
         onOpenChange={setIsAddOpen}
-        existingAccounts={accounts}
+        existingAccounts={allAccounts}
         onAccountAdded={(vals: AddAccountFormValues) => addAccount(vals)}
+        role={role}
       />
 
       <AccountDetailDialog
@@ -206,6 +231,7 @@ export default function AccountListPage() {
       <ImportAccountDialog
         open={openDialog === 'import'}
         onOpenChange={(open) => !open && setOpenDialog(null)}
+        target={role === 'Giảng viên' ? 'lecturer' : 'student'}
       />
 
       <ExportAccountDialog
@@ -214,6 +240,7 @@ export default function AccountListPage() {
         totalFiltered={filteredAccounts.length}
         totalAll={accounts.length}
         onExport={handleExportCsv}
+        role={role}
       />
     </div>
   )

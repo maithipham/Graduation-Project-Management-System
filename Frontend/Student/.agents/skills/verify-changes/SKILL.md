@@ -29,6 +29,8 @@ description: Kiểm tra code trước khi báo hoàn thành — chạy kiểm tr
 - [ ] Form: có `noValidate`, lỗi hiện bằng `FormField` (chữ đỏ dưới ô).
 - [ ] Đang tải → `Skeleton`; nút submit `disabled={isPending}` + đổi chữ.
 - [ ] Route mới nằm trong `children` của `StudentLayout`; có mục menu trong `studentNav.config.ts` nếu cần.
+- [ ] Nhóm menu có mục con: mỗi mục con có file page + route riêng, phần chung nằm trong `components/`
+      (skill `create-feature`, bước 5) — không dùng chung một page qua prop.
 - [ ] Không chạm vào file ngoài phạm vi yêu cầu.
 
 ## 3. Kiểm tra trên trình duyệt (khi thay đổi có giao diện)

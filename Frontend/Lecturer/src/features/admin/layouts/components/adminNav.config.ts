@@ -4,6 +4,8 @@ import {
   Users,
   CalendarRange,
   School,
+  UserCheck,
+  GraduationCap,
 } from 'lucide-react'
 
 export interface AdminSubNavItem {
@@ -31,6 +33,10 @@ export const adminNavItems: AdminNavItem[] = [
     to: '/admin/accounts',
     label: 'Quản lý tài khoản',
     icon: Users,
+    children: [
+      { to: '/admin/accounts-lecturer', label: 'Giảng viên', icon: UserCheck },
+      { to: '/admin/accounts-students', label: 'Sinh viên', icon: GraduationCap },
+    ],
   },
   {
     to: '/admin/semesters',

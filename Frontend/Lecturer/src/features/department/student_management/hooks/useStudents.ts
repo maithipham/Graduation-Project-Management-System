@@ -156,7 +156,7 @@ export function useCreateStudent() {
 }
 
 /**
- * Sửa thông tin + trạng thái tài khoản của sinh viên (PUT /student/{publicId}).
+ * Sửa thông tin sinh viên (PUT /student/{publicId}) — không đổi ngành, không đổi trạng thái tài khoản.
  * Invalidate `all` → bảng, dropdown Khóa và chi tiết sinh viên đều tải lại
  */
 export function useUpdateStudent() {

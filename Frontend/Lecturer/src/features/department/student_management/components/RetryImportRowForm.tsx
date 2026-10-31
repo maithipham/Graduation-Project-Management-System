@@ -5,7 +5,7 @@ import { toast } from '@/shared/components/feedback/toast.store'
 import { Button } from '@/shared/components/ui'
 import { API_SUCCESS_CODE } from '@/shared/types'
 import { useCreateStudent, useMajors } from '../hooks/useStudents'
-import type { StudentImportRowResult } from '../types'
+import type { StudentImportRowResult, UseCreateStudentMutation } from '../types'
 import {
   createStudentSchema,
   type CreateStudentFormInput,
@@ -18,12 +18,19 @@ interface RetryImportRowFormProps {
   row: StudentImportRowResult
   onRowChange: (row: StudentImportRowResult) => void
   onCancel: () => void
+  /** API gửi lại, mặc định POST /student của Trưởng bộ môn */
+  useCreate?: UseCreateStudentMutation
 }
 
-/** Sửa một dòng import bị lỗi rồi gửi lại qua POST /student */
-export function RetryImportRowForm({ row, onRowChange, onCancel }: RetryImportRowFormProps) {
+/** Sửa một dòng import bị lỗi rồi gửi lại qua API thêm sinh viên */
+export function RetryImportRowForm({
+  row,
+  onRowChange,
+  onCancel,
+  useCreate = useCreateStudent,
+}: RetryImportRowFormProps) {
   const { data: majors, isPending: majorsLoading } = useMajors()
-  const createStudent = useCreateStudent()
+  const createStudent = useCreate()
 
   const {
     register,

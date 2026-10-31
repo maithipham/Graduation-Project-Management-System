@@ -123,8 +123,6 @@ export default function StudentManagementPage() {
   // Import / Thêm luôn vào học kì hiện tại (BE tự xác định, FE không gửi semesterId),
   // không phụ thuộc học kì đang chọn. Chưa có kì hiện tại → khóa nút (BE cũng chặn bằng 3030)
   const currentSemester = current.data;
-  const viewingCurrent =
-    currentSemester !== undefined && semesterId === currentSemester.publicId;
 
   // Đổi bất kỳ bộ lọc nào → quay về trang đầu
   const updateFilters = (patch: Partial<StudentFilters>) => {
@@ -162,7 +160,7 @@ export default function StudentManagementPage() {
     ? "Chưa có học kì nào"
     : filtered
       ? "Không tìm thấy sinh viên phù hợp"
-      : "Chưa có sinh viên nào trong học kì này";
+      : "Không tìm thấy thông tin sinh viên trong học kì này";
 
   // -mt-2 / -mb-4: kéo hàng nút lên gần header, cho bảng giãn xuống sát đáy hơn (main của layout đang p-6).
   // flex-1 min-h-0: chiếm hết chiều cao còn lại của <main> để bảng giãn lấp đầy màn hình
@@ -269,9 +267,6 @@ export default function StudentManagementPage() {
         onRowClick={setSelected}
         onEdit={setEditing}
         emptyMessage={emptyMessage}
-        // Đang xem kì cũ thì không hiện nút "Thêm sinh viên" ở bảng rỗng:
-        // bấm vào sẽ thêm vào kì hiện tại chứ không phải kì đang xem
-        onCreate={viewingCurrent ? () => setOpenDialog("create") : undefined}
         // Học kì đã kết thúc → BE từ chối (3029) nên ẩn luôn nút Xóa
         onDelete={semesterResolved && !semesterClosed ? setDeleting : undefined}
       />

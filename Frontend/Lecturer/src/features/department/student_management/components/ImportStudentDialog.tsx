@@ -19,7 +19,12 @@ import {
 } from "@/shared/components/ui";
 import { cn } from "@/shared/utils/cn";
 import { useImportStudents } from "../hooks/useStudents";
-import type { SemesterOption } from "../types";
+import type {
+  RowImportStatus,
+  SemesterOption,
+  UseCreateStudentMutation,
+  UseImportStudentsMutation,
+} from "../types";
 import { StudentImportResult } from "./StudentImportResult";
 import { TargetSemesterNote } from "./TargetSemesterNote";
 
@@ -55,17 +60,26 @@ type ImportFormValues = z.infer<typeof importSchema>;
 interface ImportStudentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Học kì hiện tại — chỉ để hiển thị, không gửi lên BE */
-  targetSemester: SemesterOption | undefined;
+  /** Học kì hiện tại — chỉ để hiển thị, không gửi lên BE. Admin không có (không gắn học kì) */
+  targetSemester?: SemesterOption;
+  /** API import, mặc định POST /student/import của Trưởng bộ môn */
+  useImport?: UseImportStudentsMutation;
+  /** API gửi lại dòng lỗi, mặc định POST /student */
+  useCreate?: UseCreateStudentMutation;
+  /** Các tab kết quả (Admin không có Cảnh báo) */
+  resultStatuses?: RowImportStatus[];
 }
 
 export function ImportStudentDialog({
   open,
   onOpenChange,
   targetSemester,
+  useImport = useImportStudents,
+  useCreate,
+  resultStatuses,
 }: ImportStudentDialogProps) {
   const formId = useId();
-  const importStudents = useImportStudents();
+  const importStudents = useImport();
   // Có kết quả (data) → chuyển sang màn kết quả; reset() mutation → quay lại bước chọn file
   const result = importStudents.data;
 
@@ -139,7 +153,11 @@ export function ImportStudentDialog({
         {/* Nội dung Modal */}
         <div className="px-5 py-4 bg-white">
           {result ? (
-            <StudentImportResult result={result} />
+            <StudentImportResult
+              result={result}
+              statuses={resultStatuses}
+              useCreate={useCreate}
+            />
           ) : (
             <form
               id={formId}

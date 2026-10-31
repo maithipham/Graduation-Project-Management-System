@@ -9,3 +9,14 @@ export {
   pickDefaultTab,
   type ImportRowCounts,
 } from './utils/importResult'
+// Popup Thêm / Import + form 8 trường — Admin dùng lại với API tài khoản riêng (prop useCreate / useImport)
+export { CreateStudentDialog } from './components/CreateStudentDialog'
+export { ImportStudentDialog } from './components/ImportStudentDialog'
+export { StudentFormFields } from './components/StudentFormFields'
+export {
+  createStudentSchema,
+  EMPTY_CREATE_STUDENT_VALUES,
+  type CreateStudentFormInput,
+  type CreateStudentFormValues,
+} from './utils/createStudentSchema'
+export { splitFullName } from './utils/updateStudentSchema'

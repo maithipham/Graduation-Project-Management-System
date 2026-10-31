@@ -2,10 +2,9 @@ import { z } from 'zod'
 import type { StudentDetail } from '../types'
 import { createStudentSchema } from './createStudentSchema'
 
-// Cùng ràng buộc với form thêm, bỏ ngành (không được sửa) và thêm trạng thái tài khoản
-export const updateStudentSchema = createStudentSchema.omit({ major: true }).extend({
-  accountStatus: z.boolean(),
-})
+// Cùng ràng buộc với form thêm, bỏ ngành (không được sửa).
+// Không có trạng thái tài khoản: PUT không đổi trạng thái đăng nhập
+export const updateStudentSchema = createStudentSchema.omit({ major: true })
 
 /** Giá trị người dùng nhập trên form (trước khi chuẩn hóa) */
 export type UpdateStudentFormInput = z.input<typeof updateStudentSchema>
@@ -20,7 +19,6 @@ export const EMPTY_UPDATE_STUDENT_VALUES: UpdateStudentFormInput = {
   phone: '',
   batch: '',
   className: '',
-  accountStatus: true,
 }
 
 /**
@@ -42,6 +40,5 @@ export function toUpdateStudentFormInput(student: StudentDetail): UpdateStudentF
     phone: student.phone ?? '',
     batch: student.batch,
     className: student.className,
-    accountStatus: student.accountStatus,
   }
 }

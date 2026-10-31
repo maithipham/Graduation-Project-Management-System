@@ -24,3 +24,17 @@ export function notifyUnauthorized(): void {
   lastNotifiedAt = now
   handler?.()
 }
+
+// Kênh tin nhắn giữa các tab cùng domain: một tab đăng xuất thì các tab còn lại cũng về /login ngay.
+// Tab gửi tin không tự nhận lại tin của chính nó
+const SIGNED_OUT_MESSAGE = 'signed-out'
+const authChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('gpms-auth')
+
+authChannel?.addEventListener('message', (event: MessageEvent) => {
+  if (event.data === SIGNED_OUT_MESSAGE) notifyUnauthorized()
+})
+
+/** Gọi sau khi đăng xuất để báo cho các tab khác */
+export function broadcastSignedOut(): void {
+  authChannel?.postMessage(SIGNED_OUT_MESSAGE)
+}

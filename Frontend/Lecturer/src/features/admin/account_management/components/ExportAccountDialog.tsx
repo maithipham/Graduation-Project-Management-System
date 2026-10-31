@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
+import type { ManagedAccountRole } from '../types/account.types'
 
 type ExportScope = 'filtered' | 'all'
 
@@ -19,6 +20,8 @@ interface ExportAccountDialogProps {
   totalFiltered: number
   totalAll: number
   onExport: (scope: ExportScope) => void
+  /** Loại tài khoản đang xuất (theo trang Giảng viên / Sinh viên đang mở) */
+  role: ManagedAccountRole
 }
 
 export function ExportAccountDialog({
@@ -27,8 +30,10 @@ export function ExportAccountDialog({
   totalFiltered,
   totalAll,
   onExport,
+  role,
 }: ExportAccountDialogProps) {
   const [scope, setScope] = useState<ExportScope>('filtered')
+  const roleLabel = role.toLowerCase()
 
   const handleOpenChange = (value: boolean) => {
     if (!value) setScope('filtered')
@@ -37,7 +42,7 @@ export function ExportAccountDialog({
 
   const handleExport = () => {
     onExport(scope)
-    toast.success('Xuất file thành công')
+    toast.success(`Xuất danh sách ${roleLabel} thành công`)
     handleOpenChange(false)
   }
 
@@ -45,7 +50,7 @@ export function ExportAccountDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Export danh sách tài khoản</DialogTitle>
+          <DialogTitle>Export danh sách {roleLabel}</DialogTitle>
         </DialogHeader>
 
         <fieldset className="space-y-2">
@@ -56,16 +61,16 @@ export function ExportAccountDialog({
             title="Theo bộ lọc hiện tại"
           >
             <p className="mt-1 text-xs text-slate-500">
-              Xuất {totalFiltered} tài khoản khớp với kết quả tìm kiếm và bộ lọc hiện tại.
+              Xuất {totalFiltered} {roleLabel} khớp với kết quả tìm kiếm và bộ lọc hiện tại.
             </p>
           </ScopeOption>
           <ScopeOption
             checked={scope === 'all'}
             onSelect={() => setScope('all')}
-            title="Tất cả tài khoản"
+            title={`Tất cả ${roleLabel}`}
           >
             <p className="mt-1 text-xs text-slate-500">
-              Bỏ qua bộ lọc, xuất toàn bộ {totalAll} tài khoản trong hệ thống.
+              Bỏ qua bộ lọc, xuất toàn bộ {totalAll} {roleLabel} trong hệ thống.
             </p>
           </ScopeOption>
         </fieldset>

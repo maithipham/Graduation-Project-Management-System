@@ -91,6 +91,23 @@ import { UserCheck } from 'lucide-react'
 - Trang gốc `/student` chỉ khớp đúng URL (đã cấu hình trong `StudentHeader`).
 - Trang chi tiết (ví dụ `/student/outline/12`) không cần thêm vào menu — breadcrumb tự khớp mục cha.
 
+#### Nhóm menu có mục con → mỗi mục con là một page riêng
+
+Menu Student hiện chưa có nhóm con (`StudentNavItem` chưa có `children`). Khi cần một mục sidebar thu gọn được,
+chứa các mục con (ví dụ "Báo cáo" → "Báo cáo giữa kỳ", "Báo cáo cuối kỳ"), thì hỏi người dùng trước vì phải sửa
+`StudentNavItem` + `StudentSidebar`, rồi làm theo quy tắc:
+
+- **Mỗi mục con = 1 file page riêng + 1 route riêng**, đặt tên theo mục con
+  (`MidtermReportPage.tsx`, `FinalReportPage.tsx`). **Không** dùng chung một page rồi truyền prop
+  (`<ReportPage type="..." />`) ở file route — người đọc phải nhìn cây thư mục là biết URL nào ứng với file nào.
+- Phần giao diện giống nhau giữa các mục con đưa vào `components/` của feature (ví dụ `ReportSubmissionView.tsx`
+  nhận prop `type`); mỗi page chỉ gọi component đó với tham số của mình. Không sao chép nguyên khối code sang từng page.
+  Khi một mục con cần thứ riêng (cột, API, nút) thì viết ngay trong page của nó.
+- Các mục con cùng nghiệp vụ vẫn nằm chung **một** feature (`reports_management/pages/...`), không tách thành nhiều feature.
+- Mục cha chỉ để mở/đóng nhóm, không có trang riêng. Nếu URL của mục cha từng là một trang (có link cũ trỏ tới),
+  thêm route chuyển hướng `<Navigate to="<url mục con đầu tiên>" replace />`.
+- Mẫu đã làm ở portal Lecturer: nhóm "Quản lý tài khoản" (`Frontend/Lecturer`, feature `admin/account_management`).
+
 ### 6. Kiểm tra
 
 Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duyệt (`npm run dev`) xem route, menu, breadcrumb.
@@ -100,5 +117,6 @@ Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duy�
 - Import sâu vào feature khác (`@/features/student/x/services/...`) — chỉ qua `index.ts`.
 - Đặt component có tên nghiệp vụ (`TopicCard`) vào `src/shared/`.
 - Fetch dữ liệu bằng `useEffect + useState` — dùng skill `connect-api`.
+- Cho nhiều mục con của một nhóm menu dùng chung một page qua prop ở file route — mỗi mục con một page riêng (bước 5).
 - Tự viết chuỗi role (`'student'`…) — dùng `UserRole` (`STUDENT`), `CanAccess`, `useMyInfo` từ `@/features/auth`. Trang mới không cần tự chặn role: route của portal đã nằm trong `ProtectedRoute`.
 - Tạo đủ 6 thư mục con "cho đúng chuẩn" khi chưa có file đặt vào, hoặc viết mock fallback trong service (`catch { return mock }`).
