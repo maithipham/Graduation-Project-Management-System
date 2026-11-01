@@ -80,14 +80,15 @@ export interface StudentDeleteParams {
 }
 
 export interface SemesterOption {
+  id?: string | number
   publicId: string
   name: string // "Học kỳ 1 năm học 2026-2027"
   academicYear: string // "2026-2027"
   term: string // "Học kỳ 1"
   startDate: string // dd-MM-yyyy
   endDate: string
-  status: string // "Chưa bắt đầu" | "Đang diễn ra" | "Kết thúc"
-  statusCode: 'UPCOMING' | 'ONGOING' | 'COMPLETED'
+  status?: string // "Chưa bắt đầu" | "Đang diễn ra" | "Kết thúc"
+  statusCode?: 'UPCOMING' | 'ONGOING' | 'COMPLETED'
 }
 
 // GET /major

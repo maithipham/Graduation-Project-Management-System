@@ -43,13 +43,18 @@ export function AssignAdvisorsDialog({
 }: AssignAdvisorsDialogProps) {
   const assignMutation = useAssignAdvisors()
 
-  const initialTeachers = useMemo(() => {
+  const initialTeachers = useMemo<TeacherListItem[]>(() => {
     if (selectedTeachers.length > 0) return selectedTeachers
     return selectedIds.map((id) => ({
       id,
       teacherId: id,
       publicId: String(id),
       name: `Giảng viên #${id}`,
+      firstName: '',
+      lastName: `Giảng viên #${id}`,
+      teacherCode: `GV${id}`,
+      academicTitle: '',
+      phone: '',
       email: '',
       organization: '',
       isInternal: true,

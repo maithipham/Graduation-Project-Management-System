@@ -21,7 +21,6 @@ import {
   type RowImportStatus,
 } from '@/features/department/student_management'
 import type { TeacherImportResponse, TeacherImportRowResult } from '../types'
-import { formatAmount } from '../utils/teacherDisplay'
 import { RetryTeacherImportRowForm } from './RetryTeacherImportRowForm'
 
 const TAB_CONFIG: Record<
@@ -51,7 +50,7 @@ const TAB_CONFIG: Record<
   },
 }
 
-const COLUMN_COUNT = 8
+const COLUMN_COUNT = 7
 
 /**
  * Kết quả import giáo viên theo từng dòng Excel, chia tab Lỗi / Cảnh báo / Thành công (giống import sinh viên).
@@ -124,7 +123,6 @@ export function TeacherImportResult({ result }: { result: TeacherImportResponse 
                         <TableHead>Email</TableHead>
                         <TableHead>Đơn vị công tác</TableHead>
                         <TableHead>Ngành</TableHead>
-                        <TableHead className="text-right">Hạn mức</TableHead>
                         <TableHead>{status === 'ERROR' ? 'Lý do lỗi' : 'Thông báo'}</TableHead>
                         <TableHead className="w-20" />
                       </TableRow>
@@ -142,9 +140,6 @@ export function TeacherImportResult({ result }: { result: TeacherImportResponse 
                               <TableCell className="py-2">{row.email}</TableCell>
                               <TableCell className="py-2">{row.organization}</TableCell>
                               <TableCell className="py-2">{row.majorName}</TableCell>
-                              <TableCell className="py-2 text-right tabular-nums">
-                                {formatAmount(row.amount)}
-                              </TableCell>
                               <TableCell className={cn('py-2 text-xs', config.messageClass)}>
                                 {row.message}
                               </TableCell>

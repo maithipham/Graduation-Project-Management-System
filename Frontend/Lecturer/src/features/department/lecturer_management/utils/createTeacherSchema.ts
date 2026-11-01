@@ -1,53 +1,14 @@
 import { z } from 'zod'
 
-/** Mọi field chuỗi dài quá 255 ký tự (đếm sau khi chuẩn hóa) bị BE coi là sai định dạng của field đó */
-const MAX_LENGTH = 255
-
-/** Tên chuẩn của đơn vị công tác trong trường (email @tlu.edu.vn) */
 export const TLU_ORGANIZATION = 'Trường Đại học Thủy lợi'
-
-/**
- * Chuẩn hóa giống BE trước khi kiểm tra: NFC, khoảng trắng (cả tab, xuống dòng) gộp thành 1,
- * xóa ký tự ẩn (zero-width, ký tự điều khiển), bỏ khoảng trắng đầu/cuối
- */
-export function normalizeTeacherText(value: string): string {
-  return value
-    .normalize('NFC')
-    .replace(/\s+/g, ' ')
-    .replace(/[\p{Cc}\p{Cf}]/gu, '')
-    .replace(/ {2,}/g, ' ')
-    .trim()
-}
-
-/**
- * Ô chữ bắt buộc: chuẩn hóa → báo trống → kiểm tra định dạng (mỗi ô chỉ hiện lỗi đầu tiên).
- * Độ dài 255 được đếm trên chuỗi đã chuẩn hóa, giống BE.
- * `transform` cho phép đổi giá trị sau chuẩn hóa trước khi so regex (email viết thường, tên Thủy lợi).
- */
-function textField(
-  emptyMessage: string,
-  pattern: RegExp,
-  invalidMessage: string,
-  transform: (value: string) => string = (value) => value,
-) {
-  return z
-    .string()
-    .transform((value) => transform(normalizeTeacherText(value)))
-    .pipe(
-      z
-        .string()
-        .min(1, emptyMessage)
-        .max(MAX_LENGTH, invalidMessage)
-        .regex(pattern, invalidMessage),
-    )
-}
-
+const MAX_LENGTH = 100
+const PHONE_PATTERN = /^0\d{9}$/
 const EMAIL_PATTERN = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/
 // Tên trường: chữ, số, khoảng trắng và các dấu . , - & ( ) ' /
 const ORGANIZATION_PATTERN = /^[\p{L}\p{M}\p{N} .,\-&()'/]+$/u
 
 /**
- * Đuôi email giáo viên → trong / ngoài trường và hạn mức mặc định (BE tự gán khi không gửi amount).
+ * Đuôi email giáo viên → trong / ngoài trường.
  * Trong trường: đơn vị là Trường Đại học Thủy lợi, bắt buộc có ngành. Ngoài trường: tên trường khác, không có ngành
  */
 export const TEACHER_EMAIL_RULES = [
@@ -68,60 +29,85 @@ export function getTeacherEmailRule(email: string): TeacherEmailRule | undefined
 }
 
 /** "trường đại học THỦY LỢI" → "Trường Đại học Thủy lợi" (BE không phân biệt hoa/thường); tên trường khác giữ nguyên */
-function toOrganization(value: string): string {
-  return value.toLowerCase() === TLU_ORGANIZATION.toLowerCase() ? TLU_ORGANIZATION : value
+function toOrganization(text: string): string {
+  return text.toLowerCase() === TLU_ORGANIZATION.toLowerCase() ? TLU_ORGANIZATION : text
 }
 
-/** Đơn vị đã qua bước định dạng (dùng để biết có nên so với email hay chưa) */
-function isValidOrganization(value: string): boolean {
-  return value.length > 0 && value.length <= MAX_LENGTH && ORGANIZATION_PATTERN.test(value)
+export function isValidOrganization(organization: string): boolean {
+  return organization.length > 0 && organization.length <= MAX_LENGTH && ORGANIZATION_PATTERN.test(organization)
 }
 
-// Các refine nhiều ô nhận giá trị chưa chắc đã qua schema (when: () => true) → tự chuẩn hóa lại
-const readEmailRule = (values: { email: unknown }) => getTeacherEmailRule(String(values.email))
-const readText = (value: unknown) => normalizeTeacherText(String(value ?? ''))
+/** Cắt khoảng trắng đầu cuối, gộp nhiều khoảng trắng giữa thành 1 */
+function normalizeTeacherText(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
 
-// Ràng buộc và message trùng với bảng lỗi Mục 6.5 (api_addLecturer.md)
-export const ACADEMIC_TITLES = [
-  { value: 'ThS.', label: 'ThS. (Thạc sĩ)' },
-  { value: 'TS.', label: 'TS. (Tiến sĩ)' },
-  { value: 'PGS.TS.', label: 'PGS.TS. (Phó Giáo sư)' },
-  { value: 'GS.TS.', label: 'GS.TS. (Giáo sư)' },
-  { value: 'KS.', label: 'KS. (Kỹ sư)' },
-  { value: 'CN.', label: 'CN. (Cử nhân)' },
-] as const
+/** Đọc chuỗi đã qua transform (nếu ô bị lỗi định dạng trước transform, lấy chuỗi người dùng gõ) */
+const readText = (value: unknown): string => normalizeTeacherText(value)
 
-export type AcademicTitleValue = (typeof ACADEMIC_TITLES)[number]['value']
+/**
+ * Đọc quy tắc theo email (nếu email đã đúng cú pháp).
+ * Zod v4 gọi refine độc lập từng ô → phải đọc qua helper, không dựa vào kết quả validate của ô email
+ */
+const readEmailRule = (values: Record<string, unknown>): TeacherEmailRule | undefined =>
+  getTeacherEmailRule(readText(values.email))
 
 export const createTeacherSchema = z
   .object({
-    firstName: textField(
-      'Họ không được để trống',
-      /^\p{L}+( \p{L}+)*$/u,
-      'Họ chỉ được chứa chữ cái và khoảng trắng',
-    ),
-    lastName: textField('Tên không được để trống', /^\p{L}+$/u, 'Tên chỉ được chứa chữ cái'),
-    email: textField(
-      'Email không được để trống',
-      EMAIL_PATTERN,
-      'Email không đúng định dạng',
-      (value) => value.toLowerCase(),
-    ).refine(
-      // Sai định dạng thì chỉ báo lỗi định dạng, không báo thêm lỗi đuôi email
-      (value) => !EMAIL_PATTERN.test(value) || getTeacherEmailRule(value) !== undefined,
-      'Email giáo viên phải có đuôi @tlu.edu.vn (trong trường) hoặc @gmail.com (ngoài trường)',
-    ),
-    phone: textField(
-      'Số điện thoại không được để trống',
-      /^0\d{9}$/,
-      'Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0',
-    ),
-    organization: textField(
-      'Đơn vị công tác không được để trống',
-      ORGANIZATION_PATTERN,
-      "Đơn vị công tác chỉ gồm chữ, số, khoảng trắng và các dấu . , - & ( ) ' / (tối đa 255 ký tự)",
-      toOrganization,
-    ),
+    firstName: z
+      .string()
+      .transform(normalizeTeacherText)
+      .pipe(
+        z
+          .string()
+          .min(1, 'Họ và tên đệm không được để trống')
+          .max(MAX_LENGTH, 'Họ và tên đệm không được vượt quá 100 ký tự'),
+      ),
+    lastName: z
+      .string()
+      .transform(normalizeTeacherText)
+      .pipe(
+        z
+          .string()
+          .min(1, 'Tên không được để trống')
+          .max(MAX_LENGTH, 'Tên không được vượt quá 100 ký tự'),
+      ),
+    email: z
+      .string()
+      .transform((value) => normalizeTeacherText(value).toLowerCase())
+      .pipe(
+        z
+          .string()
+          .min(1, 'Email không được để trống')
+          .max(MAX_LENGTH, 'Email không được vượt quá 100 ký tự')
+          .regex(EMAIL_PATTERN, 'Email không đúng định dạng')
+          .refine(
+            (value) => TEACHER_EMAIL_RULES.some((rule) => value.endsWith(rule.domain)),
+            'Chỉ chấp nhận email @tlu.edu.vn hoặc @gmail.com',
+          ),
+      ),
+    phone: z
+      .string()
+      .transform(normalizeTeacherText)
+      .pipe(
+        z
+          .string()
+          .min(1, 'Số điện thoại không được để trống')
+          .regex(PHONE_PATTERN, 'Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0'),
+      ),
+    organization: z
+      .string()
+      .transform(normalizeTeacherText)
+      .transform(toOrganization)
+      .pipe(
+        z
+          .string()
+          .min(1, 'Đơn vị công tác không được để trống')
+          .max(MAX_LENGTH, 'Đơn vị công tác không được vượt quá 100 ký tự')
+          .regex(ORGANIZATION_PATTERN, 'Đơn vị công tác chỉ được chứa chữ cái, số và dấu câu hợp lệ'),
+      ),
     // Gửi tên ngành (BE nhận tên hoặc mã ngành). Bắt buộc hay phải trống tùy email → kiểm tra ở refine bên dưới
     major: z.string().transform(normalizeTeacherText),
     // Học hàm / Học vị (POST /teacher: academicTitleId từ bảng academic_title hoặc academicTitle viết tắt)
@@ -131,16 +117,17 @@ export const createTeacherSchema = z
       .optional()
       .nullable()
       .transform((val) => (val ? normalizeTeacherText(val) : null)),
-    // Không bắt buộc: bỏ trống → null để BE tự gán. Chỉ nhận chữ số (không 5.5, -1, +5), tối đa 18 chữ số
     amount: z
       .string()
-      .transform(normalizeTeacherText)
+      .optional()
+      .nullable()
+      .transform((val) => (val ? normalizeTeacherText(val) : ''))
       .pipe(
         z
           .string()
           .regex(/^\d{0,18}$/, 'Số lượng sinh viên hướng dẫn phải là số nguyên không âm'),
       )
-      .transform((value) => (value === '' ? null : value)),
+      .transform((val) => (val === '' ? null : val)),
   })
   // Các refine dưới đây vẫn chạy khi ô khác đang lỗi (when: () => true),
   // để người dùng thấy hết lỗi trong 1 lần bấm Lưu

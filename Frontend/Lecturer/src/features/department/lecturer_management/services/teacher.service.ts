@@ -90,28 +90,18 @@ export const teacherService = {
     return { code: res.data.code, message: res.data.message }
   },
 
-  // PATCH /teacher/{publicId}/amount — gửi chuỗi để BE không làm tròn. Response chỉ có code + message.
-  // Lỗi (4000, 3009, 3012) để interceptor hiện toast
-  async updateTeacherAmount({ publicId, amount }: { publicId: string; amount: string }): Promise<string> {
-    const res = await apiClient.patch<ApiResponse<unknown>>(TEACHER.amount(publicId), { amount })
-    return res.data.message
-  },
-
-  // GET /teacher/academic-titles (hoặc /academic-titles) — Danh mục học hàm, học vị
+  // GET /teacher/academic-titles — Danh mục học hàm, học vị
   async getAcademicTitles(): Promise<AcademicTitle[]> {
-    const urls = [TEACHER.academicTitles, '/academic-titles', '/teachers/academic-titles']
-    for (const url of urls) {
-      try {
-        const res = await apiClient.get<ApiResponse<AcademicTitle[]>>(url, {
-          skipErrorToast: true,
-        })
-        const data = res.data?.data
-        if (Array.isArray(data) && data.length > 0) {
-          return data
-        }
-      } catch {
-        // Thử URL tiếp theo
+    try {
+      const res = await apiClient.get<ApiResponse<AcademicTitle[]>>(TEACHER.academicTitles, {
+        skipErrorToast: true,
+      })
+      const data = res.data?.data
+      if (Array.isArray(data) && data.length > 0) {
+        return data
       }
+    } catch {
+      // Bỏ qua lỗi mạng, dùng danh mục mặc định
     }
     return DEFAULT_ACADEMIC_TITLES
   },

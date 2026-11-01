@@ -15,15 +15,15 @@ interface UseTeacherEmailAutoFillOptions {
   setValue: UseFormSetValue<CreateTeacherFormInput>
   /** Đã bấm Lưu / Gửi lại một lần thì kiểm tra lại ngay để dòng lỗi cũ biến mất */
   isSubmitted: boolean
-  /** Email có sẵn khi mở form (sửa dòng import) → coi đơn vị / hạn mức hiện tại như đã tự điền theo email đó */
+  /** Email có sẵn khi mở form (sửa dòng import) → coi đơn vị hiện tại như đã tự điền theo email đó */
   initialEmail?: string
   defaultMajor?: string
 }
 
 /**
- * Gõ email xong đúng đuôi → tự điền đơn vị công tác và hạn mức mặc định:
- *   @tlu.edu.vn → Trường Đại học Thủy lợi / 20
- *   @gmail.com  → xóa tên Thủy lợi đã tự điền (người dùng gõ tên trường khác) / 10, xóa ngành
+ * Gõ email xong đúng đuôi → tự điền đơn vị công tác:
+ *   @tlu.edu.vn → Trường Đại học Thủy lợi
+ *   @gmail.com  → xóa tên Thủy lợi đã tự điền (người dùng gõ tên trường khác), xóa ngành
  * Chỉ ghi đè ô còn trống hoặc vẫn đang là giá trị tự điền lần trước, không đè lên giá trị người dùng tự sửa.
  * Trả về hàm `resetAutoFill` để gọi khi làm trống form (mở lại popup).
  */
@@ -55,9 +55,6 @@ export function useTeacherEmailAutoFill({
           ) {
             setValue('organization', autoOrganization(rule), options)
           }
-          if (!values.amount || values.amount === String(previous?.amount)) {
-            setValue('amount', String(rule.amount), options)
-          }
           // Ngoài trường không có ngành (BE báo lỗi nếu có)
           if (!rule.internal && values.major) {
             setValue('major', '', options)
@@ -70,6 +67,7 @@ export function useTeacherEmailAutoFill({
     [subscribe, setValue, isSubmitted, defaultMajor],
   )
 
+  /** Gọi khi reset form về rỗng để lần gõ email sau vẫn tự điền như bình thường */
   const resetAutoFill = useCallback(() => {
     autoFilledRef.current = undefined
   }, [])

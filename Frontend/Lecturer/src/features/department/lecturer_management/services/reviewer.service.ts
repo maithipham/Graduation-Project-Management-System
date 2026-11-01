@@ -37,9 +37,8 @@ export const reviewerService = {
     return res.content.map(toReviewerStudent)
   },
 
-  async getLecturers(semesterId?: string): Promise<ReviewerLecturer[]> {
-    const cleanSemesterId = semesterId === 'all' ? undefined : semesterId
-    const res = await teacherService.getTeachers({ semesterId: cleanSemesterId, size: 100 })
+  async getLecturers(_semesterId?: string): Promise<ReviewerLecturer[]> {
+    const res = await teacherService.getTeachers({ page: 0, size: 100 })
     return res.content.map(toReviewerLecturer)
   },
 }

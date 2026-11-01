@@ -1,6 +1,7 @@
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { teacherService } from '@/features/department/lecturer_management/services/teacher.service'
+import { supervisorService } from '@/features/department/lecturer_management/services/supervisor.service'
 import { apiClient } from '@/shared/api'
 import { useToastStore } from '@/shared/components/feedback/toast.store'
 
@@ -126,14 +127,14 @@ describe('teacherService.importTeachers', () => {
   })
 })
 
-describe('teacherService.updateTeacherAmount', () => {
-  it('PATCH /teacher/{publicId}/amount với amount dạng chuỗi, trả message của BE', async () => {
+describe('supervisorService.updateLecturerQuota', () => {
+  it('PUT /semesters/{semesterId}/advisors/{teacherId}/quota với maxStudents, trả message của BE', async () => {
     reply = { code: 1000, message: 'Cập nhật số lượng hướng dẫn thành công' }
 
-    const message = await teacherService.updateTeacherAmount({ publicId: 'id-1', amount: '15' })
+    const message = await supervisorService.updateLecturerQuota({ semesterId: 'sem-1', teacherOrAdvisorId: 'id-1', quota: 15 })
 
-    expect(requests[0]).toMatchObject({ method: 'patch', url: '/teacher/id-1/amount' })
-    expect(JSON.parse(requests[0].data as string)).toEqual({ amount: '15' })
+    expect(requests[0]).toMatchObject({ method: 'put', url: '/semesters/sem-1/advisors/id-1/quota' })
+    expect(JSON.parse(requests[0].data as string)).toEqual({ maxStudents: 15 })
     expect(message).toBe('Cập nhật số lượng hướng dẫn thành công')
   })
 })

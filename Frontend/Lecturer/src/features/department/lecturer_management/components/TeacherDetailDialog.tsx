@@ -9,7 +9,7 @@ import {
   Skeleton,
 } from '@/shared/components/ui'
 import { useTeacherDetail } from '../hooks/useTeachers'
-import { formatAmount } from '../utils/teacherDisplay'
+
 import { TeacherStatusBadge } from './TeacherStatusBadge'
 
 interface TeacherDetailDialogProps {
@@ -51,7 +51,7 @@ export function TeacherDetailDialog({ publicId, onClose, onOpenChange }: Teacher
             <DetailItem label="Họ và tên">{teacher.name}</DetailItem>
             <DetailItem label="Đơn vị công tác">{teacher.organization}</DetailItem>
             <DetailItem label="Ngành">{teacher.majorName ?? '—'}</DetailItem>
-            <DetailItem label="Hạn mức">{formatAmount(teacher.amount)}</DetailItem>
+            <DetailItem label="Học vị / Học hàm">{teacher.academicTitle ?? '—'}</DetailItem>
             <DetailItem label="Số điện thoại">{teacher.phone ?? '—'}</DetailItem>
             <DetailItem label="Email">
               <a href={`mailto:${teacher.email}`} className="break-all text-blue-600 hover:underline">

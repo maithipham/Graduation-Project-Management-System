@@ -94,7 +94,7 @@ export function toSupervisorLecturer(
     category: t.isInternal ? 'internal' : 'univ_ext',
     categoryLabel: t.isInternal ? 'Trong bộ môn' : 'Ngoài trường',
     department: t.majorName || t.organization || 'Bộ môn',
-    quota: typeof t.amount === 'number' ? t.amount : 0,
+    quota: typeof t.maxStudents === 'number' ? t.maxStudents : 0,
     assigned: assignedCount,
     year,
     semester: semesterName,
@@ -139,8 +139,8 @@ export function toSupervisorLecturerFromAdvisor(
   const quota =
     typeof item.maxStudents === 'number'
       ? item.maxStudents
-      : typeof teacher?.amount === 'number'
-        ? teacher.amount
+      : typeof teacher?.maxStudents === 'number'
+        ? teacher.maxStudents
         : 0
 
   const cleanName = (item.name || item.teacherName || teacher?.name || rawName).trim()
@@ -215,41 +215,32 @@ export function toSupervisorStudent(
 }
 
 export const supervisorService = {
-  // GET /semesters/{semesterId}/advisors hoặc /advisors: Lấy danh sách GVHD trong kỳ (từ bảng semester_advisor)
+  // GET /semesters/{semesterId}/advisors: Lấy danh sách GVHD trong kỳ (từ bảng semester_advisor)
   async getAssignedAdvisors(
     semesterId?: string,
     keyword?: string,
   ): Promise<SemesterAdvisorResponse[]> {
-    const isSpecificSemester = Boolean(semesterId && semesterId !== 'all' && semesterId !== 'ALL')
+    const resolvedSemesterId =
+      semesterId && semesterId !== 'all' && semesterId !== 'ALL' ? semesterId : 'all'
     const params: Record<string, string> = {}
     if (keyword) params.keyword = keyword
-    if (isSpecificSemester && semesterId) {
-      params.semesterId = semesterId
-    }
 
-    // Thứ tự endpoint thử nghiệm (ưu tiên /advisors?semesterId=... để tránh lỗi 405 Method Not Allowed trên /semesters/{id}/advisors)
-    const urlsToTry: string[] = [
-      '/advisors',
-      ...(isSpecificSemester
-        ? [`/semester/${semesterId}/advisors`, `/semesters/${semesterId}/advisors`]
-        : []),
-    ]
-
-    for (const url of urlsToTry) {
-      try {
-        const res = await apiClient.get<ApiResponse<SemesterAdvisorResponse[]>>(url, {
+    try {
+      const res = await apiClient.get<ApiResponse<SemesterAdvisorResponse[]>>(
+        API_ENDPOINTS.advisor.advisors(resolvedSemesterId),
+        {
           params,
           skipErrorToast: true,
-        })
-        const data = res.data?.data
-        if (Array.isArray(data) && data.length > 0) return data
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          return res.data as unknown as SemesterAdvisorResponse[]
-        }
-        if (Array.isArray(data)) return data
-      } catch {
-        continue
+        },
+      )
+      const data = res.data?.data
+      if (Array.isArray(data) && data.length > 0) return data
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        return res.data as unknown as SemesterAdvisorResponse[]
       }
+      if (Array.isArray(data)) return data
+    } catch {
+      // Fallback bên dưới
     }
 
     return []
@@ -335,91 +326,71 @@ export const supervisorService = {
     }
   },
 
-  // GET /advisor/quotas?semesterId={semesterId}: Lấy thiết lập hạn mức theo chức danh
+  // GET /semesters/{semesterId}/advisor-quotas: Lấy thiết lập hạn mức theo chức danh của học kỳ
   async getAdvisorQuotas(semesterId?: string): Promise<TitleQuotaConfig[]> {
     const cleanSemesterId =
-      semesterId && semesterId !== 'all' ? semesterId : undefined
+      semesterId && semesterId !== 'all' ? semesterId : 'current'
 
-    const urlsToTry: { url: string; params?: Record<string, string> }[] = []
-    if (cleanSemesterId) {
-      urlsToTry.push({
-        url: `/semesters/${cleanSemesterId}/advisor-quotas`,
-      })
-      urlsToTry.push({
-        url: `/semester/${cleanSemesterId}/advisor-quotas`,
-      })
-      urlsToTry.push({
-        url: API_ENDPOINTS.advisor.quotas,
-        params: { semesterId: cleanSemesterId },
-      })
-    }
-    urlsToTry.push({
-      url: API_ENDPOINTS.advisor.quotas,
-    })
+    try {
+      const res = await apiClient.get<ApiResponse<any[]>>(
+        API_ENDPOINTS.advisor.quotas(cleanSemesterId),
+        { skipErrorToast: true },
+      )
+      const data = res.data?.data
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((item, idx) => {
+          const academicTitleId = item.academicTitleId || item.id || idx + 1
+          const titleCode = item.titleCode || item.code || ''
+          const defaultMatch =
+            DEFAULT_TITLE_QUOTAS.find(
+              (d) =>
+                d.academicTitleId === academicTitleId ||
+                (titleCode && d.titleCode === titleCode),
+            ) || DEFAULT_TITLE_QUOTAS[idx]
+          const titleName =
+            item.titleName || item.title || defaultMatch?.titleName || ''
+          const academicTitle =
+            item.academicTitle || item.shortTitle || defaultMatch?.academicTitle || ''
+          const internalQuota =
+            typeof item.internalQuota === 'number'
+              ? item.internalQuota
+              : typeof item.internal === 'number'
+                ? item.internal
+                : null
+          const externalQuota =
+            typeof item.externalQuota === 'number'
+              ? item.externalQuota
+              : typeof item.external === 'number'
+                ? item.external
+                : null
 
-    for (const { url, params } of urlsToTry) {
-      try {
-        const res = await apiClient.get<ApiResponse<any[]>>(url, {
-          params,
-          skipErrorToast: true,
+          return {
+            id: academicTitleId,
+            academicTitleId,
+            code: titleCode || defaultMatch?.titleCode || '',
+            titleCode: titleCode || defaultMatch?.titleCode || '',
+            title: titleName || titleCode || 'Chức danh',
+            titleName: titleName || titleCode || 'Chức danh',
+            shortTitle: academicTitle || titleName,
+            academicTitle: academicTitle || titleName,
+            internal: internalQuota,
+            external: externalQuota,
+            internalQuota,
+            externalQuota,
+          }
         })
-        const data = res.data?.data
-        if (Array.isArray(data) && data.length > 0) {
-          return data.map((item, idx) => {
-            const academicTitleId = item.academicTitleId || item.id || idx + 1
-            const titleCode = item.titleCode || item.code || ''
-            const defaultMatch =
-              DEFAULT_TITLE_QUOTAS.find(
-                (d) =>
-                  d.academicTitleId === academicTitleId ||
-                  (titleCode && d.titleCode === titleCode),
-              ) || DEFAULT_TITLE_QUOTAS[idx]
-            const titleName =
-              item.titleName || item.title || defaultMatch?.titleName || ''
-            const academicTitle =
-              item.academicTitle || item.shortTitle || defaultMatch?.academicTitle || ''
-            const internalQuota =
-              typeof item.internalQuota === 'number'
-                ? item.internalQuota
-                : typeof item.internal === 'number'
-                  ? item.internal
-                  : null
-            const externalQuota =
-              typeof item.externalQuota === 'number'
-                ? item.externalQuota
-                : typeof item.external === 'number'
-                  ? item.external
-                  : null
-
-            return {
-              id: academicTitleId,
-              academicTitleId,
-              code: titleCode || defaultMatch?.titleCode || '',
-              titleCode: titleCode || defaultMatch?.titleCode || '',
-              title: titleName || titleCode || 'Chức danh',
-              titleName: titleName || titleCode || 'Chức danh',
-              shortTitle: academicTitle || titleName,
-              academicTitle: academicTitle || titleName,
-              internal: internalQuota,
-              external: externalQuota,
-              internalQuota,
-              externalQuota,
-            }
-          })
-        }
-      } catch {
-        // Tiếp tục thử fallback URL khác
       }
+    } catch {
+      // Dùng danh mục mặc định
     }
 
     return DEFAULT_TITLE_QUOTAS
   },
 
-  // PUT / POST /advisor/quotas hoặc /semesters/{semesterId}/advisor-quotas
-  // Body: List<AdvisorTitleQuotaDTO>
+  // PUT /semesters/{semesterId}/advisor-quotas: Lưu thiết lập hạn mức theo chức danh cho cả học kỳ
   async saveAdvisorQuotas(quotas: TitleQuotaConfig[], semesterId?: string): Promise<void> {
     const cleanSemesterId =
-      semesterId && semesterId !== 'all' ? semesterId : undefined
+      semesterId && semesterId !== 'all' ? semesterId : 'current'
 
     const payload = quotas.map((q, idx) => {
       const academicTitleId =
@@ -442,46 +413,10 @@ export const supervisorService = {
       }
     })
 
-    const urlsToTry: { url: string; params?: Record<string, string> }[] = []
-    if (cleanSemesterId) {
-      urlsToTry.push({
-        url: `/semesters/${cleanSemesterId}/advisor-quotas`,
-      })
-      urlsToTry.push({
-        url: `/semester/${cleanSemesterId}/advisor-quotas`,
-      })
-      urlsToTry.push({
-        url: API_ENDPOINTS.advisor.quotas,
-        params: { semesterId: cleanSemesterId },
-      })
-    }
-    urlsToTry.push({
-      url: API_ENDPOINTS.advisor.quotas,
-    })
-
-    let lastError: unknown = null
-    for (const { url, params } of urlsToTry) {
-      try {
-        await apiClient.put<ApiResponse<unknown>>(url, payload, {
-          params,
-          skipErrorToast: true,
-        })
-        return
-      } catch (err) {
-        lastError = err
-        try {
-          await apiClient.post<ApiResponse<unknown>>(url, payload, {
-            params,
-            skipErrorToast: true,
-          })
-          return
-        } catch (postErr) {
-          lastError = postErr
-        }
-      }
-    }
-
-    throw lastError
+    await apiClient.put<ApiResponse<unknown>>(
+      API_ENDPOINTS.advisor.quotas(cleanSemesterId),
+      payload,
+    )
   },
 
   getTitleQuotas(): TitleQuotaConfig[] {
@@ -492,9 +427,7 @@ export const supervisorService = {
     void this.saveAdvisorQuotas(data)
   },
 
-  // PUT / PATCH: Chỉnh sửa hạn mức (maxStudents) cho từng GVHD cụ thể trong kỳ
-  // URL: /semesters/{semesterId}/advisors/{teacherId}/quota hoặc /advisors/{advisorId}/quota
-  // Body: { "maxStudents": quota }
+  // PUT /semesters/{semesterId}/advisors/{teacherId}/quota: Chỉnh sửa hạn mức (maxStudents) cho 1 GVHD cụ thể trong kỳ
   async updateLecturerQuota(
     params:
       | {
@@ -523,38 +456,10 @@ export const supervisorService = {
 
     const payload = { maxStudents: quota }
     const cleanSemesterId =
-      semesterId && semesterId !== 'all' ? semesterId : undefined
+      semesterId && semesterId !== 'all' ? semesterId : 'current'
 
-    const urlsToTry: string[] = []
-    if (cleanSemesterId) {
-      urlsToTry.push(API_ENDPOINTS.advisor.updateQuota(cleanSemesterId, teacherOrAdvisorId))
-      urlsToTry.push(`/semester/${cleanSemesterId}/advisors/${teacherOrAdvisorId}/quota`)
-      urlsToTry.push(`/semesters/${cleanSemesterId}/advisors/${teacherOrAdvisorId}`)
-      urlsToTry.push(`/semester/${cleanSemesterId}/advisors/${teacherOrAdvisorId}`)
-    }
-    urlsToTry.push(API_ENDPOINTS.advisor.singleQuota(teacherOrAdvisorId))
-    urlsToTry.push(`/advisors/${teacherOrAdvisorId}`)
-
-    let lastError: unknown = null
-    for (const url of urlsToTry) {
-      try {
-        const res = await apiClient.put<ApiResponse<unknown>>(url, payload, {
-          skipErrorToast: true,
-        })
-        return res.data?.message || 'Cập nhật hạn mức thành công'
-      } catch (err) {
-        lastError = err
-        try {
-          const resPatch = await apiClient.patch<ApiResponse<unknown>>(url, payload, {
-            skipErrorToast: true,
-          })
-          return resPatch.data?.message || 'Cập nhật hạn mức thành công'
-        } catch (patchErr) {
-          lastError = patchErr
-        }
-      }
-    }
-
-    throw lastError
+    const url = API_ENDPOINTS.advisor.updateQuota(cleanSemesterId, teacherOrAdvisorId)
+    const res = await apiClient.put<ApiResponse<unknown>>(url, payload)
+    return res.data?.message || 'Cập nhật hạn mức thành công'
   },
 }

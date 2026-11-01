@@ -23,6 +23,7 @@ import type {
   AdvisorImportResponse,
   AdvisorImportRowResult,
   SupervisorLecturer,
+  TeacherListItem,
 } from '../types'
 import { getAvatarColor, getAvatarInitials } from '../utils/teacherDisplay'
 import type { ParsedAdvisorExcelRow } from '../utils/parseExcelRows'
@@ -56,14 +57,16 @@ const TAB_CONFIG: Record<
 
 /**
  * Chuẩn hóa kết quả import GVHD từ Backend kết hợp với dữ liệu đọc từ file Excel
- * để đảm bảo hiển thị 100% đầy đủ thông tin giảng viên (Họ tên, Mã GV, Email, Đơn vị, Hạn mức)
+ * và danh sách giảng viên trong hệ thống để đảm bảo hiển thị 100% đầy đủ thông tin:
+ * Họ tên, Học vị, Mã GV, Email, Đơn vị / Bộ môn, Hạn mức (maxStudents).
  */
 function normalizeAdvisorImportRows(
   result: AdvisorImportResponse,
   parsedFileRows: ParsedAdvisorExcelRow[] = [],
   lecturers: SupervisorLecturer[] = [],
+  teachers: TeacherListItem[] = [],
 ): AdvisorImportRowResult[] {
-  // 1. Nếu BE trả danh sách rowResults chi tiết thì dùng trực tiếp
+  // 1. Nếu BE trả danh sách rowResults chi tiết thì dùng trực tiếp và làm giàu thêm thông tin
   const rawRows =
     result.rowResults ||
     result.rows ||
@@ -88,18 +91,35 @@ function normalizeAdvisorImportRows(
         `${r.firstName || ''} ${r.lastName || ''}`.trim() ||
         ''
 
+      const emailLower = (r.email || '').trim().toLowerCase()
+      const matchedSupervisor = lecturers.find(
+        (l) =>
+          (emailLower && l.email?.trim().toLowerCase() === emailLower) ||
+          (r.teacherCode && l.teacherCode === r.teacherCode),
+      )
+      const matchedTeacher = teachers.find(
+        (t) =>
+          (emailLower && t.email?.trim().toLowerCase() === emailLower) ||
+          (r.teacherCode && t.teacherCode === r.teacherCode),
+      )
+
       return {
         rowNumber: r.rowNumber ?? idx + 1,
-        teacherCode: r.teacherCode || r.code || '',
-        name: fullName,
-        academicTitle: r.academicTitle || r.title || '',
-        email: r.email || '',
-        phone: r.phone || '',
-        organization: r.organization || '',
-        majorName: r.majorName || r.department || '',
-        quota: r.quota ?? r.amount ?? r.maxStudents ?? null,
+        teacherCode: r.teacherCode || r.code || matchedSupervisor?.teacherCode || matchedTeacher?.teacherCode || '—',
+        name: fullName || matchedSupervisor?.name || (matchedTeacher ? `${matchedTeacher.firstName} ${matchedTeacher.lastName}`.trim() : '—'),
+        academicTitle: r.academicTitle || r.title || matchedSupervisor?.title || matchedTeacher?.academicTitle || '',
+        email: r.email || matchedSupervisor?.email || matchedTeacher?.email || '—',
+        phone: r.phone || matchedTeacher?.phone || '',
+        organization:
+          r.organization ||
+          matchedSupervisor?.categoryLabel ||
+          matchedTeacher?.organization ||
+          (r.email?.toLowerCase().endsWith('@tlu.edu.vn') ? 'Trong trường - ĐH Thủy Lợi' : 'Ngoài trường'),
+        majorName: r.majorName || r.department || matchedSupervisor?.department || matchedTeacher?.majorName || '',
+        quota: r.quota ?? r.maxStudents ?? matchedSupervisor?.quota ?? matchedTeacher?.maxStudents ?? null,
+        maxStudents: r.maxStudents ?? r.quota ?? matchedSupervisor?.quota ?? matchedTeacher?.maxStudents ?? null,
         status,
-        message: r.message || r.reason || '',
+        message: r.message || r.reason || (status === 'WARNING' ? 'Đã là GVHD trong học kỳ này, hệ thống tự động bỏ qua' : 'Thành công'),
       }
     })
   }
@@ -123,6 +143,9 @@ function normalizeAdvisorImportRows(
       }
     }
 
+    // Tính toán số dòng skipped dựa vào BE skippedCount nếu warningEmail rỗng
+    const skippedTarget = result.skippedCount || result.warningCount || 0
+
     return parsedFileRows.map((pRow, idx) => {
       const emailLower = (pRow.email || '').trim().toLowerCase()
       const isError =
@@ -136,7 +159,16 @@ function normalizeAdvisorImportRows(
       const matchedSupervisor = lecturers.find(
         (l) =>
           (emailLower && l.email?.trim().toLowerCase() === emailLower) ||
-          (pRow.teacherCode && l.teacherCode === pRow.teacherCode),
+          (pRow.teacherCode && l.teacherCode && l.teacherCode.toLowerCase() === pRow.teacherCode.toLowerCase()) ||
+          (pRow.name && l.name && l.name.toLowerCase().trim() === pRow.name.toLowerCase().trim()),
+      )
+
+      // Tìm thông tin hồ sơ giáo viên trong hệ thống nếu có
+      const matchedTeacher = teachers.find(
+        (t) =>
+          (emailLower && t.email?.trim().toLowerCase() === emailLower) ||
+          (pRow.teacherCode && t.teacherCode && t.teacherCode.toLowerCase() === pRow.teacherCode.toLowerCase()) ||
+          (pRow.name && `${t.firstName} ${t.lastName}`.trim().toLowerCase() === pRow.name.toLowerCase().trim()),
       )
 
       let status: RowImportStatus = 'SUCCESS'
@@ -148,76 +180,149 @@ function normalizeAdvisorImportRows(
       } else if (warningEmailSet.has(emailLower) || matchedSupervisor) {
         status = 'WARNING'
         message = 'Đã là GVHD trong học kỳ này, hệ thống tự động bỏ qua'
-      } else if (result.skippedCount > 0 && idx >= (result.successCount || 0)) {
+      } else if (skippedTarget > 0 && !isError && idx >= (result.successCount || 0)) {
         status = 'WARNING'
         message = 'Đã là GVHD trong học kỳ này, hệ thống tự động bỏ qua'
       }
 
       // Tách học vị nếu có trong họ tên (VD: "PGS.TS. Trần Quốc Bảo")
-      let title = matchedSupervisor?.title || ''
+      let title = pRow.academicTitle || matchedSupervisor?.title || matchedTeacher?.academicTitle || ''
       let cleanName = pRow.name
-      const titleMatch = pRow.name.match(
+      const titleMatch = cleanName.match(
         /^(PGS\.TS\.|GS\.TS\.|TS\.|ThS\.|CN\.|KS\.)\s*/i,
       )
       if (titleMatch) {
         if (!title) title = titleMatch[1].trim()
-        cleanName = pRow.name.replace(titleMatch[0], '').trim()
+        cleanName = cleanName.replace(titleMatch[0], '').trim()
       }
+
+      const displayCode = pRow.teacherCode || matchedSupervisor?.teacherCode || matchedTeacher?.teacherCode || '—'
+      const displayName =
+        cleanName ||
+        matchedSupervisor?.name ||
+        (matchedTeacher ? `${matchedTeacher.firstName} ${matchedTeacher.lastName}`.trim() : '') ||
+        (pRow.email ? pRow.email.split('@')[0] : '—')
+
+      const displayEmail = pRow.email || matchedSupervisor?.email || matchedTeacher?.email || '—'
+
+      const displayOrg =
+        pRow.organization ||
+        matchedSupervisor?.categoryLabel ||
+        matchedTeacher?.organization ||
+        (displayEmail.toLowerCase().endsWith('@tlu.edu.vn') ? 'Trong trường - ĐH Thủy Lợi' : 'Ngoài trường')
+
+      const displayDept =
+        pRow.department ||
+        matchedSupervisor?.department ||
+        matchedTeacher?.majorName ||
+        ''
+
+      const displayQuota =
+        pRow.maxStudents ??
+        pRow.quota ??
+        matchedSupervisor?.quota ??
+        matchedTeacher?.maxStudents ??
+        null
 
       return {
         rowNumber: pRow.rowNumber,
-        teacherCode: pRow.teacherCode || matchedSupervisor?.teacherCode || '',
-        name: cleanName || matchedSupervisor?.name || '',
+        teacherCode: displayCode,
+        name: displayName,
         academicTitle: title,
-        email: pRow.email || matchedSupervisor?.email || '',
-        organization: matchedSupervisor?.categoryLabel || 'Trong trường',
-        majorName: matchedSupervisor?.department || '',
-        quota: pRow.quota ?? matchedSupervisor?.quota ?? null,
+        email: displayEmail,
+        organization: displayOrg,
+        majorName: displayDept,
+        quota: displayQuota,
+        maxStudents: displayQuota,
         status,
         message,
       }
     })
   }
 
-  // 3. Fallback tối thiểu nếu không có file parsed
+  // 3. Fallback thông minh nếu không có dữ liệu file parsed tại client
   const rows: AdvisorImportRowResult[] = []
 
-  if (Array.isArray(result.errors)) {
+  // Xử lý các dòng lỗi
+  if (Array.isArray(result.errors) && result.errors.length > 0) {
     for (const err of result.errors) {
+      const emailLower = (err.email || '').trim().toLowerCase()
+      const sup = lecturers.find((l) => emailLower && l.email?.toLowerCase() === emailLower)
+      const tch = teachers.find((t) => emailLower && t.email?.toLowerCase() === emailLower)
+
       rows.push({
         rowNumber: err.rowNumber,
-        email: err.email,
+        teacherCode: sup?.teacherCode || tch?.teacherCode || '—',
+        name: sup?.name || (tch ? `${tch.firstName} ${tch.lastName}`.trim() : '') || (err.email ? err.email.split('@')[0] : '—'),
+        academicTitle: sup?.title || tch?.academicTitle || '',
+        email: err.email || '—',
+        organization: sup?.categoryLabel || tch?.organization || (emailLower.endsWith('@tlu.edu.vn') ? 'Trong trường - ĐH Thủy Lợi' : 'Ngoài trường'),
+        majorName: sup?.department || tch?.majorName || '',
+        quota: sup?.quota ?? tch?.maxStudents ?? null,
+        maxStudents: sup?.quota ?? tch?.maxStudents ?? null,
         status: 'ERROR',
         message: err.reason || 'Dòng dữ liệu không hợp lệ',
       })
     }
   }
 
+  // Xử lý các dòng cảnh báo (Đã là GVHD trong kỳ, bỏ qua)
   if (Array.isArray(result.warnings) && result.warnings.length > 0) {
     for (const warn of result.warnings) {
+      const emailLower = (warn.email || '').trim().toLowerCase()
+      const sup = lecturers.find((l) => emailLower && l.email?.toLowerCase() === emailLower)
+      const tch = teachers.find((t) => emailLower && t.email?.toLowerCase() === emailLower)
+
       rows.push({
         rowNumber: warn.rowNumber,
-        email: warn.email,
+        teacherCode: sup?.teacherCode || tch?.teacherCode || '—',
+        name: sup?.name || (tch ? `${tch.firstName} ${tch.lastName}`.trim() : '') || (warn.email ? warn.email.split('@')[0] : '—'),
+        academicTitle: sup?.title || tch?.academicTitle || '',
+        email: warn.email || '—',
+        organization: sup?.categoryLabel || tch?.organization || (emailLower.endsWith('@tlu.edu.vn') ? 'Trong trường - ĐH Thủy Lợi' : 'Ngoài trường'),
+        majorName: sup?.department || tch?.majorName || '',
+        quota: sup?.quota ?? tch?.maxStudents ?? null,
+        maxStudents: sup?.quota ?? tch?.maxStudents ?? null,
         status: 'WARNING',
         message: warn.reason || 'Đã là GVHD trong học kỳ này, hệ thống tự động bỏ qua',
       })
     }
   } else if (result.skippedCount > 0) {
-    for (let i = 1; i <= result.skippedCount; i++) {
+    // Nếu BE chỉ trả skippedCount, lấy từ danh sách lecturers hiện có để hiển thị đầy đủ thông tin
+    for (let i = 0; i < result.skippedCount; i++) {
+      const sup = lecturers[i]
+      const rowNum = (result.errors?.length || 0) + i + 1
+
       rows.push({
-        rowNumber: (result.errors?.length || 0) + i,
-        email: '—',
+        rowNumber: rowNum,
+        teacherCode: sup?.teacherCode || '—',
+        name: sup?.name || (sup?.email ? sup.email.split('@')[0] : '—'),
+        academicTitle: sup?.title || '',
+        email: sup?.email || '—',
+        organization: sup?.categoryLabel || 'Trong trường - ĐH Thủy Lợi',
+        majorName: sup?.department || '',
+        quota: sup?.quota ?? null,
+        maxStudents: sup?.quota ?? null,
         status: 'WARNING',
         message: 'Đã là GVHD trong học kỳ này, hệ thống tự động bỏ qua',
       })
     }
   }
 
+  // Xử lý các dòng thành công
   if (result.successCount > 0) {
-    for (let i = 1; i <= result.successCount; i++) {
+    for (let i = 0; i < result.successCount; i++) {
+      const rowNum = (result.errors?.length || 0) + (result.skippedCount || 0) + i + 1
       rows.push({
-        rowNumber: (result.errors?.length || 0) + (result.skippedCount || 0) + i,
+        rowNumber: rowNum,
+        teacherCode: '—',
+        name: 'Giảng viên mới',
+        academicTitle: '',
         email: '—',
+        organization: 'Trong trường',
+        majorName: '',
+        quota: null,
+        maxStudents: null,
         status: 'SUCCESS',
         message: 'Phân công làm giáo viên hướng dẫn kỳ này thành công',
       })
@@ -231,15 +336,17 @@ interface AdvisorImportResultProps {
   result: AdvisorImportResponse
   parsedFileRows?: ParsedAdvisorExcelRow[]
   lecturers?: SupervisorLecturer[]
+  teachers?: TeacherListItem[]
 }
 
 export function AdvisorImportResult({
   result,
   parsedFileRows = [],
   lecturers = [],
+  teachers = [],
 }: AdvisorImportResultProps) {
   const [rows] = useState<AdvisorImportRowResult[]>(() =>
-    normalizeAdvisorImportRows(result, parsedFileRows, lecturers),
+    normalizeAdvisorImportRows(result, parsedFileRows, lecturers, teachers),
   )
 
   const counts = countRowsByStatus(rows)
@@ -295,7 +402,7 @@ export function AdvisorImportResult({
                         <TableHead className="w-24">Mã GV</TableHead>
                         <TableHead className="min-w-[190px]">Giảng viên</TableHead>
                         <TableHead className="min-w-[180px]">Email</TableHead>
-                        <TableHead className="min-w-[160px]">Đơn vị / Bộ môn</TableHead>
+                        <TableHead className="min-w-[170px]">Đơn vị / Bộ môn</TableHead>
                         <TableHead className="text-right w-24">Hạn mức</TableHead>
                         <TableHead className="min-w-[200px]">
                           {status === 'ERROR' ? 'Lý do lỗi' : 'Thông báo / Trạng thái'}
@@ -306,6 +413,7 @@ export function AdvisorImportResult({
                       {tabRows.map((row, idx) => {
                         const avatarBg = getAvatarColor(row.email || row.name || String(idx))
                         const initials = getAvatarInitials(row.name || row.email || 'GV')
+                        const quotaDisplay = row.maxStudents ?? row.quota
 
                         return (
                           <TableRow key={row.rowNumber || idx} className="hover:bg-slate-50/60 transition">
@@ -354,19 +462,19 @@ export function AdvisorImportResult({
                             <TableCell className="py-2.5 text-xs text-slate-600">
                               <div className="space-y-0.5">
                                 <div className="font-semibold text-slate-700">
-                                  {row.majorName || '—'}
+                                  {row.organization || row.majorName || '—'}
                                 </div>
-                                {row.organization && row.organization !== row.majorName && (
+                                {row.majorName && row.organization && row.organization !== row.majorName && (
                                   <div className="text-[11px] text-slate-400">
-                                    {row.organization}
+                                    {row.majorName}
                                   </div>
                                 )}
                               </div>
                             </TableCell>
 
-                            {/* Hạn mức */}
+                            {/* Hạn mức (maxStudents) */}
                             <TableCell className="py-2.5 text-right tabular-nums font-bold text-slate-800 text-xs">
-                              {row.quota != null ? `${row.quota} SV` : '—'}
+                              {quotaDisplay != null ? `${quotaDisplay} SV` : '—'}
                             </TableCell>
 
                             {/* Thông báo / Lý do */}

@@ -50,15 +50,6 @@ export function useImportTeachers() {
   })
 }
 
-/** Thiết lập hạn mức 1 giáo viên. Thành công → tải lại danh sách và popup chi tiết */
-export function useUpdateTeacherAmount() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: teacherService.updateTeacherAmount,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: departmentTeacherKeys.all }),
-  })
-}
-
 /** Thêm thủ công 1 giáo viên. Thành công (1000 / 1100) → tải lại danh sách và popup chi tiết */
 export function useCreateTeacher() {
   const queryClient = useQueryClient()

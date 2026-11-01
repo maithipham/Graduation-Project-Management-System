@@ -33,32 +33,33 @@ export const API_ENDPOINTS = {
     // GET: các khóa đang có sinh viên trong học kì (dropdown Khóa)
     batch: '/student/batch',
   },
-  // Quản lý giáo viên hướng dẫn (Trưởng bộ môn / Admin)
+  // Quản lý giáo viên (Trưởng bộ môn / Admin)
   departmentTeacher: {
     // GET: danh sách (Page) · POST: thêm thủ công
     base: '/teacher',
     detail: (publicId: string) => `/teacher/${publicId}`,
     import: '/teacher/import',
     activate: (publicId: string) => `/teacher/${publicId}/activate`,
-    // PATCH: thiết lập hạn mức sinh viên được nhận
-    amount: (publicId: string) => `/teacher/${publicId}/amount`,
-    // POST: phân công danh sách giáo viên làm GVHD trong học kỳ
-    advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
-    // POST: import file Excel danh sách GVHD trong học kỳ
-    importAdvisorsExcel: (semesterId: string) => `/semesters/${semesterId}/advisors/import-excel`,
     // GET: danh mục học hàm, học vị (id, code, name, abbreviation)
     academicTitles: '/teacher/academic-titles',
     // GET: danh sách GV khả dụng chưa làm GVHD trong kỳ
     available: '/teacher/available',
+    // POST: phân công danh sách giáo viên làm GVHD trong học kỳ
+    advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
+    // POST: import file Excel danh sách GVHD trong học kỳ
+    importAdvisorsExcel: (semesterId: string) => `/semesters/${semesterId}/advisors/import-excel`,
   },
-  // Hạn mức theo chức danh khoa học (GVHD) & Hạn mức từng GVHD
+  // Quản lý Giáo viên hướng dẫn (GVHD) theo học kỳ
   advisor: {
-    // GET: lấy danh sách hạn mức theo chức danh · PUT: cập nhật
-    quotas: '/advisor/quotas',
-    // PUT / PATCH: Cập nhật hạn mức sinh viên tối đa cho 1 GVHD trong kỳ
+    // GET: lấy danh sách GVHD trong kỳ · POST: phân công GVHD
+    advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
+    // POST: import file Excel danh sách GVHD trong học kỳ
+    importAdvisorsExcel: (semesterId: string) => `/semesters/${semesterId}/advisors/import-excel`,
+    // GET: lấy hạn mức theo chức danh · PUT: cập nhật hạn mức theo chức danh cho kỳ
+    quotas: (semesterId: string) => `/semesters/${semesterId}/advisor-quotas`,
+    // PUT: Cập nhật hạn mức sinh viên tối đa cho 1 GVHD trong kỳ
     updateQuota: (semesterId: string, teacherId: string | number) =>
       `/semesters/${semesterId}/advisors/${teacherId}/quota`,
-    singleQuota: (advisorId: string | number) => `/advisors/${advisorId}/quota`,
   },
   major: {
     base: '/major',

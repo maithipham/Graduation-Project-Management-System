@@ -13,7 +13,7 @@ import {
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
 import { toast } from '@/shared/components/feedback'
-import { useImportAdvisorsExcel } from '../hooks/useTeachers'
+import { useImportAdvisorsExcel, useTeachers } from '../hooks/useTeachers'
 import type { AdvisorImportResponse, SupervisorLecturer } from '../types'
 import { AdvisorImportResult } from './AdvisorImportResult'
 import { parseAdvisorExcelFile, type ParsedAdvisorExcelRow } from '../utils/parseExcelRows'
@@ -51,6 +51,7 @@ export function ImportAdvisorsDialog({
   const [parsedFileRows, setParsedFileRows] = useState<ParsedAdvisorExcelRow[]>([])
 
   const importMutation = useImportAdvisorsExcel()
+  const { data: teachersData } = useTeachers({ page: 0, size: 1000 })
 
   const handleReset = () => {
     setFile(null)
@@ -66,7 +67,7 @@ export function ImportAdvisorsDialog({
     onOpenChange(nextOpen)
   }
 
-  const handleSelectFile = (selected: File) => {
+  const handleSelectFile = async (selected: File) => {
     setFileError(null)
     if (!selected.name.toLowerCase().endsWith('.xlsx')) {
       setFileError('File import phải có định dạng .xlsx')
@@ -77,9 +78,12 @@ export function ImportAdvisorsDialog({
       return
     }
     setFile(selected)
-    void parseAdvisorExcelFile(selected).then((rows) => {
+    try {
+      const rows = await parseAdvisorExcelFile(selected)
       setParsedFileRows(rows)
-    })
+    } catch (err) {
+      console.warn('Lỗi phân tích file Excel tại client:', err)
+    }
   }
 
   const handleSubmit = async () => {
@@ -93,6 +97,13 @@ export function ImportAdvisorsDialog({
     }
 
     try {
+      // Đảm bảo dữ liệu các dòng file Excel đã phân tích xong
+      let currentRows = parsedFileRows
+      if (!currentRows || currentRows.length === 0) {
+        currentRows = await parseAdvisorExcelFile(file)
+        setParsedFileRows(currentRows)
+      }
+
       const data = await importMutation.mutateAsync({
         semesterId,
         file,
@@ -165,6 +176,7 @@ export function ImportAdvisorsDialog({
             result={result}
             parsedFileRows={parsedFileRows}
             lecturers={lecturers}
+            teachers={teachersData?.content ?? []}
           />
         ) : (
           <div className="space-y-4">
@@ -175,7 +187,7 @@ export function ImportAdvisorsDialog({
                 error={fileError ?? undefined}
               >
                 <FileDropZone
-                  file={file}
+                  file={file ?? undefined}
                   accept=".xlsx"
                   hint="Chỉ nhận file .xlsx, tối đa 50MB"
                   onSelect={handleSelectFile}

@@ -12,6 +12,12 @@ export interface SpringPage<T> {
   first: boolean
   last: boolean
   empty: boolean
+  page?: {
+    number: number
+    totalElements: number
+    totalPages: number
+    size?: number
+  }
 }
 
 /**

@@ -9,7 +9,7 @@ import {
 const DEFAULT_RETRY_SUCCESS_MESSAGE = 'Thêm giáo viên thành công'
 
 /**
- * Dòng import → giá trị form sửa. File không có cột hạn mức → để trống cho BE tự gán theo email.
+ * Dòng import → giá trị form sửa.
  * Email ngoài trường thì bỏ ngành (ô Ngành bị khóa, giữ lại thì không xóa được và BE vẫn báo lỗi)
  */
 export function importRowToFormValues(row: TeacherImportRowResult): CreateTeacherFormInput {
@@ -39,8 +39,7 @@ function withValues(
     phone: values.phone,
     organization: values.organization,
     majorName: values.major,
-    // POST /teacher không trả hạn mức: chỉ biết khi người dùng tự nhập
-    amount: values.amount === null ? null : Number(values.amount),
+    amount: values.amount === null || values.amount === undefined ? null : Number(values.amount),
   }
 }
 
@@ -58,11 +57,17 @@ export function applyRetrySuccess(
   }
 }
 
-/** Gửi lại vẫn lỗi → giữ ở tab Lỗi, cập nhật lý do mới */
+/**
+ * Gửi lại bị lỗi (3006, 3007...):
+ * Giữ nguyên trạng thái ERROR, đổi message theo lỗi mới nhất của BE (VD: sửa xong email nhưng trùng SĐT)
+ */
 export function applyRetryError(
   row: TeacherImportRowResult,
   values: CreateTeacherFormValues,
   message: string,
 ): TeacherImportRowResult {
-  return { ...withValues(row, values), status: 'ERROR', message }
+  return {
+    ...withValues(row, values),
+    message,
+  }
 }

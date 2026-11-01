@@ -30,15 +30,17 @@ export interface TeacherListItem {
   fullNameWithTitle?: string | null // "PGS.TS. Trần Quốc Bảo"
   displayName?: string | null
   email: string
-  phone: string | null
+  phone?: string | null
   organization: string // Đơn vị công tác: tên trường (trong trường luôn là "Trường Đại học Thủy lợi")
-  isInternal: boolean
+  isInternal?: boolean
   unitType?: 'INTERNAL' | 'EXTERNAL' | string
   majorName: string | null // Ngành (giáo viên ngoài trường không có ngành)
   majorPublicId?: string | null
   isAssigned?: boolean
   assignmentStatus?: string // "Chưa phân công" | "Đã phân công"
-  amount?: number | null // Hạn mức sinh viên được nhận (nếu có)
+  maxStudents?: number | null
+  /** @deprecated */
+  amount?: number | null
   status: boolean // true = tài khoản đang hoạt động
 }
 
@@ -76,6 +78,8 @@ export interface AssignAdvisorsRequest {
 // Response GET /semesters/{semesterId}/advisors hoặc /advisors (kèm thông tin GV & hạn mức maxStudents từ bảng semester_advisor)
 export interface SemesterAdvisorResponse {
   id?: string | number
+  publicId?: string
+  teacherCode?: string
   semesterAdvisorId?: string | number
   semesterId?: string
   maxStudents?: number
@@ -110,7 +114,8 @@ export interface TeacherCreationRequest {
   major: string // tên hoặc mã ngành; ngoài trường gửi ""
   academicTitleId?: number | null // ID từ bảng academic_title
   academicTitle?: string | null // ThS., TS., PGS.TS., GS.TS.
-  amount?: string | null // hạn mức; null → BE tự gán theo email (20 / 10)
+  /** @deprecated */
+  amount?: string | number | null
 }
 
 /**
@@ -133,7 +138,9 @@ export interface TeacherImportRowResult {
   phone: string
   organization: string
   majorName: string // đúng chuỗi trong ô Ngành (có thể là mã ngành)
-  amount: number | null // SUCCESS: vừa gán · WARNING: giá trị đang có trong DB · ERROR: null
+  maxStudents?: number | null
+  /** @deprecated */
+  amount?: number | null
   status: RowImportStatus
   message: string
 }
@@ -163,8 +170,9 @@ export interface AdvisorImportRowResult {
   majorName?: string
   department?: string
   quota?: number | null
-  amount?: number | null
   maxStudents?: number | null
+  /** @deprecated */
+  amount?: number | null
   status: RowImportStatus
   reason?: string
   message?: string

@@ -26,6 +26,7 @@ const VALUES = {
   phone: '0912345678',
   organization: 'Trường Đại học Thủy lợi',
   major: '7480103',
+  academicTitle: null,
   amount: null,
 }
 
