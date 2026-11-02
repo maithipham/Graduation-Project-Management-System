@@ -288,21 +288,36 @@ function normalizeAdvisorImportRows(
       })
     }
   } else if (result.skippedCount > 0) {
-    // Nếu BE chỉ trả skippedCount, lấy từ danh sách lecturers hiện có để hiển thị đầy đủ thông tin
+    // Nếu BE chỉ trả skippedCount, lấy từ danh sách lecturers hoặc teachers để hiển thị đầy đủ thông tin
     for (let i = 0; i < result.skippedCount; i++) {
       const sup = lecturers[i]
+      const tch = teachers[i]
       const rowNum = (result.errors?.length || 0) + i + 1
+
+      const code = sup?.teacherCode || tch?.teacherCode || '—'
+      const name =
+        sup?.name ||
+        (tch ? `${tch.firstName} ${tch.lastName}`.trim() : '') ||
+        (sup?.email ? sup.email.split('@')[0] : '—')
+      const title = sup?.title || tch?.academicTitle || ''
+      const email = sup?.email || tch?.email || '—'
+      const org =
+        sup?.categoryLabel ||
+        tch?.organization ||
+        (email.toLowerCase().endsWith('@tlu.edu.vn') ? 'Trong trường - ĐH Thủy Lợi' : 'Ngoài trường')
+      const dept = sup?.department || tch?.majorName || ''
+      const quota = sup?.quota ?? tch?.maxStudents ?? null
 
       rows.push({
         rowNumber: rowNum,
-        teacherCode: sup?.teacherCode || '—',
-        name: sup?.name || (sup?.email ? sup.email.split('@')[0] : '—'),
-        academicTitle: sup?.title || '',
-        email: sup?.email || '—',
-        organization: sup?.categoryLabel || 'Trong trường - ĐH Thủy Lợi',
-        majorName: sup?.department || '',
-        quota: sup?.quota ?? null,
-        maxStudents: sup?.quota ?? null,
+        teacherCode: code,
+        name: name,
+        academicTitle: title,
+        email: email,
+        organization: org,
+        majorName: dept,
+        quota: quota,
+        maxStudents: quota,
         status: 'WARNING',
         message: 'Đã là GVHD trong học kỳ này, hệ thống tự động bỏ qua',
       })

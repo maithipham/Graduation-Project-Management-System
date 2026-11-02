@@ -124,3 +124,12 @@ export function useImportAdvisorsExcel() {
     },
   })
 }
+
+/** Ngành mà người dùng hiện tại (Trưởng bộ môn) đang phụ trách quản lý */
+export function useManagedMajor() {
+  return useQuery({
+    queryKey: [...departmentTeacherKeys.all, 'managed-major'] as const,
+    queryFn: teacherService.getManagedMajor,
+    staleTime: 5 * 60 * 1000,
+  })
+}

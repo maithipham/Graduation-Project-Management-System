@@ -1,4 +1,4 @@
-import { X, GraduationCap, FileText } from 'lucide-react'
+import { GraduationCap, FileText } from 'lucide-react'
 import { Dialog, DialogContent } from '@/shared/components/ui'
 import type { SupervisorLecturer, SupervisorStudent } from '../types'
 
@@ -50,13 +50,7 @@ export function AssignedStudentsModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
         </div>
 
         {/* Content list */}

@@ -105,11 +105,23 @@ export async function parseAdvisorExcelFile(
         // Tạo slice buffer sạch (byteOffset = 0) để tương thích tuyệt đối với DecompressionStream
         const cleanChunk = new Uint8Array(bytes.buffer.slice(dataStart, dataStart + entry.compSize))
         if (typeof DecompressionStream !== 'undefined') {
-          const ds = new DecompressionStream('deflate-raw')
-          const blob = new Blob([cleanChunk])
-          const decompressedStream = blob.stream().pipeThrough(ds)
-          const res = new Response(decompressedStream)
-          return await res.text()
+          try {
+            const ds = new DecompressionStream('deflate-raw')
+            const blob = new Blob([cleanChunk])
+            const decompressedStream = blob.stream().pipeThrough(ds)
+            const res = new Response(decompressedStream)
+            return await res.text()
+          } catch {
+            try {
+              const ds = new DecompressionStream('deflate')
+              const blob = new Blob([cleanChunk])
+              const decompressedStream = blob.stream().pipeThrough(ds)
+              const res = new Response(decompressedStream)
+              return await res.text()
+            } catch {
+              return ''
+            }
+          }
         }
       }
       return ''
@@ -210,11 +222,15 @@ export async function parseAdvisorExcelFile(
 
     // Fallback Regex nếu DOMParser không khả dụng
     if (rawRowsMap.size === 0) {
-      const rowRegex = /<row\b[^>]*\br="(\d+)"[^>]*>([\s\S]*?)<\/row>/gi
+      const rowRegex = /<row\b([^>]*)>([\s\S]*?)<\/row>/gi
       let rowMatch: RegExpExecArray | null
+      let autoRowNum = 1
 
       while ((rowMatch = rowRegex.exec(sheetXml)) !== null) {
-        const rowNum = parseInt(rowMatch[1], 10)
+        const rowAttrs = rowMatch[1]
+        const rMatch = /r="(\d+)"/i.exec(rowAttrs)
+        const rowNum = rMatch ? parseInt(rMatch[1], 10) : autoRowNum
+        autoRowNum = rowNum + 1
         const rowContent = rowMatch[2]
         const cells: Record<string, string> = {}
 
@@ -268,28 +284,37 @@ export async function parseAdvisorExcelFile(
       const h = val.toLowerCase().trim()
       if (h.includes('mã') || h.includes('code') || h.includes('id')) {
         colTeacherCode = col
-      } else if (h.includes('họ và tên') || h.includes('họ tên') || h.includes('giảng viên') || h.includes('tên gv')) {
-        colName = col
-      } else if (h.includes('họ và tên đệm') || h.includes('họ đệm') || h.includes('họ')) {
+      } else if (h.includes('họ và tên đệm') || h.includes('họ và đệm') || h.includes('họ đệm') || h === 'họ' || h === 'họ tên đệm' || h.includes('last name')) {
         colLastNamePrefix = col
-      } else if (h === 'tên' || h.includes('tên')) {
+      } else if (h === 'tên' || h === 'tên gọi' || h.startsWith('tên ') || h === 'first name') {
         colFirstName = col
+      } else if (!h.includes('đệm') && (h.includes('họ và tên') || h.includes('họ tên') || h.includes('giảng viên') || h.includes('tên gv') || h.includes('tên giảng viên') || h === 'full name')) {
+        colName = col
       } else if (h.includes('email') || h.includes('mail')) {
         colEmail = col
-      } else if (h.includes('hạn mức') || h.includes('tối đa') || h.includes('số lượng sv') || h.includes('quota') || h.includes('max')) {
+      } else if (h.includes('hạn mức') || h.includes('tối đa') || h.includes('số lượng sv') || h.includes('quota') || h.includes('max') || h.includes('chỉ tiêu')) {
         colQuota = col
-      } else if (h.includes('đơn vị') || h.includes('cơ quan') || h.includes('trường') || h.includes('nơi công tác')) {
+      } else if (h.includes('đơn vị') || h.includes('cơ quan') || h.includes('trường') || h.includes('nơi công tác') || h.includes('organization')) {
         colOrg = col
-      } else if (h.includes('bộ môn') || h.includes('ngành') || h.includes('khoa')) {
+      } else if (h.includes('bộ môn') || h.includes('ngành') || h.includes('khoa') || h.includes('major')) {
         colDept = col
       }
     }
 
-    // Ánh xạ mặc định nếu tiêu đề không nhận diện được
-    if (!colEmail) colEmail = 'D'
-    if (!colName && !colLastNamePrefix) colName = 'C'
-    if (!colTeacherCode) colTeacherCode = 'B'
-    if (!colQuota) colQuota = 'E'
+    if (!colLastNamePrefix && colFirstName && colName) {
+      colLastNamePrefix = colName
+      colName = ''
+    }
+
+    // Ánh xạ mặc định CHỈ KHI hoàn toàn không nhận diện được cột tiêu đề nào
+    if (!colEmail && !colName && !colLastNamePrefix) {
+      colTeacherCode = 'B'
+      colName = 'C'
+      colEmail = 'D'
+      colQuota = 'E'
+    } else {
+      if (!colEmail) colEmail = 'D'
+    }
 
     // 7. Tạo danh sách các dòng dữ liệu GVHD
     const parsedRows: ParsedAdvisorExcelRow[] = []
@@ -302,9 +327,20 @@ export async function parseAdvisorExcelFile(
       const cells = rawRowsMap.get(rowNum) || {}
 
       let teacherCode = (colTeacherCode ? cells[colTeacherCode] : '') || ''
-      let name = (colName ? cells[colName] : '') || ''
-      if (!name && colLastNamePrefix && colFirstName) {
+      let name = ''
+      if (colLastNamePrefix && colFirstName) {
         name = `${cells[colLastNamePrefix] || ''} ${cells[colFirstName] || ''}`.trim()
+      } else if (colName) {
+        name = cells[colName] || ''
+      } else if (colLastNamePrefix) {
+        name = cells[colLastNamePrefix] || ''
+      } else if (colFirstName) {
+        name = cells[colFirstName] || ''
+      }
+
+      // Tránh gán nhầm tên làm mã giáo viên khi không có cột mã
+      if (teacherCode && (teacherCode === cells[colFirstName] || teacherCode === cells[colLastNamePrefix] || teacherCode === name)) {
+        teacherCode = ''
       }
       let email = (colEmail ? cells[colEmail] : '') || ''
       let rawQuota = (colQuota ? cells[colQuota] : '') || ''
@@ -327,10 +363,10 @@ export async function parseAdvisorExcelFile(
       // Nhận diện hạn mức số lượng SV
       let quota: number | null = null
       const parsedQ = parseInt(rawQuota, 10)
-      if (!isNaN(parsedQ) && parsedQ > 0) {
+      if (!isNaN(parsedQ) && parsedQ >= 0) {
         quota = parsedQ
       } else {
-        const foundNum = cellValues.find((v) => /^\d{1,2}$/.test(v) && parseInt(v, 10) > 0 && parseInt(v, 10) <= 50)
+        const foundNum = cellValues.find((v) => /^\d{1,2}$/.test(v) && parseInt(v, 10) >= 0 && parseInt(v, 10) <= 50)
         if (foundNum) quota = parseInt(foundNum, 10)
       }
 

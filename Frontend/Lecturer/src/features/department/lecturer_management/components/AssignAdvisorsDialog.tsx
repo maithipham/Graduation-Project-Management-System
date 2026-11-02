@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { ChevronDown, Trash2, UserCheck, X } from 'lucide-react'
+import { ChevronDown, Trash2, UserCheck } from 'lucide-react'
 import {
   Button,
   Dialog,
@@ -157,14 +157,7 @@ export function AssignAdvisorsDialog({
               </h3>
             </div>
           </div>
-          <button
-            type="button"
-            disabled={assignMutation.isPending}
-            onClick={() => onOpenChange(false)}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
         </div>
 
         {/* Body */}

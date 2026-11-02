@@ -11,7 +11,7 @@ import { TeacherTable } from '../components/TeacherTable'
 import { SemesterScopeFilter } from '../components/SemesterScopeFilter'
 import { getTeacherId } from '../utils/teacherDisplay'
 import { TeacherToolbar } from '../components/TeacherToolbar'
-import { useTeachers } from '../hooks/useTeachers'
+import { useManagedMajor, useTeachers } from '../hooks/useTeachers'
 import { useSemesterScope } from '../hooks/useSemesterScope'
 import type { TeacherSort } from '../types'
 import {
@@ -52,8 +52,9 @@ export default function LecturerManagementPage() {
     onYearChange,
     onSemesterChange,
   } = useSemesterScope()
+  const { data: managedMajor } = useManagedMajor()
   const { data: majors, isPending: majorsLoading } = useMajors()
-  const tbmMajor = majors?.find((m) => m.publicId === filters.majorId)?.name ?? majors?.[0]?.name
+  const tbmMajor = managedMajor?.name ?? majors?.find((m) => m.publicId === filters.majorId)?.name ?? majors?.[0]?.name
 
   // Khi chọn 'all' năm học hoặc học kỳ: hiện tất cả giáo viên
   // Khi chọn kỳ này (kỳ cụ thể): chỉ hiện giáo viên có thể phân công (chưa phân công: isAssigned = false)
@@ -258,6 +259,7 @@ export default function LecturerManagementPage() {
       {/* Popup Chi tiết giảng viên khi bấm vào dòng */}
       <TeacherDetailDialog
         publicId={selectedId}
+        onClose={() => setSelectedId(undefined)}
         onOpenChange={(open) => !open && setSelectedId(undefined)}
       />
     </div>

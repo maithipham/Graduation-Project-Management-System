@@ -2,14 +2,15 @@ import { useState, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Download,
-  Minus,
   Search,
   SlidersHorizontal,
+  Trash2,
   Upload,
   UserCheck,
 } from 'lucide-react'
 import { Button } from '@/shared/components/ui'
 import { toast } from '@/shared/components/feedback'
+import { exportTableToCsv } from '@/shared/utils/excel'
 import { cn } from '@/shared/utils/cn'
 import { getAvatarInitials, getAvatarColor, getTeacherPlainName } from '../utils/teacherDisplay'
 import type { MajorOption, SemesterOption } from '@/features/department/student_management'
@@ -18,6 +19,7 @@ import { QuotaConfigModal } from './QuotaConfigModal'
 import { AssignedStudentsModal } from './AssignedStudentsModal'
 import { SemesterScopeFilter } from './SemesterScopeFilter'
 import { ImportAdvisorsDialog } from './ImportAdvisorsDialog'
+import { RemoveSupervisorDialog } from './RemoveSupervisorDialog'
 
 interface SupervisorOverviewViewProps {
   lecturers: SupervisorLecturer[]
@@ -64,6 +66,7 @@ export function SupervisorOverviewView({
   const [configOpen, setConfigOpen] = useState(false)
   const [importAdvisorOpen, setImportAdvisorOpen] = useState(false)
   const [viewLecturer, setViewLecturer] = useState<SupervisorLecturer | null>(null)
+  const [removeLecturerTarget, setRemoveLecturerTarget] = useState<SupervisorLecturer | null>(null)
 
   const currentSemesterName = useMemo(() => {
     const currentTerm = termsOfYear.find((t) => t.id === selectedSemesterId)
@@ -116,14 +119,61 @@ export function SupervisorOverviewView({
       toast.warning('Không thể loại bỏ giảng viên đang có sinh viên hướng dẫn!')
       return
     }
-    if (window.confirm(`Bạn có chắc muốn loại bỏ giảng viên "${l.name}" khỏi danh sách GVHD của kỳ này?`)) {
-      onRemoveLecturer(l.id)
-      toast.success(`Đã loại bỏ giảng viên ${l.name} khỏi danh sách GVHD của kỳ`)
-    }
+    setRemoveLecturerTarget(l)
+  }
+
+  const handleConfirmRemove = () => {
+    if (!removeLecturerTarget) return
+    onRemoveLecturer(removeLecturerTarget.id)
+    toast.success(`Đã loại bỏ giảng viên ${removeLecturerTarget.name} khỏi danh sách GVHD của kỳ`)
+    setRemoveLecturerTarget(null)
   }
 
   const handleExport = () => {
-    toast.success('Đã xuất danh sách giảng viên hướng dẫn.')
+    if (!filteredLecturers || filteredLecturers.length === 0) {
+      toast.warning('Không có dữ liệu giảng viên hướng dẫn để xuất file')
+      return
+    }
+
+    const headers = [
+      'STT',
+      'Mã GV',
+      'Học vị',
+      'Họ và tên',
+      'Email',
+      'Đơn vị / Bộ môn',
+      'Hạn mức tối đa',
+      'Đã phân công',
+      'Còn lại',
+      'Trạng thái',
+    ]
+
+    const rows = filteredLecturers.map((l, index) => {
+      const remaining = Math.max(0, (l.quota ?? 0) - (l.assigned ?? 0))
+      const statusLabel =
+        (l.assigned ?? 0) >= (l.quota ?? 0)
+          ? 'Đã đủ hạn mức'
+          : (l.assigned ?? 0) > 0
+            ? 'Đang hướng dẫn'
+            : 'Chưa phân công'
+
+      return [
+        index + 1,
+        l.teacherCode || '',
+        l.title || '',
+        l.name || '',
+        l.email || '',
+        l.categoryLabel ? `${l.categoryLabel}${l.department ? ` - ${l.department}` : ''}` : l.department || '',
+        l.quota ?? 0,
+        l.assigned ?? 0,
+        remaining,
+        statusLabel,
+      ]
+    })
+
+    const safeSemesterName = currentSemesterName.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]/g, '_')
+    exportTableToCsv(headers, rows, `danh_sach_gvhd_${safeSemesterName || 'hoc_ky'}_${Date.now()}`)
+    toast.success(`Đã xuất thành công ${filteredLecturers.length} giảng viên hướng dẫn`)
   }
 
   return (
@@ -397,14 +447,23 @@ export function SupervisorOverviewView({
                         className="py-3.5 px-3 text-center whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {assignedCount === 0 && (
+                        {assignedCount === 0 ? (
                           <button
                             type="button"
                             onClick={(e) => handleRemove(e, l)}
-                            title="Loại bỏ khỏi danh sách GVHD kỳ này (chỉ khi 0 SV)"
+                            title="Loại bỏ khỏi danh sách GVHD kỳ này"
                             className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition mx-auto cursor-pointer"
                           >
-                            <Minus className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            title="Không thể loại bỏ giảng viên đang có sinh viên hướng dẫn"
+                            className="w-7 h-7 rounded-lg text-slate-300 cursor-not-allowed flex items-center justify-center mx-auto"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </td>
@@ -504,6 +563,13 @@ export function SupervisorOverviewView({
         students={students}
         open={Boolean(viewLecturer)}
         onOpenChange={(open) => !open && setViewLecturer(null)}
+      />
+      <RemoveSupervisorDialog
+        lecturer={removeLecturerTarget}
+        semesterName={currentSemesterName}
+        open={Boolean(removeLecturerTarget)}
+        onClose={() => setRemoveLecturerTarget(null)}
+        onConfirm={handleConfirmRemove}
       />
     </div>
   )

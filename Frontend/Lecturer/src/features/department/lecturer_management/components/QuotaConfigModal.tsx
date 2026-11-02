@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { SlidersHorizontal, X, Check, Loader2 } from 'lucide-react'
+import { SlidersHorizontal, Check, Loader2 } from 'lucide-react'
 import { Button, Dialog, DialogContent } from '@/shared/components/ui'
 import { toast } from '@/shared/components/feedback'
 import { supervisorService } from '../services/supervisor.service'
@@ -92,13 +92,7 @@ export function QuotaConfigModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
         </div>
 
         {/* Body */}

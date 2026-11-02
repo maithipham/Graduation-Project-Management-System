@@ -62,7 +62,7 @@ export function TeacherDetailDialog({ publicId, onClose, onOpenChange }: Teacher
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={() => { onClose?.(); onOpenChange?.(false); }}>
             Đóng
           </Button>
         </DialogFooter>

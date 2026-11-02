@@ -1,6 +1,7 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse, SpringPage } from '@/shared/types'
 import { compactParams, toSpringPage, type RawSpringPage } from '@/shared/utils'
+import type { MajorOption } from '@/features/department/student_management'
 import type {
   AcademicTitle,
   AdvisorImportResponse,
@@ -138,5 +139,11 @@ export const teacherService = {
       failedCount: 0,
       errors: [],
     }
+  },
+
+  // GET /teacher/managed-major — Lấy ngành mà TBM phụ trách quản lý
+  async getManagedMajor(): Promise<MajorOption | null> {
+    const res = await apiClient.get<ApiResponse<MajorOption | null>>('/teacher/managed-major')
+    return res.data.data
   },
 }
