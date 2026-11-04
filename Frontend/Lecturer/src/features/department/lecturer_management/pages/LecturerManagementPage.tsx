@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Upload, UserCheck } from 'lucide-react'
 import { Button } from '@/shared/components/ui'
 import { useDebounce } from '@/shared/hooks'
@@ -56,6 +56,31 @@ export default function LecturerManagementPage() {
   const { data: majors, isPending: majorsLoading } = useMajors()
   const tbmMajor = managedMajor?.name ?? majors?.find((m) => m.publicId === filters.majorId)?.name ?? majors?.[0]?.name
 
+  const [hasInitializedMajor, setHasInitializedMajor] = useState(false)
+
+  // Mới vào trang tự động gán bộ lọc ngành theo ngành phụ trách của Trưởng bộ môn
+  useEffect(() => {
+    if (!hasInitializedMajor && managedMajor) {
+      const targetPublicId =
+        managedMajor.publicId ||
+        majors?.find((m) => m.name.toLowerCase() === managedMajor.name?.toLowerCase())?.publicId
+
+      if (targetPublicId) {
+        setFilters((prev) => {
+          if (!prev.majorId) {
+            return {
+              ...prev,
+              majorId: targetPublicId,
+              majorName: managedMajor.name || '',
+            }
+          }
+          return prev
+        })
+        setHasInitializedMajor(true)
+      }
+    }
+  }, [managedMajor, majors, hasInitializedMajor])
+
   // Khi chọn 'all' năm học hoặc học kỳ: hiện tất cả giáo viên
   // Khi chọn kỳ này (kỳ cụ thể): chỉ hiện giáo viên có thể phân công (chưa phân công: isAssigned = false)
   const isAllScope = selectedSemesterId === 'all' || selectedYear === 'all'
@@ -104,7 +129,16 @@ export default function LecturerManagementPage() {
     })
   }, [displayData, selectedIds])
 
-  const filtered = hasActiveTeacherFilters(filters)
+  const filtered = useMemo(() => {
+    const isKeyword = Boolean((filters.keyword ?? filters.name ?? '').trim())
+    const isOrg = filters.organization !== ''
+    const isUnit = Boolean(filters.unitType) && filters.unitType !== 'ALL'
+    const isAssigned = filters.isAssigned !== undefined && filters.isAssigned !== false
+    const isMajorDifferent = managedMajor?.publicId
+      ? filters.majorId !== managedMajor.publicId
+      : Boolean(filters.majorId)
+    return isKeyword || isOrg || isUnit || isAssigned || isMajorDifferent
+  }, [filters, managedMajor])
 
   // Đổi bất kỳ bộ lọc nào → quay về trang đầu
   const updateFilters = (patch: Partial<TeacherFilters>) => {
@@ -113,7 +147,13 @@ export default function LecturerManagementPage() {
   }
 
   const resetFilters = () => {
-    setFilters(DEFAULT_TEACHER_FILTERS)
+    const defaultMajorId = managedMajor?.publicId || ''
+    const defaultMajorName = managedMajor?.name || ''
+    setFilters({
+      ...DEFAULT_TEACHER_FILTERS,
+      majorId: defaultMajorId,
+      majorName: defaultMajorName,
+    })
     setSort(undefined)
     setPage(0)
   }

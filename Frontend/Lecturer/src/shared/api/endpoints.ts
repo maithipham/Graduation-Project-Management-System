@@ -61,6 +61,18 @@ export const API_ENDPOINTS = {
     updateQuota: (semesterId: string, teacherId: string | number) =>
       `/semesters/${semesterId}/advisors/${teacherId}/quota`,
   },
+  // Phân công Giảng viên Hướng dẫn (TBM Workspace & Actions)
+  advisorAssignment: {
+    workspace: (semesterId: string) => `/semesters/${semesterId}/advisor-assignments`,
+    approve: (semesterId: string) => `/semesters/${semesterId}/advisor-assignments/approve`,
+    reject: (semesterId: string) => `/semesters/${semesterId}/advisor-assignments/reject`,
+    assign: (semesterId: string) => `/semesters/${semesterId}/advisor-assignments/assign`,
+    changeSupervisor: (semesterId: string, studentPublicId: string) =>
+      `/semesters/${semesterId}/advisor-assignments/students/${studentPublicId}/supervisor`,
+    changeCoSupervisor: (semesterId: string, studentPublicId: string) =>
+      `/semesters/${semesterId}/advisor-assignments/students/${studentPublicId}/co-supervisor`,
+    toggleLock: (semesterId: string) => `/semesters/${semesterId}/advisor-assignments/lock-status`,
+  },
   major: {
     base: '/major',
   },

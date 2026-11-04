@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Download,
@@ -15,6 +15,7 @@ import { cn } from '@/shared/utils/cn'
 import { getAvatarInitials, getAvatarColor, getTeacherPlainName } from '../utils/teacherDisplay'
 import type { MajorOption, SemesterOption } from '@/features/department/student_management'
 import type { SupervisorLecturer, SupervisorStudent } from '../types'
+import { useManagedMajor } from '../hooks/useTeachers'
 import { QuotaConfigModal } from './QuotaConfigModal'
 import { AssignedStudentsModal } from './AssignedStudentsModal'
 import { SemesterScopeFilter } from './SemesterScopeFilter'
@@ -54,10 +55,20 @@ export function SupervisorOverviewView({
   onRemoveLecturer,
   onOpenWorkspace,
 }: SupervisorOverviewViewProps) {
+  const { data: managedMajor } = useManagedMajor()
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('all')
+  const [hasInitializedDept, setHasInitializedDept] = useState(false)
   const [unitFilter, setUnitFilter] = useState<'all' | 'internal' | 'external'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'unassigned'>('all')
+
+  // Mới vào trang tự động gán bộ lọc ngành theo ngành phụ trách của Trưởng bộ môn
+  useEffect(() => {
+    if (!hasInitializedDept && managedMajor?.name) {
+      setDeptFilter(managedMajor.name)
+      setHasInitializedDept(true)
+    }
+  }, [managedMajor, hasInitializedDept])
 
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(15)
@@ -69,9 +80,11 @@ export function SupervisorOverviewView({
   const [removeLecturerTarget, setRemoveLecturerTarget] = useState<SupervisorLecturer | null>(null)
 
   const currentSemesterName = useMemo(() => {
-    const currentTerm = termsOfYear.find((t) => t.id === selectedSemesterId)
+    const currentTerm = termsOfYear.find(
+      (t) => t.publicId === selectedSemesterId || String(t.id) === selectedSemesterId,
+    )
     if (currentTerm) {
-      return `${currentTerm.name} (${selectedYear})`
+      return `${currentTerm.term || currentTerm.name} (${selectedYear})`
     }
     return selectedSemesterId === 'all' ? 'Tất cả học kỳ' : 'Kỳ hiện tại'
   }, [termsOfYear, selectedSemesterId, selectedYear])
@@ -93,8 +106,10 @@ export function SupervisorOverviewView({
         if (l.category !== 'univ_ext') return false
       }
 
-      if (deptFilter !== 'all' && l.category !== 'univ_ext') {
-        if (!l.department.toLowerCase().includes(deptFilter.toLowerCase())) return false
+      if (deptFilter !== 'all') {
+        const deptStr = (l.department || '').toLowerCase()
+        const filterStr = deptFilter.toLowerCase()
+        if (!deptStr.includes(filterStr) && !filterStr.includes(deptStr)) return false
       }
 
       if (statusFilter === 'active' && (l.assigned || 0) === 0) return false
@@ -574,4 +589,3 @@ export function SupervisorOverviewView({
     </div>
   )
 }
-

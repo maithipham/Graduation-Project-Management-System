@@ -223,6 +223,9 @@ export interface SupervisorLecturer {
 
 export interface SupervisorStudent {
   id: string
+  studentPublicId?: string
+  registrationPublicId?: string | null
+  topicPublicId?: string | null
   code: string
   name: string
   className: string
@@ -235,6 +238,95 @@ export interface SupervisorStudent {
   status: 'received' | 'unassigned' | 'approved'
   year: string
   semester: string
+}
+
+export interface AdvisorAssignmentCounts {
+  received: number
+  unassigned: number
+  approved: number
+}
+
+export interface AdvisorSimpleItem {
+  teacherPublicId: string
+  teacherCode?: string
+  fullName: string
+  title?: string
+  email?: string
+  phone?: string
+  department?: string
+  organization?: string
+  category?: 'INTERNAL' | 'DEPT_EXT' | 'UNIV_EXT' | string
+  categoryLabel?: string
+}
+
+export interface StudentAssignmentItem {
+  studentPublicId: string
+  topicPublicId?: string | null
+  registrationPublicId?: string | null
+  studentCode: string
+  fullName: string
+  className?: string
+  batch?: string
+  majorName?: string
+  topicName?: string | null
+  topicDescription?: string | null
+  status: 'RECEIVED' | 'UNASSIGNED' | 'APPROVED' | string
+  supervisor?: AdvisorSimpleItem | null
+  coSupervisor?: AdvisorSimpleItem | null
+  assignedAt?: string | null
+}
+
+export interface LecturerAssignmentItem {
+  teacherPublicId: string
+  teacherCode?: string
+  fullName: string
+  title?: string
+  email: string
+  department?: string
+  organization?: string
+  category: 'INTERNAL' | 'DEPT_EXT' | 'UNIV_EXT' | string
+  categoryLabel?: string
+  quota: number
+  assignedCount: number
+  isFull: boolean
+}
+
+export interface AdvisorAssignmentWorkspaceResponse {
+  semesterPublicId: string
+  semesterName: string
+  academicYear: string
+  term: string
+  isLocked: boolean
+  lockedAt?: string | null
+  lockedByName?: string | null
+  counts: AdvisorAssignmentCounts
+  students: StudentAssignmentItem[]
+  lecturers: LecturerAssignmentItem[]
+}
+
+export interface AssignAdvisorPayload {
+  studentPublicIds: string[]
+  teacherPublicId: string
+}
+
+export interface ApproveRegistrationsPayload {
+  registrationPublicIds: string[]
+}
+
+export interface RejectRegistrationsPayload {
+  registrationPublicIds: string[]
+}
+
+export interface ChangeSupervisorPayload {
+  newTeacherPublicId: string
+}
+
+export interface ChangeCoSupervisorPayload {
+  coTeacherPublicId?: string | null
+}
+
+export interface ToggleLockAssignmentPayload {
+  isLocked: boolean
 }
 
 export interface TitleQuotaConfig {

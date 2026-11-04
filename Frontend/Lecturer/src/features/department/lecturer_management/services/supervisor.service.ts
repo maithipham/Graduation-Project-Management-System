@@ -8,6 +8,9 @@ import type {
   SupervisorStudent,
   TitleQuotaConfig,
   SemesterAdvisorResponse,
+  AdvisorAssignmentWorkspaceResponse,
+  StudentAssignmentItem,
+  LecturerAssignmentItem,
 } from '../types'
 import type { StudentListItem } from '@/features/department/student_management/types'
 
@@ -107,6 +110,7 @@ export function toSupervisorLecturerFromAdvisor(
   students: StudentListItem[] = [],
   semesterName = '',
   year = '',
+  managedMajorName = '',
 ): SupervisorLecturer {
   const teacher = item.teacher
   const advisorId = item.id ?? item.semesterAdvisorId
@@ -157,6 +161,25 @@ export function toSupervisorLecturerFromAdvisor(
         ? item.assignedStudents
         : matchedStudentCount
 
+  let category: 'internal' | 'dept_ext' | 'univ_ext' = 'internal'
+  let categoryLabel = 'Trong bộ môn'
+
+  if (!isInternal) {
+    category = 'univ_ext'
+    categoryLabel = 'Ngoài trường'
+  } else if (
+    managedMajorName &&
+    department &&
+    !department.toLowerCase().includes(managedMajorName.toLowerCase()) &&
+    !managedMajorName.toLowerCase().includes(department.toLowerCase())
+  ) {
+    category = 'dept_ext'
+    categoryLabel = 'Ngoài bộ môn'
+  } else {
+    category = 'internal'
+    categoryLabel = 'Trong bộ môn'
+  }
+
   return {
     id,
     advisorId,
@@ -167,8 +190,8 @@ export function toSupervisorLecturerFromAdvisor(
     name: rawName,
     title,
     email,
-    category: isInternal ? 'internal' : 'univ_ext',
-    categoryLabel: isInternal ? 'Trong bộ môn' : 'Ngoài trường',
+    category,
+    categoryLabel,
     department,
     quota,
     assigned,
@@ -214,20 +237,192 @@ export function toSupervisorStudent(
   }
 }
 
+export function toSupervisorStudentFromWorkspace(
+  item: StudentAssignmentItem,
+  semesterName = '',
+  year = '',
+): SupervisorStudent {
+  const rawStatus = (item.status || 'UNASSIGNED').toUpperCase()
+  let status: 'received' | 'unassigned' | 'approved' = 'unassigned'
+  if (rawStatus === 'RECEIVED') {
+    status = 'received'
+  } else if (rawStatus === 'APPROVED') {
+    status = 'approved'
+  }
+
+  return {
+    id: item.studentPublicId,
+    studentPublicId: item.studentPublicId,
+    registrationPublicId: item.registrationPublicId,
+    topicPublicId: item.topicPublicId,
+    code: item.studentCode,
+    name: item.fullName,
+    className: item.className || '',
+    topic: item.topicName || '',
+    supervisorId: item.supervisor?.teacherPublicId || null,
+    supervisorName: item.supervisor?.fullName || null,
+    supervisor2Id: item.coSupervisor?.teacherPublicId || null,
+    supervisor2Name: item.coSupervisor?.fullName || null,
+    assignedTime: item.assignedAt || null,
+    status,
+    year,
+    semester: semesterName,
+  }
+}
+
+export function toSupervisorLecturerFromWorkspace(
+  item: LecturerAssignmentItem,
+  semesterName = '',
+  year = '',
+  managedMajorName = '',
+): SupervisorLecturer {
+  const cat = (item.category || '').toLowerCase()
+  let category: 'internal' | 'dept_ext' | 'univ_ext' = 'internal'
+  let categoryLabel = item.categoryLabel || ''
+
+  if (cat === 'univ_ext' || item.isInternal === false) {
+    category = 'univ_ext'
+    categoryLabel = categoryLabel || 'Ngoài trường'
+  } else if (cat === 'dept_ext') {
+    category = 'dept_ext'
+    categoryLabel = categoryLabel || 'Ngoài bộ môn'
+  } else if (cat === 'internal') {
+    category = 'internal'
+    categoryLabel = categoryLabel || 'Trong bộ môn'
+  } else {
+    const dept = item.department || item.organization || ''
+    if (
+      managedMajorName &&
+      dept &&
+      !dept.toLowerCase().includes(managedMajorName.toLowerCase()) &&
+      !managedMajorName.toLowerCase().includes(dept.toLowerCase())
+    ) {
+      category = 'dept_ext'
+      categoryLabel = categoryLabel || 'Ngoài bộ môn'
+    } else {
+      category = 'internal'
+      categoryLabel = categoryLabel || 'Trong bộ môn'
+    }
+  }
+
+  return {
+    id: item.teacherPublicId,
+    teacherPublicId: item.teacherPublicId,
+    teacherCode: item.teacherCode,
+    name: item.fullName,
+    title: item.title || '',
+    email: item.email,
+    category,
+    categoryLabel:
+      categoryLabel ||
+      (category === 'univ_ext'
+        ? 'Ngoài trường'
+        : category === 'dept_ext'
+          ? 'Ngoài bộ môn'
+          : 'Trong bộ môn'),
+    department: item.department || item.organization || 'Bộ môn',
+    quota: item.quota,
+    assigned: item.assignedCount,
+    year,
+    semester: semesterName,
+    status: 'active',
+  }
+}
+
 export const supervisorService = {
+  // GET /semesters/{semesterId}/advisor-assignments: Lấy dữ liệu phân công 2 cột (Workspace)
+  async getWorkspace(semesterId?: string): Promise<AdvisorAssignmentWorkspaceResponse | null> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    try {
+      const res = await apiClient.get<ApiResponse<AdvisorAssignmentWorkspaceResponse>>(
+        API_ENDPOINTS.advisorAssignment.workspace(cleanSemesterId),
+        { skipErrorToast: true },
+      )
+      return res.data?.data || null
+    } catch {
+      return null
+    }
+  },
+
+  // PUT /semesters/{semesterId}/advisor-assignments/approve: Phê duyệt sinh viên ở tab Đã nhận GV
+  async approveRegistrations(semesterId: string, registrationPublicIds: string[]): Promise<void> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.approve(cleanSemesterId),
+      { registrationPublicIds },
+    )
+  },
+
+  // PUT /semesters/{semesterId}/advisor-assignments/reject: Từ chối phân công ở tab Đã nhận GV
+  async rejectRegistrations(semesterId: string, registrationPublicIds: string[]): Promise<void> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.reject(cleanSemesterId),
+      { registrationPublicIds },
+    )
+  },
+
+  // POST /semesters/{semesterId}/advisor-assignments/assign: Phân công trực tiếp sinh viên cho GV
+  async assignAdvisor(
+    semesterId: string,
+    studentPublicIds: string[],
+    teacherPublicId: string,
+  ): Promise<void> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.post<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.assign(cleanSemesterId),
+      { studentPublicIds, teacherPublicId },
+    )
+  },
+
+  // PUT /semesters/{semesterId}/advisor-assignments/students/{studentPublicId}/supervisor: Đổi GVHD 1
+  async changeSupervisor(
+    semesterId: string,
+    studentPublicId: string,
+    newTeacherPublicId: string,
+  ): Promise<void> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.changeSupervisor(cleanSemesterId, studentPublicId),
+      { newTeacherPublicId },
+    )
+  },
+
+  // PUT /semesters/{semesterId}/advisor-assignments/students/{studentPublicId}/co-supervisor: Đổi / Gỡ GVHD 2
+  async changeCoSupervisor(
+    semesterId: string,
+    studentPublicId: string,
+    coTeacherPublicId?: string | null,
+  ): Promise<void> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.changeCoSupervisor(cleanSemesterId, studentPublicId),
+      { coTeacherPublicId: coTeacherPublicId || null },
+    )
+  },
+
+  // PUT /semesters/{semesterId}/advisor-assignments/lock-status: Khóa / Mở khóa danh sách phân công
+  async toggleLockAssignment(semesterId: string, isLocked: boolean): Promise<void> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.toggleLock(cleanSemesterId),
+      { isLocked },
+    )
+  },
   // GET /semesters/{semesterId}/advisors: Lấy danh sách GVHD trong kỳ (từ bảng semester_advisor)
   async getAssignedAdvisors(
     semesterId?: string,
     keyword?: string,
   ): Promise<SemesterAdvisorResponse[]> {
-    const resolvedSemesterId =
-      semesterId && semesterId !== 'all' && semesterId !== 'ALL' ? semesterId : 'all'
+    if (!semesterId || semesterId === 'all' || semesterId === 'ALL') {
+      return []
+    }
     const params: Record<string, string> = {}
     if (keyword) params.keyword = keyword
 
     try {
       const res = await apiClient.get<ApiResponse<SemesterAdvisorResponse[]>>(
-        API_ENDPOINTS.advisor.advisors(resolvedSemesterId),
+        API_ENDPOINTS.advisor.advisors(semesterId),
         {
           params,
           skipErrorToast: true,
@@ -246,58 +441,36 @@ export const supervisorService = {
     return []
   },
 
-  async getSupervisors(semesterId?: string, keyword?: string): Promise<SupervisorLecturer[]> {
-    const resolvedSemesterId = semesterId === 'all' ? undefined : semesterId
+  async getSupervisors(
+    semesterId?: string,
+    keyword?: string,
+    managedMajorName?: string,
+  ): Promise<SupervisorLecturer[]> {
+    if (!semesterId || semesterId === 'all') {
+      return []
+    }
 
     try {
-      const [advisors, studentsPage] = await Promise.all([
-        supervisorService.getAssignedAdvisors(resolvedSemesterId, keyword),
-        resolvedSemesterId
-          ? studentService
-              .getStudents(
-                { semesterId: resolvedSemesterId, page: 0, size: 100 },
-                { skipErrorToast: true },
-              )
-              .catch(() => ({ content: [] }))
-          : Promise.resolve({ content: [] }),
+      const [advisors, studentsPage, fetchedMajor] = await Promise.all([
+        supervisorService.getAssignedAdvisors(semesterId, keyword),
+        studentService
+          .getStudents(
+            { semesterId, page: 0, size: 100 },
+            { skipErrorToast: true },
+          )
+          .catch(() => ({ content: [] })),
+        managedMajorName ? Promise.resolve(null) : teacherService.getManagedMajor().catch(() => null),
       ])
+
+      const finalMajorName = managedMajorName || fetchedMajor?.name || ''
 
       if (advisors.length > 0) {
         return advisors.map((item) =>
-          toSupervisorLecturerFromAdvisor(item, studentsPage.content),
+          toSupervisorLecturerFromAdvisor(item, studentsPage.content, '', '', finalMajorName),
         )
       }
     } catch {
-      // Bỏ qua lỗi, tiếp tục fallback
-    }
-
-    // Fallback: nếu /advisors chưa có dữ liệu, gọi teacherService.getTeachers với isAssigned=true
-    if (resolvedSemesterId) {
-      try {
-        const [teachersPage, studentsPage] = await Promise.all([
-          teacherService.getTeachers(
-            {
-              semesterId: resolvedSemesterId,
-              isAssigned: true,
-              keyword,
-              page: 0,
-              size: 100,
-            },
-            { skipErrorToast: true },
-          ),
-          studentService
-            .getStudents(
-              { semesterId: resolvedSemesterId, page: 0, size: 100 },
-              { skipErrorToast: true },
-            )
-            .catch(() => ({ content: [] })),
-        ])
-        return teachersPage.content.map((t) =>
-          toSupervisorLecturer(t, studentsPage.content),
-        )
-      } catch (fallbackErr) {
-        console.warn('Fallback teacherService.getTeachers also failed:', fallbackErr)
-      }
+      // Bỏ qua lỗi
     }
 
     return []
