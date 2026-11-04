@@ -3,6 +3,7 @@ import { Plus, Upload, UserCheck } from 'lucide-react'
 import { Button } from '@/shared/components/ui'
 import { useDebounce } from '@/shared/hooks'
 import { useMajors } from '@/features/department/student_management'
+import type { SpringPage } from '@/shared/types'
 import { AssignAdvisorsDialog } from '../components/AssignAdvisorsDialog'
 import { CreateTeacherDialog } from '../components/CreateTeacherDialog'
 import { ImportTeacherDialog } from '../components/ImportTeacherDialog'
@@ -11,12 +12,11 @@ import { TeacherTable } from '../components/TeacherTable'
 import { SemesterScopeFilter } from '../components/SemesterScopeFilter'
 import { getTeacherId } from '../utils/teacherDisplay'
 import { TeacherToolbar } from '../components/TeacherToolbar'
-import { useManagedMajor, useTeachers } from '../hooks/useTeachers'
+import { useManagedMajor, useAllTeachers } from '../hooks/useTeachers'
 import { useSemesterScope } from '../hooks/useSemesterScope'
-import type { TeacherSort } from '../types'
+import type { TeacherSort, TeacherSortField, TeacherListItem } from '../types'
 import {
   DEFAULT_TEACHER_FILTERS,
-  hasActiveTeacherFilters,
   toOrganizationParams,
   type TeacherFilters,
 } from '../utils/teacherFilters'
@@ -81,19 +81,23 @@ export default function LecturerManagementPage() {
     }
   }, [managedMajor, majors, hasInitializedMajor])
 
-  // Khi chọn 'all' năm học hoặc học kỳ: hiện tất cả giáo viên
-  // Khi chọn kỳ này (kỳ cụ thể): chỉ hiện giáo viên có thể phân công (chưa phân công: isAssigned = false)
+  // Khi chọn 'all' năm học hoặc học kỳ: không truyền semesterId cụ thể
   const isAllScope = selectedSemesterId === 'all' || selectedYear === 'all'
   const querySemesterId = isAllScope ? undefined : (selectedSemesterId || activeSemesterId)
 
-  const effectiveIsAssigned =
-    filters.isAssigned !== undefined
-      ? filters.isAssigned
-      : isAllScope
-        ? undefined
-        : false
+  // Bộ lọc trạng thái phân công:
+  // - undefined: "Tất cả trạng thái" (hiển thị đầy đủ cả Đã phân công và Chưa phân công)
+  // - false: "Chưa phân công"
+  // - true: "Đã phân công"
+  const effectiveIsAssigned = filters.isAssigned
 
-  const { data, isPending, isError, isPlaceholderData } = useTeachers({
+  // Gọi API /teacher/all lấy toàn bộ danh sách giáo viên hệ thống không phân trang
+  const {
+    data: rawTeachers = [],
+    isPending,
+    isError,
+    isPlaceholderData,
+  } = useAllTeachers({
     semesterId: querySemesterId,
     keyword: keyword || undefined,
     name: keyword || undefined,
@@ -102,38 +106,85 @@ export default function LecturerManagementPage() {
     ...toOrganizationParams(filters.organization),
     majorName: filters.majorName || undefined,
     isAssigned: effectiveIsAssigned,
-    page,
-    size: pageSize,
-    sort,
   })
 
-  // Nếu ở kỳ này: chỉ hiện giáo viên có thể phân công (lọc bỏ các giáo viên đã phân công)
-  // Nếu ở tất cả: hiện toàn bộ giáo viên
-  const displayData = useMemo(() => {
-    if (!data) return undefined
-    if (isAllScope || filters.isAssigned !== undefined) return data
-    return {
-      ...data,
-      content: data.content.filter(
-        (t) => t.isAssigned !== true && t.assignmentStatus !== 'Đã phân công',
-      ),
+  // Lọc danh sách và sắp xếp
+  const filteredList = useMemo(() => {
+    if (!rawTeachers) return []
+    let list = rawTeachers
+
+    // Lọc theo trạng thái phân công (nếu người dùng chọn cụ thể Chưa phân công hoặc Đã phân công)
+    if (filters.isAssigned !== undefined) {
+      list = list.filter((t) =>
+        filters.isAssigned
+          ? t.isAssigned === true || t.assignmentStatus === 'Đã phân công'
+          : t.isAssigned !== true && t.assignmentStatus !== 'Đã phân công',
+      )
     }
-  }, [data, isAllScope, filters.isAssigned])
+
+    if (sort) {
+      const [field, order] = (sort as string).split(',') as [TeacherSortField, 'asc' | 'desc']
+      list = [...list].sort((a, b) => {
+        const valA = (a as any)[field] ?? ''
+        const valB = (b as any)[field] ?? ''
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return order === 'asc'
+            ? valA.localeCompare(valB, 'vi')
+            : valB.localeCompare(valA, 'vi')
+        }
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return order === 'asc' ? valA - valB : valB - valA
+        }
+        return 0
+      })
+    }
+
+    return list
+  }, [rawTeachers, filters.isAssigned, sort])
+
+  // Phân trang phía giao diện (Client-side pagination)
+  const totalElements = filteredList.length
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize))
+  const currentPage = Math.min(page, Math.max(0, totalPages - 1))
+
+  const pagedContent = useMemo(() => {
+    return filteredList.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+  }, [filteredList, currentPage, pageSize])
+
+  const displayData = useMemo<SpringPage<TeacherListItem>>(() => {
+    return {
+      content: pagedContent,
+      totalElements,
+      totalPages,
+      number: currentPage,
+      size: pageSize,
+      numberOfElements: pagedContent.length,
+      first: currentPage === 0,
+      last: currentPage >= totalPages - 1,
+      empty: filteredList.length === 0,
+      page: {
+        number: currentPage,
+        size: pageSize,
+        totalElements,
+        totalPages,
+      },
+    }
+  }, [pagedContent, currentPage, pageSize, totalElements, totalPages, filteredList.length])
 
   const selectedTeachers = useMemo(() => {
-    if (!displayData) return []
-    return displayData.content.filter((t, idx) => {
+    if (!filteredList) return []
+    return filteredList.filter((t, idx) => {
       const rawId = getTeacherId(t)
       const id = typeof rawId === 'number' ? rawId : t.id ?? idx + 1
       return selectedIds.has(id)
     })
-  }, [displayData, selectedIds])
+  }, [filteredList, selectedIds])
 
   const filtered = useMemo(() => {
     const isKeyword = Boolean((filters.keyword ?? filters.name ?? '').trim())
     const isOrg = filters.organization !== ''
     const isUnit = Boolean(filters.unitType) && filters.unitType !== 'ALL'
-    const isAssigned = filters.isAssigned !== undefined && filters.isAssigned !== false
+    const isAssigned = filters.isAssigned !== undefined
     const isMajorDifferent = managedMajor?.publicId
       ? filters.majorId !== managedMajor.publicId
       : Boolean(filters.majorId)
@@ -177,6 +228,7 @@ export default function LecturerManagementPage() {
       setSelectedIds(new Set())
     } else {
       const ids = displayData.content
+        .filter((t) => !t.isAssigned)
         .map((t, idx) => {
           const rawId = getTeacherId(t)
           return typeof rawId === 'number' ? rawId : t.id ?? idx + 1

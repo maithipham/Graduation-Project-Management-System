@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { teacherService } from '../services/teacher.service'
-import type { TeacherListParams } from '../types'
+import type { TeacherListParams, TeacherAllListParams } from '../types'
 
 // Bộ "tên cache" của feature. Sau khi ghi (hạn mức/import/thêm/kích hoạt/phân công) thì invalidate theo các key này
 export const departmentTeacherKeys = {
@@ -15,6 +15,8 @@ export const departmentTeacherKeys = {
   academicTitles: () => [...departmentTeacherKeys.all, 'academic-titles'] as const,
   available: (params: { semesterId?: string; keyword?: string }) =>
     [...departmentTeacherKeys.all, 'available', params] as const,
+  allList: (params: TeacherAllListParams) =>
+    [...departmentTeacherKeys.all, 'all-list', params] as const,
   lists: () => [...departmentTeacherKeys.all, 'list'] as const,
   list: (params: TeacherListParams) => [...departmentTeacherKeys.lists(), params] as const,
   detail: (publicId: string | undefined) =>
@@ -26,6 +28,15 @@ export function useTeachers(params: TeacherListParams) {
   return useQuery({
     queryKey: departmentTeacherKeys.list(params),
     queryFn: () => teacherService.getTeachers(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Lấy toàn bộ danh sách giáo viên không phân trang từ backend (GET /teacher/all) */
+export function useAllTeachers(params: TeacherAllListParams) {
+  return useQuery({
+    queryKey: departmentTeacherKeys.allList(params),
+    queryFn: () => teacherService.getAllTeachersList(params),
     placeholderData: keepPreviousData,
   })
 }

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback'
+import { cn } from '@/shared/utils/cn'
 import { useMajors } from '@/features/department/student_management'
 import {
   supervisorService,
@@ -78,15 +79,15 @@ export default function SupervisorAssignmentPage() {
     retry: false,
   })
 
-  // Fallback nếu workspace chưa có dữ liệu (chỉ lấy GVHD được phân công trong kỳ này)
+  // Query danh sách tất cả GVHD của học kỳ này từ bảng semester_advisors cho màn Overview
   const { data: remoteLecturers = [], isLoading: lecturersLoading } = useQuery({
     queryKey: ['supervisors', effectiveSemesterId, managedMajor?.name],
     queryFn: () => supervisorService.getSupervisors(effectiveSemesterId, undefined, managedMajor?.name),
-    enabled: !workspace && !!effectiveSemesterId,
+    enabled: !!effectiveSemesterId,
     retry: false,
   })
 
-  const { data: fallbackStudents = [], isLoading: studentsLoading } = useQuery({
+  const { data: fallbackStudents = [], isLoading: _studentsLoading } = useQuery({
     queryKey: ['supervisor-students', effectiveSemesterId],
     queryFn: () => supervisorService.getStudents(effectiveSemesterId),
     enabled: !workspace && !!effectiveSemesterId,
@@ -95,22 +96,13 @@ export default function SupervisorAssignmentPage() {
 
   const [quotaOverrides, setQuotaOverrides] = useState<Record<string, number>>({})
 
-  // Danh sách giảng viên
-  const lecturers = useMemo(() => {
-    let list: SupervisorLecturer[] = []
-    if (workspace && Array.isArray(workspace.lecturers) && workspace.lecturers.length > 0) {
-      list = workspace.lecturers.map((l) =>
-        toSupervisorLecturerFromWorkspace(l, termName, selectedYear, managedMajor?.name),
-      )
-    } else {
-      list = remoteLecturers
-    }
-
-    return list.map((l) => ({
+  // Danh sách toàn bộ GVHD của học kỳ này cho màn Overview
+  const overviewLecturers = useMemo(() => {
+    return remoteLecturers.map((l) => ({
       ...l,
       quota: quotaOverrides[l.id] ?? l.quota,
     }))
-  }, [workspace, remoteLecturers, quotaOverrides, termName, selectedYear, managedMajor?.name])
+  }, [remoteLecturers, quotaOverrides])
 
   // Danh sách sinh viên
   const students = useMemo(() => {
@@ -121,6 +113,65 @@ export default function SupervisorAssignmentPage() {
     }
     return fallbackStudents
   }, [workspace, fallbackStudents, termName, selectedYear])
+
+  // Danh sách giảng viên cho Workspace (Phân công GVHD):
+  // Lấy danh sách GVHD của học kỳ này (từ bảng semester_advisors - remoteLecturers, tương tự màn Overview),
+  // không lấy danh sách toàn bộ giáo viên hệ thống.
+  const workspaceLecturers = useMemo(() => {
+    if (remoteLecturers.length > 0) {
+      return remoteLecturers.map((remoteLec) => {
+        const matchedWorkspace = workspace?.lecturers?.find(
+          (wl) =>
+            wl.teacherPublicId === remoteLec.teacherPublicId ||
+            wl.teacherPublicId === remoteLec.id ||
+            (wl.teacherCode && wl.teacherCode === remoteLec.teacherCode) ||
+            wl.fullName?.trim().toLowerCase() === remoteLec.name?.trim().toLowerCase(),
+        )
+
+        const quota =
+          quotaOverrides[remoteLec.id] ??
+          matchedWorkspace?.quota ??
+          remoteLec.quota
+
+        // Đếm số sinh viên đang nhận từ danh sách students của workspace nếu có
+        const assignedFromStudents = students.filter(
+          (s) =>
+            (s.supervisorId === remoteLec.id ||
+              s.supervisorId === remoteLec.teacherPublicId ||
+              (s.supervisorName &&
+                s.supervisorName.trim().toLowerCase() === remoteLec.name.trim().toLowerCase()) ||
+              s.supervisor2Id === remoteLec.id ||
+              s.supervisor2Id === remoteLec.teacherPublicId ||
+              (s.supervisor2Name &&
+                s.supervisor2Name.trim().toLowerCase() === remoteLec.name.trim().toLowerCase())) &&
+            s.status !== 'unassigned',
+        ).length
+
+        const assigned =
+          matchedWorkspace?.assignedCount ??
+          (assignedFromStudents > 0 ? assignedFromStudents : remoteLec.assigned)
+
+        return {
+          ...remoteLec,
+          quota,
+          assigned,
+        }
+      })
+    }
+
+    // Fallback nếu remoteLecturers chưa có dữ liệu
+    let list: SupervisorLecturer[] = []
+    if (workspace && Array.isArray(workspace.lecturers) && workspace.lecturers.length > 0) {
+      list = workspace.lecturers.map((l) =>
+        toSupervisorLecturerFromWorkspace(l, termName, selectedYear, managedMajor?.name),
+      )
+    }
+
+    return list.map((l) => ({
+      ...l,
+      quota: quotaOverrides[l.id] ?? l.quota,
+    }))
+  }, [remoteLecturers, workspace, students, quotaOverrides, termName, selectedYear, managedMajor?.name])
 
   // Storage key cho trạng thái khóa của kỳ / năm học hiện tại
   const lockStorageKey = useMemo(() => {
@@ -186,7 +237,9 @@ export default function SupervisorAssignmentPage() {
   const counts = workspace?.counts
 
   const handleUpdateQuota = async (id: string, quota: number) => {
-    const target = lecturers.find((l) => l.id === id)
+    const target =
+      overviewLecturers.find((l) => l.id === id) ||
+      workspaceLecturers.find((l) => l.id === id)
     const targetIdentifier =
       target?.teacherId ??
       target?.advisorId ??
@@ -214,8 +267,31 @@ export default function SupervisorAssignmentPage() {
     }
   }
 
-  const handleRemoveLecturer = (_id: string) => {
-    toast.info('Chức năng hủy phân công GVHD đang chờ Backend hoàn thiện endpoint xóa.')
+  const handleRemoveLecturer = async (id: string) => {
+    const target =
+      overviewLecturers.find((l) => l.id === id) ||
+      workspaceLecturers.find((l) => l.id === id)
+    const targetIdentifier =
+      target?.advisorPublicId ||
+      target?.advisorId ||
+      target?.teacherPublicId ||
+      target?.teacherId ||
+      id
+
+    try {
+      await supervisorService.removeAdvisor(effectiveSemesterId, targetIdentifier)
+      toast.success(
+        `Đã loại bỏ giảng viên ${target?.name || ''} khỏi danh sách GVHD của kỳ thành công!`,
+      )
+      queryClient.invalidateQueries({ queryKey: ['supervisors'] })
+      queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Không thể loại bỏ giảng viên hướng dẫn. Vui lòng kiểm tra lại sinh viên hướng dẫn của giảng viên.'
+      toast.error(msg)
+      throw err
+    }
   }
 
   const handleAssignStudents = async (studentIds: string[], supervisor: SupervisorLecturer) => {
@@ -267,13 +343,17 @@ export default function SupervisorAssignmentPage() {
     try {
       await supervisorService.changeSupervisor(effectiveSemesterId, studentId, newTeacherId)
       toast.success(`Đã đổi GVHD 1 sang ${newSupervisor.name} thành công!`)
-      queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
-      queryClient.invalidateQueries({ queryKey: ['supervisors'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] }),
+        queryClient.invalidateQueries({ queryKey: ['supervisors'] }),
+        queryClient.invalidateQueries({ queryKey: ['supervisor-students'] }),
+      ])
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Không thể thay đổi giảng viên hướng dẫn'
       toast.error(msg)
+      throw err
     }
   }
 
@@ -348,17 +428,22 @@ export default function SupervisorAssignmentPage() {
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <div
+      className={cn(
+        'w-full min-h-0 flex flex-col',
+        view === 'workspace' ? 'flex-1 h-full overflow-hidden' : 'space-y-4 pb-12',
+      )}
+    >
       {view === 'overview' ? (
         <SupervisorOverviewView
-          lecturers={lecturers}
+          lecturers={overviewLecturers}
           students={students}
           majors={majors}
           selectedYear={selectedYear}
           selectedSemesterId={selectedSemesterId}
           academicYears={academicYears}
           termsOfYear={termsOfYear}
-          isLoading={semestersLoading || workspaceLoading || lecturersLoading || studentsLoading}
+          isLoading={semestersLoading || lecturersLoading}
           onYearChange={onYearChange}
           onSemesterChange={onSemesterChange}
           onUpdateQuota={handleUpdateQuota}
@@ -372,7 +457,7 @@ export default function SupervisorAssignmentPage() {
         />
       ) : (
         <SupervisorWorkspaceView
-          lecturers={lecturers}
+          lecturers={workspaceLecturers}
           students={students}
           year={selectedYear}
           semesterName={termName}
@@ -385,7 +470,7 @@ export default function SupervisorAssignmentPage() {
           lockedAt={lockedAt}
           lockedByName={lockedByName}
           counts={counts}
-          isLoading={workspaceLoading}
+          isLoading={workspaceLoading || lecturersLoading}
           onBack={() => setView('overview')}
           onAssignStudents={handleAssignStudents}
           onApproveRegistrations={handleApproveRegistrations}

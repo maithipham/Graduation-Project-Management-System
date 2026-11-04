@@ -57,15 +57,17 @@ export function TeacherTable({
   const totalElements = data?.page?.totalElements ?? (data as unknown as { totalElements?: number })?.totalElements ?? 0
   const totalPages = data?.page?.totalPages ?? (data as unknown as { totalPages?: number })?.totalPages ?? 0
 
+  const assignableContent = content.filter((t) => !t.isAssigned)
+
   const allSelected =
-    content.length > 0 &&
-    content.every((t) => {
+    assignableContent.length > 0 &&
+    assignableContent.every((t) => {
       const id = typeof getTeacherId(t) === 'number' ? (getTeacherId(t) as number) : t.id
       return id ? selectedIds.has(id) : false
     })
 
   const someSelected =
-    content.some((t) => {
+    assignableContent.some((t) => {
       const id = typeof getTeacherId(t) === 'number' ? (getTeacherId(t) as number) : t.id
       return id ? selectedIds.has(id) : false
     }) && !allSelected
@@ -185,9 +187,11 @@ export function TeacherTable({
             <input
               type="checkbox"
               checked={isSelected}
+              disabled={teacher.isAssigned}
               onChange={() => onToggleSelect(numId)}
               aria-label={`Chọn giảng viên ${teacher.name}`}
-              className="h-4 w-4 rounded border-slate-300 text-[#1565C0] focus:ring-[#1565C0] cursor-pointer"
+              className="h-4 w-4 rounded border-slate-300 text-[#1565C0] focus:ring-[#1565C0] cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+              title={teacher.isAssigned ? 'Giảng viên đã được phân công làm GVHD trong kỳ này' : undefined}
             />
           </TableCell>
 

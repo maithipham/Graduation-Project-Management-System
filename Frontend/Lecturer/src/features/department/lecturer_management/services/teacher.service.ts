@@ -11,6 +11,7 @@ import type {
   TeacherImportResponse,
   TeacherListItem,
   TeacherListParams,
+  TeacherAllListParams,
   TeacherWriteResult,
 } from '../types'
 
@@ -29,6 +30,38 @@ export const DEFAULT_ACADEMIC_TITLES: AcademicTitle[] = [
 
 // Giống một @Service: chỉ gọi API và bóc wrapper ApiResponse, không xử lý giao diện
 export const teacherService = {
+  // GET /teacher/all?semesterId=...&keyword=...&majorId=...&unitType=...&isAssigned=...
+  // Lấy toàn bộ danh sách giáo viên hệ thống không phân trang từ backend
+  async getAllTeachersList(
+    params: TeacherAllListParams,
+    config?: { skipErrorToast?: boolean },
+  ): Promise<TeacherListItem[]> {
+    const cleanParams: Record<string, any> = {}
+    if (params.semesterId && params.semesterId !== 'all') {
+      cleanParams.semesterId = params.semesterId
+    }
+    if (params.keyword?.trim()) {
+      cleanParams.keyword = params.keyword.trim()
+    } else if (params.name?.trim()) {
+      cleanParams.keyword = params.name.trim()
+    }
+    if (params.majorId?.trim()) {
+      cleanParams.majorId = params.majorId.trim()
+    }
+    if (params.unitType && params.unitType !== 'ALL' && (params.unitType as string) !== '') {
+      cleanParams.unitType = params.unitType
+    }
+    if (params.isAssigned !== undefined) {
+      cleanParams.isAssigned = params.isAssigned
+    }
+
+    const res = await apiClient.get<ApiResponse<TeacherListItem[]>>(TEACHER.all, {
+      params: cleanParams,
+      skipErrorToast: config?.skipErrorToast,
+    })
+    return res.data?.data || []
+  },
+
   // GET /teacher?keyword=...&majorId=...&unitType=...&isAssigned=...&page=0&size=15&sort=name,asc
   // Không gửi sort thì BE tự sắp: đang hoạt động trước, mới thêm trước
   async getTeachers(

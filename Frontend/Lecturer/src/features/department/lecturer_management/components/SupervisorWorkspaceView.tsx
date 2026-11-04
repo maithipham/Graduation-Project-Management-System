@@ -36,7 +36,7 @@ interface SupervisorWorkspaceViewProps {
   onAssignStudents: (studentIds: string[], supervisor: SupervisorLecturer) => void
   onApproveRegistrations: (registrationPublicIds: string[]) => void
   onRejectRegistrations: (registrationPublicIds: string[]) => void
-  onChangeSupervisor: (studentId: string, newSupervisor: SupervisorLecturer) => void
+  onChangeSupervisor: (studentId: string, newSupervisor: SupervisorLecturer) => void | Promise<void>
   onChangeCoSupervisor: (studentId: string, coSupervisor: SupervisorLecturer | null) => void
   onToggleLock: (isLocked: boolean) => void
 }
@@ -233,7 +233,7 @@ export function SupervisorWorkspaceView({
   }
 
   // Hành động Gán GVHD (Gán mới hoặc Đổi GVHD trực tiếp từ bảng phải, không qua popup)
-  const handleAssignAction = () => {
+  const handleAssignAction = async () => {
     if (isLocked) {
       toast.warning('Danh sách phân công đã được khóa! Vui lòng mở khóa để chỉnh sửa.')
       return
@@ -302,15 +302,16 @@ export function SupervisorWorkspaceView({
         return
       }
 
-      targetIds.forEach((sId) => {
-        onChangeSupervisor(sId, selectedLecturer)
-      })
-      const firstStudent = students.find((s) => s.id === targetIds[0])
-      toast.success(
-        `Đã đổi GVHD 1 thành ${selectedLecturer.name} cho ${targetIds.length > 1 ? `${targetIds.length} sinh viên` : firstStudent?.name || 'sinh viên'} thành công!`,
-      )
-      setEditingTarget(null)
-      setSelectedStudentIds(new Set())
+      try {
+        for (const sId of targetIds) {
+          await onChangeSupervisor(sId, selectedLecturer)
+        }
+      } catch {
+        // Lỗi đã được thông báo qua toast ở handler
+      } finally {
+        setEditingTarget(null)
+        setSelectedStudentIds(new Set())
+      }
       return
     }
 
@@ -397,7 +398,7 @@ export function SupervisorWorkspaceView({
     )
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden space-y-2">
+    <div className="w-full h-full flex-1 min-h-0 flex flex-col overflow-hidden space-y-2">
       {/* 1. Header Workspace: Nút Quay lại, Năm học, Học kỳ và Nút Khóa danh sách */}
       <div className="flex items-center justify-between gap-3 flex-wrap shrink-0 pb-1">
         <div className="flex items-center gap-3 flex-wrap min-w-0">
@@ -495,10 +496,10 @@ export function SupervisorWorkspaceView({
         </div>
       </div>
 
-      {/* 2. Thanh công cụ cố định trên cùng 2 cột (Search, Tabs, Nút hành động, Tiêu đề bảng) */}
-      <div className="shrink-0 w-full flex flex-row items-start gap-3.5 pr-[6px]">
-        {/* === CỘT TRÁI (SINH VIÊN): Ô tìm kiếm + 3 tabs + Tiêu đề bảng === */}
-        <div className="flex-1 min-w-0 flex flex-col">
+      {/* 2. KHU VỰC CHÍNH 2 CỘT: CẢ 2 CỘT CUỘN ĐỘC LẬP */}
+      <div className="flex-1 min-h-0 flex flex-row items-stretch gap-3.5 w-full">
+        {/* === CỘT TRÁI (SINH VIÊN): Ô tìm kiếm + 3 tabs + Bảng sinh viên cuộn riêng === */}
+        <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Ô tìm kiếm sinh viên & Nút Phê duyệt / Từ chối */}
           <div className="flex items-center gap-2 mb-1">
             <div className="relative flex-1">
@@ -608,190 +609,53 @@ export function SupervisorWorkspaceView({
             </button>
           </div>
 
-          {/* Tiêu đề bảng sinh viên (cố định trên cùng, bo góc trên) */}
-          <div className="bg-white border border-slate-200 rounded-t-xl overflow-hidden border-b-0 shadow-2xs">
-            <table className="w-full text-left text-sm border-collapse table-fixed">
-              <colgroup>
-                <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
-                <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
-                <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
-                <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
-              </colgroup>
-              <thead>
-                <tr className="bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11 border-b border-slate-200">
-                  <th className="py-0 px-2.5 align-middle">SINH VIÊN</th>
-                  <th className="py-0 px-2.5 align-middle">ĐỀ TÀI</th>
-                  <th className="py-0 px-2.5 align-middle">
-                    {currentTab === 'approved' ? 'GVHD 1' : 'GIẢNG VIÊN HƯỚNG DẪN'}
-                  </th>
-                  {currentTab === 'approved' ? (
-                    <th className="py-0 px-2.5 text-blue-900 font-extrabold align-middle">GVHD 2</th>
-                  ) : (
-                    <th className="py-0 px-1 text-center align-middle">
-                      <input
-                        type="checkbox"
-                        checked={isAllStudentsSelected}
-                        onChange={toggleSelectAllStudents}
-                        disabled={isLocked}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed align-middle"
-                        title="Chọn tất cả sinh viên trong tab"
-                      />
+          {/* Khung Bảng Sinh viên hoàn chỉnh (Header cố định + Body cuộn độc lập) */}
+          <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+            {/* Header cố định */}
+            <div className="shrink-0 bg-slate-100 border-b border-slate-200">
+              <table className="w-full text-left text-sm border-collapse table-fixed">
+                <colgroup>
+                  <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
+                  <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
+                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
+                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
+                </colgroup>
+                <thead>
+                  <tr className="text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11">
+                    <th className="py-0 px-2.5 align-middle">SINH VIÊN</th>
+                    <th className="py-0 px-2.5 align-middle">ĐỀ TÀI</th>
+                    <th className="py-0 px-2.5 align-middle">
+                      {currentTab === 'approved' ? 'GVHD 1' : 'GIẢNG VIÊN HƯỚNG DẪN'}
                     </th>
-                  )}
-                </tr>
-              </thead>
-            </table>
-          </div>
-        </div>
-
-        {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm & Nút Gán + 4 tabs lọc + Tiêu đề bảng GV === */}
-        <div className="w-[390px] xl:w-[430px] shrink-0 flex flex-col">
-          {/* Ô tìm kiếm giảng viên & Nút Gán */}
-          <div className="flex items-center gap-2 mb-1">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Tìm theo tên giảng viên, học hàm, bộ..."
-                value={lecturerSearch}
-                onChange={(e) => setLecturerSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3.5 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-xs"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    {currentTab === 'approved' ? (
+                      <th className="py-0 px-2.5 text-blue-900 font-extrabold align-middle">GVHD 2</th>
+                    ) : (
+                      <th className="py-0 px-1 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          checked={isAllStudentsSelected}
+                          onChange={toggleSelectAllStudents}
+                          disabled={isLocked}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed align-middle"
+                          title="Chọn tất cả sinh viên trong tab"
+                        />
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+              </table>
             </div>
 
-            <button
-              type="button"
-              onClick={handleAssignAction}
-              disabled={
-                isLocked ||
-                !selectedLecturer ||
-                (currentTab === 'unassigned' && selectedCount === 0) ||
-                (currentTab === 'approved' && selectedCount === 0 && !editingTarget) ||
-                currentTab === 'received'
-              }
-              className="h-9 px-4 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[13px] font-semibold transition cursor-pointer shadow-xs flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={
-                isLocked
-                  ? 'Danh sách đã khóa'
-                  : currentTab === 'received'
-                    ? 'Tab Đã nhận GV dùng nút Phê duyệt / Từ chối'
-                    : 'Gán giảng viên cho sinh viên'
-              }
-            >
-              <span>
-                {currentTab === 'approved' && editingTarget?.slot === 2
-                  ? 'Gán GVHD 2'
-                  : currentTab === 'approved' && (editingTarget || selectedCount > 0)
-                    ? `Đổi GVHD (${selectedCount || 1} SV)`
-                    : `Gán (${selectedCount} SV)`}
-              </span>
-            </button>
-          </div>
-
-          {/* Tab Bar Lọc Nhanh Đơn Vị */}
-          <div className="h-9 bg-slate-200/70 p-0.5 rounded-lg flex items-center gap-1 mb-1 text-[12px] font-semibold overflow-x-auto shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setLecturerCategory('all')}
-              className={cn(
-                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-                lecturerCategory === 'all'
-                  ? 'bg-white text-blue-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900',
-              )}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              onClick={() => setLecturerCategory('internal')}
-              className={cn(
-                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-                lecturerCategory === 'internal'
-                  ? 'bg-white text-blue-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900',
-              )}
-            >
-              Trong bộ môn
-            </button>
-            <button
-              type="button"
-              onClick={() => setLecturerCategory('dept_ext')}
-              className={cn(
-                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-                lecturerCategory === 'dept_ext'
-                  ? 'bg-white text-blue-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900',
-              )}
-            >
-              Ngoài bộ môn
-            </button>
-            <button
-              type="button"
-              onClick={() => setLecturerCategory('univ_ext')}
-              className={cn(
-                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-                lecturerCategory === 'univ_ext'
-                  ? 'bg-white text-blue-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900',
-              )}
-            >
-              Ngoài trường
-            </button>
-          </div>
-
-          {/* Tiêu đề bảng Giảng viên (cố định trên cùng, bo góc trên) */}
-          <div className="bg-white border border-slate-200 rounded-t-xl overflow-hidden border-b-0 shadow-2xs text-left text-sm">
-            <div className="grid grid-cols-12 bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11 px-3.5 border-b border-slate-200 items-center">
-              <div className="col-span-2 text-center">CHỌN</div>
-              <div className="col-span-6">TÊN GIẢNG VIÊN</div>
-              <div className="col-span-4 flex items-center justify-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-                  }
-                  className={cn(
-                    'p-1 rounded hover:bg-slate-200/80 transition cursor-pointer flex items-center justify-center',
-                    lecturerSort !== 'default'
-                      ? 'text-blue-600 bg-blue-100 font-bold'
-                      : 'text-slate-400 hover:text-slate-600',
-                  )}
-                  title={
-                    lecturerSort === 'asc'
-                      ? 'Sắp xếp: Số SV tăng dần'
-                      : 'Sắp xếp: Số SV giảm dần'
-                  }
-                >
-                  {sortIcon}
-                </button>
-                <span
-                  className="cursor-pointer select-none"
-                  onClick={() =>
-                    setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-                  }
-                >
-                  ĐANG NHẬN
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. KHỐI DƯỚI CUỘN CHUNG: CẢ 2 DANH SÁCH SINH VIÊN VÀ GIẢNG VIÊN CÙNG CUỘN */}
-      <div className="overflow-y-auto flex-1 min-h-0 [scrollbar-gutter:stable] pr-[1px]">
-        <div className="flex flex-row items-start gap-3.5 w-full pb-6">
-          {/* CỘT TRÁI: THÂN DANH SÁCH SINH VIÊN (Bo góc dưới) */}
-          <div className="flex-1 min-w-0 bg-white border border-slate-200 rounded-b-xl shadow-xs overflow-hidden border-t-0">
-            <table className="w-full text-left text-sm border-collapse table-fixed">
-              <colgroup>
-                <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
-                <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
-                <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
-                <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
-              </colgroup>
-              <tbody className="divide-y divide-slate-100 text-[12.5px]">
+            {/* Thân bảng sinh viên cuộn độc lập */}
+            <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
+              <table className="w-full text-left text-sm border-collapse table-fixed">
+                <colgroup>
+                  <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
+                  <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
+                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
+                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
+                </colgroup>
+                <tbody className="divide-y divide-slate-100 text-[12.5px]">
                 {filteredStudents.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
@@ -1063,10 +927,144 @@ export function SupervisorWorkspaceView({
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
 
-          {/* CỘT PHẢI: THÂN DANH SÁCH GIẢNG VIÊN (Bo góc dưới) */}
-          <div className="w-[390px] xl:w-[430px] shrink-0 bg-white border border-slate-200 rounded-b-xl shadow-xs overflow-hidden border-t-0 text-left text-sm">
-            <div className="divide-y divide-slate-100">
+      {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */}
+      <div className="w-[390px] xl:w-[430px] shrink-0 flex flex-col h-full">
+        {/* Ô tìm kiếm giảng viên & Nút Gán */}
+        <div className="shrink-0 flex items-center gap-2 mb-1.5">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Tìm theo tên giảng viên, học hàm, bộ..."
+              value={lecturerSearch}
+              onChange={(e) => setLecturerSearch(e.target.value)}
+              className="w-full h-9 pl-9 pr-3.5 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-xs"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAssignAction}
+            disabled={
+              isLocked ||
+              !selectedLecturer ||
+              (currentTab === 'unassigned' && selectedCount === 0) ||
+              (currentTab === 'approved' && selectedCount === 0 && !editingTarget) ||
+              currentTab === 'received'
+            }
+            className="h-9 px-4 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[13px] font-semibold transition cursor-pointer shadow-xs flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              isLocked
+                ? 'Danh sách đã khóa'
+                : currentTab === 'received'
+                  ? 'Tab Đã nhận GV dùng nút Phê duyệt / Từ chối'
+                  : 'Gán giảng viên cho sinh viên'
+            }
+          >
+            <span>
+              {currentTab === 'approved' && editingTarget?.slot === 2
+                ? 'Gán GVHD 2'
+                : currentTab === 'approved' && (editingTarget || selectedCount > 0)
+                  ? `Đổi GVHD (${selectedCount || 1} SV)`
+                  : `Gán (${selectedCount} SV)`}
+            </span>
+          </button>
+        </div>
+
+        {/* Tab Bar Lọc Nhanh Đơn Vị */}
+        <div className="shrink-0 h-9 bg-slate-200/70 p-0.5 rounded-lg flex items-center gap-1 mb-1.5 text-[12px] font-semibold overflow-x-auto shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setLecturerCategory('all')}
+            className={cn(
+              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+              lecturerCategory === 'all'
+                ? 'bg-white text-blue-700 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900',
+            )}
+          >
+            Tất cả
+          </button>
+          <button
+            type="button"
+            onClick={() => setLecturerCategory('internal')}
+            className={cn(
+              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+              lecturerCategory === 'internal'
+                ? 'bg-white text-blue-700 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900',
+            )}
+          >
+            Trong bộ môn
+          </button>
+          <button
+            type="button"
+            onClick={() => setLecturerCategory('dept_ext')}
+            className={cn(
+              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+              lecturerCategory === 'dept_ext'
+                ? 'bg-white text-blue-700 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900',
+            )}
+          >
+            Ngoài bộ môn
+          </button>
+          <button
+            type="button"
+            onClick={() => setLecturerCategory('univ_ext')}
+            className={cn(
+              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+              lecturerCategory === 'univ_ext'
+                ? 'bg-white text-blue-700 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900',
+            )}
+          >
+            Ngoài trường
+          </button>
+        </div>
+
+        {/* Khung Danh sách Giảng viên (Header cố định + Body cuộn độc lập) */}
+        <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden text-left text-sm">
+          {/* Tiêu đề bảng Giảng viên (cố định trên cùng) */}
+          <div className="shrink-0 grid grid-cols-12 bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11 px-3.5 border-b border-slate-200 items-center">
+            <div className="col-span-2 text-center">CHỌN</div>
+            <div className="col-span-6">TÊN GIẢNG VIÊN</div>
+            <div className="col-span-4 flex items-center justify-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                }
+                className={cn(
+                  'p-1 rounded hover:bg-slate-200/80 transition cursor-pointer flex items-center justify-center',
+                  lecturerSort !== 'default'
+                    ? 'text-blue-600 bg-blue-100 font-bold'
+                    : 'text-slate-400 hover:text-slate-600',
+                )}
+                title={
+                  lecturerSort === 'asc'
+                    ? 'Sắp xếp: Số SV tăng dần'
+                    : 'Sắp xếp: Số SV giảm dần'
+                }
+              >
+                {sortIcon}
+              </button>
+              <span
+                className="cursor-pointer select-none"
+                onClick={() =>
+                  setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                }
+              >
+                ĐANG NHẬN
+              </span>
+            </div>
+          </div>
+
+          {/* Thân danh sách GV: CUỘN ĐỘC LẬP MƯỢT MÀ */}
+          <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] divide-y divide-slate-100">
               {/* Nhóm Giảng viên còn chỉ tiêu */}
               {availableLecturers.map((l) => {
                 const isSelected = effectiveSelectedLecturerId === l.id

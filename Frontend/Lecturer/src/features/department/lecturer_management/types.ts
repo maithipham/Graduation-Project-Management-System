@@ -69,6 +69,12 @@ export interface TeacherListParams {
   sort?: TeacherSort
 }
 
+/** Tham số gửi lên GET /teacher/all (không phân trang) */
+export type TeacherAllListParams = Omit<TeacherListParams, 'page' | 'size'> & {
+  page?: number
+  size?: number
+}
+
 // Body POST /semesters/{semesterId}/advisors
 export interface AssignAdvisorsRequest {
   teacherIds: number[]
@@ -284,6 +290,7 @@ export interface LecturerAssignmentItem {
   email: string
   department?: string
   organization?: string
+  isInternal?: boolean
   category: 'INTERNAL' | 'DEPT_EXT' | 'UNIV_EXT' | string
   categoryLabel?: string
   quota: number

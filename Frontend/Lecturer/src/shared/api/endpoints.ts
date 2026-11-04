@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   departmentTeacher: {
     // GET: danh sách (Page) · POST: thêm thủ công
     base: '/teacher',
+    all: '/teacher/all',
     detail: (publicId: string) => `/teacher/${publicId}`,
     import: '/teacher/import',
     activate: (publicId: string) => `/teacher/${publicId}/activate`,
@@ -53,6 +54,11 @@ export const API_ENDPOINTS = {
   advisor: {
     // GET: lấy danh sách GVHD trong kỳ · POST: phân công GVHD
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
+    // DELETE: xóa/loại bỏ GVHD khỏi học kỳ
+    removeAdvisor: (semesterId: string, teacherId: string | number) =>
+      `/semesters/${semesterId}/advisors/${teacherId}`,
+    // DELETE: alias xóa GVHD theo ID phân công
+    removeAdvisorById: (advisorId: string | number) => `/semesters/advisors/${advisorId}`,
     // POST: import file Excel danh sách GVHD trong học kỳ
     importAdvisorsExcel: (semesterId: string) => `/semesters/${semesterId}/advisors/import-excel`,
     // GET: lấy hạn mức theo chức danh · PUT: cập nhật hạn mức theo chức danh cho kỳ

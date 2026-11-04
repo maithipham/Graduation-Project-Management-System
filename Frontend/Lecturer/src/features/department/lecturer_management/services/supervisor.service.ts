@@ -635,4 +635,16 @@ export const supervisorService = {
     const res = await apiClient.put<ApiResponse<unknown>>(url, payload)
     return res.data?.message || 'Cập nhật hạn mức thành công'
   },
+
+  // DELETE /semesters/{semesterId}/advisors/{teacherId}: Xóa/loại bỏ giảng viên khỏi danh sách GVHD của học kỳ
+  async removeAdvisor(
+    semesterId: string,
+    teacherOrAdvisorId: string | number,
+  ): Promise<void> {
+    const cleanSemesterId =
+      semesterId && semesterId !== 'all' ? semesterId : 'current'
+    await apiClient.delete<ApiResponse<void>>(
+      API_ENDPOINTS.advisor.removeAdvisor(cleanSemesterId, teacherOrAdvisorId),
+    )
+  },
 }

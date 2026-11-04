@@ -57,6 +57,6 @@ export function hasActiveTeacherFilters(filters: TeacherFilters): boolean {
     filters.majorName !== '' ||
     Boolean(filters.majorId) ||
     (Boolean(filters.unitType) && filters.unitType !== 'ALL') ||
-    (filters.isAssigned !== undefined && filters.isAssigned !== false)
+    filters.isAssigned !== undefined
   )
 }

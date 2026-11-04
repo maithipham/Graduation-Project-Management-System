@@ -1,4 +1,5 @@
 import { teacherService } from './teacher.service'
+import { supervisorService } from './supervisor.service'
 import { studentService } from '@/features/department/student_management/services/student.service'
 import type { TeacherListItem, ReviewerLecturer, ReviewerStudent } from '../types'
 import type { StudentListItem } from '@/features/department/student_management/types'
@@ -37,7 +38,24 @@ export const reviewerService = {
     return res.content.map(toReviewerStudent)
   },
 
-  async getLecturers(_semesterId?: string): Promise<ReviewerLecturer[]> {
+  async getLecturers(semesterId?: string): Promise<ReviewerLecturer[]> {
+    const cleanSemesterId = semesterId === 'all' ? undefined : semesterId
+    if (cleanSemesterId) {
+      try {
+        const advisors = await supervisorService.getSupervisors(cleanSemesterId)
+        if (advisors.length > 0) {
+          return advisors.map((a) => ({
+            id: a.teacherPublicId || a.id,
+            name: a.name,
+            email: a.email,
+            department: a.department || '',
+            isExternal: a.category === 'univ_ext',
+          }))
+        }
+      } catch {
+        // Fallback
+      }
+    }
     const res = await teacherService.getTeachers({ page: 0, size: 100 })
     return res.content.map(toReviewerLecturer)
   },

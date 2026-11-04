@@ -34,7 +34,7 @@ interface SupervisorOverviewViewProps {
   onYearChange: (year: string) => void
   onSemesterChange: (semesterId: string) => void
   onUpdateQuota: (id: string, quota: number) => void
-  onRemoveLecturer: (id: string) => void
+  onRemoveLecturer: (id: string) => void | Promise<void>
   onOpenWorkspace: () => void
 }
 
@@ -78,6 +78,7 @@ export function SupervisorOverviewView({
   const [importAdvisorOpen, setImportAdvisorOpen] = useState(false)
   const [viewLecturer, setViewLecturer] = useState<SupervisorLecturer | null>(null)
   const [removeLecturerTarget, setRemoveLecturerTarget] = useState<SupervisorLecturer | null>(null)
+  const [isRemoving, setIsRemoving] = useState(false)
 
   const currentSemesterName = useMemo(() => {
     const currentTerm = termsOfYear.find(
@@ -137,11 +138,17 @@ export function SupervisorOverviewView({
     setRemoveLecturerTarget(l)
   }
 
-  const handleConfirmRemove = () => {
+  const handleConfirmRemove = async () => {
     if (!removeLecturerTarget) return
-    onRemoveLecturer(removeLecturerTarget.id)
-    toast.success(`Đã loại bỏ giảng viên ${removeLecturerTarget.name} khỏi danh sách GVHD của kỳ`)
-    setRemoveLecturerTarget(null)
+    setIsRemoving(true)
+    try {
+      await onRemoveLecturer(removeLecturerTarget.id)
+      setRemoveLecturerTarget(null)
+    } catch {
+      // Đã có toast thông báo lỗi ở onRemoveLecturer
+    } finally {
+      setIsRemoving(false)
+    }
   }
 
   const handleExport = () => {
@@ -583,8 +590,9 @@ export function SupervisorOverviewView({
         lecturer={removeLecturerTarget}
         semesterName={currentSemesterName}
         open={Boolean(removeLecturerTarget)}
-        onClose={() => setRemoveLecturerTarget(null)}
+        onClose={() => !isRemoving && setRemoveLecturerTarget(null)}
         onConfirm={handleConfirmRemove}
+        isPending={isRemoving}
       />
     </div>
   )
