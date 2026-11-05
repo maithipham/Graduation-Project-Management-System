@@ -94,6 +94,21 @@ export const API_ENDPOINTS = {
     reportEvaluation: '/lecturer/report-eval',
     council: '/lecturer/council',
     department: '/lecturer/department',
+
+    // Quản lý yêu cầu đăng ký GVHD
+    base: '/api/teacher/advisor-registrations',
+
+    // GET: chi tiết yêu cầu
+    detail: (publicId: string) =>
+      `/api/teacher/advisor-registrations/${publicId}`,
+
+    // PATCH: duyệt yêu cầu
+    approve: (publicId: string) =>
+      `/api/teacher/advisor-registrations/${publicId}/approve`,
+
+    // PATCH: từ chối yêu cầu
+    reject: (publicId: string) =>
+      `/api/teacher/advisor-registrations/${publicId}/reject`,
   },
   admin: {
     accounts: '/accounts',

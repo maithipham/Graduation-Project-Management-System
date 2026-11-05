@@ -1,44 +1,57 @@
-export type RegistrationOrigin = 'internal' | 'external'
 
-export type RegistrationSubStatus =
-  | 'pending_gvhd'
-  | 'pending_tbm'
-  | 'approved_tbm'
-  | 'rejected_gvhd'
-  | 'rejected_tbm'
+export type AdvisorRegistrationStatus =
+  | 'PENDING'
+  | 'TEACHER_APPROVED'
+  | 'HOD_APPROVED'
+  | 'REJECTED'
+  | 'ASSIGNED_BY_HOD'
 
-export type RegistrationStatus = 'Đang xử lý' | 'Đã duyệt' | 'Đã từ chối'
-
-export interface RegistrationLecturerOption {
-  id: number
-  name: string
-  degree: string
-  department: string
-  unit?: string
-  origin: RegistrationOrigin
-  email: string
-  phone: string
-  room: string
-  quota: string
-  used: number
-  max: number
-  isAccepting: number
-  field: string
-  bio: string
+export interface AvailableAdvisor {
+  teacherPublicId: string
+  teacherCode: string
+  teacherName: string
+  academicTitle: string | null
+  organization: string | null
+  maxStudents: number
+  occupiedStudents: number
+  remainingSlots: number
 }
 
-export interface SupervisorRegistrationItem {
-  id: number
-  time: string
-  lecturerId: number
-  lecturer: string
-  dept: string
-  origin: RegistrationOrigin
-  unit: string
-  topic: string
-  status: RegistrationStatus
-  subStatus: RegistrationSubStatus
-  approvedTime: string
-  note: string
+export interface AdvisorRegistrationResponse {
+  registrationPublicId: string
+  studentPublicId: string | null
+  semesterPublicId: string | null
+  teacherPublicId: string
+  studentCode: string | null
+  studentName: string | null
+  majorName: string | null
+  teacherCode: string | null
+  teacherName: string | null
+  topicName: string | null
+  status: AdvisorRegistrationStatus
+  statusDescription: string | null
+  submittedAt: string | null
+  processedAt: string | null
 }
 
+export interface SubmitAdvisorRegistrationRequest {
+  teacherPublicId: string
+  topicName?: string
+}
+
+export interface UpdateAdvisorRegistrationRequest {
+  semesterPublicId: string
+  teacherPublicId: string
+  topicName?: string
+}
+
+export interface RegistrationOverviewResponse {
+  semesterPublicId: string
+  mentorName: string | null
+  topicName: string | null
+  deadlineName: string | null
+  deadlineStartDate: string | null
+  deadlineEndDate: string | null
+  deadlineActive: boolean
+  deadlineStatus: string | null
+}

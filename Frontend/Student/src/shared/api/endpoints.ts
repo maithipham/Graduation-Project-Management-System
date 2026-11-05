@@ -13,12 +13,17 @@ export const API_ENDPOINTS = {
   },
   student: {
     overview: '/student/overview',
-    registration: '/student/registration',
-    lecturers: '/student/lecturers',
-    outline: '/student/outline',
-    reports: '/student/reports',
-    schedule: '/student/schedule',
-    results: '/student/results',
+    // Đăng ký giảng viên hướng dẫn
+    advisorRegistrations: '/api/student/advisor-registrations',
+    // gvhd và đề tài chính thức các kỳ
+    registrationOverview: '/api/student/advisor-registrations/overview',
+    // danh sách gvhd
+    availableAdvisors: '/api/student/advisor-registrations/advisors',
+    lecturers: '/api/student/lecturers',
+    outline: '/api/student/outline',
+    reports: '/api/student/reports',
+    schedule: '/api/student/schedule',
+    results: '/api/student/results',
     documents: '/student/documents',
   },
   lecturer: {

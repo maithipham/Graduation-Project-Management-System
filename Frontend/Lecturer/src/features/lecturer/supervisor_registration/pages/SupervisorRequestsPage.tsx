@@ -1,19 +1,86 @@
-import { useRef } from 'react'
-import { Clock, Inbox, Search } from 'lucide-react'
+
+import { useEffect, useRef, useState } from 'react'
+
+import { Search, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+
+import { semesterService } from '@/shared/services/semester.service'
+import type { SemesterResponse } from '@/shared/types/semester.types'
+
+import { mockDeadlineService } from '../services/mockDeadline.service'
+import type { RegistrationDeadline } from '../services/mockDeadline.service'
+
+import { useSupervisorRequests } from '../hooks/useSupervisorRequests'
+
 import {
   ApproveSupervisorModal,
   RejectSupervisorModal,
 } from '../components/SupervisorRequestModals'
-import { useSupervisorRequests } from '../hooks/useSupervisorRequests'
-import type { SupervisorTabStatus } from '../types/supervisorRegistration.types'
 
-function formatSubmittedDate(dateStr: string): string {
-  if (!dateStr) return '—'
-  if (/\d{1,2}:\d{2}/.test(dateStr)) return dateStr
-  return `${dateStr} 09:15`
-}
+const PAGE_SIZE = 15
 
 export default function SupervisorRequestsPage() {
+  const [semesters, setSemesters] = useState<SemesterResponse[]>([])
+  const [selectedSemesterPublicId, setSelectedSemesterPublicId] = useState('')
+  const [semesterLoading, setSemesterLoading] = useState(true)
+  const [semesterError, setSemesterError] = useState<string | null>(null)
+
+  // Deadline đăng ký GVHD (dữ liệu giả)
+  const [deadline, setDeadline] = useState<RegistrationDeadline | null>(null)
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Lấy học kỳ hiện tại từ Backend
+  // Lấy danh sách học kỳ và xác định học kỳ mặc định
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      try {
+        setSemesterLoading(true)
+        setSemesterError(null)
+
+        const [semesterList, currentSemester] = await Promise.all([
+          semesterService.getAllSemesters(),
+          semesterService.getCurrentSemester(),
+        ])
+
+        setSemesters(semesterList)
+
+        // Mặc định chọn học kỳ hiện tại
+        const currentSemesterExists = semesterList.some(
+          (item) => item.publicId === currentSemester.publicId,
+        )
+
+        if (currentSemesterExists) {
+          setSelectedSemesterPublicId(currentSemester.publicId)
+        } else if (semesterList.length > 0) {
+          setSelectedSemesterPublicId(semesterList[0].publicId)
+        } else {
+          setSemesterError('Hiện chưa có học kỳ nào.')
+        }
+      } catch (error) {
+        console.error('Không thể tải danh sách học kỳ:', error)
+        setSemesterError('Không thể tải danh sách học kỳ.')
+      } finally {
+        setSemesterLoading(false)
+      }
+    }
+
+    fetchSemesters()
+  }, [])
+
+  // Lấy deadline đăng ký GVHD từ dữ liệu giả
+  useEffect(() => {
+    const fetchDeadline = async () => {
+      try {
+        const result = await mockDeadlineService.getRegistrationDeadline()
+        setDeadline(result)
+      } catch (error) {
+        console.error('Không thể tải deadline đăng ký GVHD:', error)
+      }
+    }
+
+    fetchDeadline()
+  }, [])
+
   const {
     tabStatus,
     setTabStatus,
@@ -25,290 +92,473 @@ export default function SupervisorRequestsPage() {
     counts,
     filtered,
     pageData,
+    loading,
+    error,
     approveTarget,
     setApproveTarget,
     rejectTarget,
     setRejectTarget,
     handleConfirmApprove,
     handleConfirmReject,
-  } = useSupervisorRequests()
+  } = useSupervisorRequests(selectedSemesterPublicId)
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  // Cuộn bảng về đầu khi chuyển trang
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [currentPage])
 
-  const showStatusCol = tabStatus === 'approved' || tabStatus === 'rejected' || tabStatus === ''
-  const showActionCol = tabStatus === 'pending' || tabStatus === ''
+  // Định dạng ngày và giờ
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '—'
 
-  return (
-    <div
-      className="h-full flex flex-col min-h-0 bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden select-none"
-      style={{
-        fontFamily:
-          '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      {/* ========================================================
-          1. HEADER THANH ĐIỀU HƯỚNG TABS & Ô TÌM KIẾM
-          ======================================================== */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 shrink-0 bg-white">
-        {/* Tabs chuyển trạng thái */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl shrink-0 overflow-x-auto">
-          {(
-            [
-              { key: 'pending', label: 'Chưa duyệt', count: counts.pending },
-              { key: 'approved', label: 'Đã nhận', count: counts.approved },
-              { key: 'rejected', label: 'Đã từ chối', count: counts.rejected },
-              { key: '', label: 'Tất cả', count: counts.all },
-            ] as const
-          ).map((tab) => {
-            const active = tabStatus === tab.key
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => {
-                  setTabStatus(tab.key as SupervisorTabStatus)
-                  setCurrentPage(1)
-                }}
-                className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                  active
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-bold ${
-                    active
-                      ? tab.key === 'pending' && tab.count > 0
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-200 text-slate-800'
-                      : 'bg-slate-200/70 text-slate-600'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+    const date = new Date(value)
 
-        {/* Ô Tìm kiếm MSSV, tên, đề tài */}
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value)
-              setCurrentPage(1)
-            }}
-            placeholder="Tìm theo tên, MSSV, đề tài..."
-            className="w-full text-xs pl-10 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] transition"
-          />
-        </div>
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
 
-        {/* Hạn đăng ký GVHD */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs font-semibold shrink-0 whitespace-nowrap">
-          <Clock className="w-3.5 h-3.5 text-amber-600" />
-          <span>
-            Hạn đăng ký GVHD: <b className="font-bold text-amber-900">15/11/2026 23:59</b>
-          </span>
+    return date.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  }
+
+  // Định dạng ngày deadline
+  const formatDeadlineDate = (value: string) => {
+    const [year, month, day] = value.split('-')
+    return `${day}/${month}/${year}`
+  }
+
+  // Tính thời gian còn lại đến hạn đăng ký
+  const getRemainingTime = (endDate: string) => {
+    const now = new Date()
+    const end = new Date(`${endDate}T23:59:59`)
+
+    const diff = end.getTime() - now.getTime()
+
+    if (diff <= 0) {
+      return 'Đã hết hạn'
+    }
+
+    const totalDays = Math.ceil(diff / (1000 * 60 * 60 * 24))
+
+    if (totalDays === 1) {
+      return 'Còn 1 ngày'
+    }
+
+    return `Còn ${totalDays} ngày`
+  }
+
+  // Trạng thái deadline
+  const getDeadlineStatus = () => {
+    if (!deadline) return 'Chưa có thông tin deadline'
+
+    if (!deadline.isActive) return 'Đã đóng đăng ký'
+
+    return getRemainingTime(deadline.endDate)
+  }
+
+  // Hiển thị loading khi tải học kỳ
+  if (semesterLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <p className="text-sm text-gray-500">Đang tải dữ liệu...</p>
         </div>
       </div>
+    )
+  }
 
-      {/* ========================================================
-          2. NỘI DUNG BẢNG DANH SÁCH SINH VIÊN
-          ======================================================== */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200"
-      >
-        {filtered.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-              <Inbox size={28} />
-            </div>
-            <p className="text-sm font-semibold text-slate-700">
-              Không có yêu cầu đăng ký nào
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Thử thay đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm.
-            </p>
+  // Hiển thị lỗi nếu không lấy được học kỳ
+  if (semesterError || semesters.length === 0) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+        {semesterError || 'Không có học kỳ hiện tại.'}
+
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="ml-3 font-semibold underline"
+        >
+          Tải lại
+        </button>
+      </div>
+    )
+  }
+
+  const tabs = [
+    { key: 'pending' as const, label: 'Chưa duyệt', count: counts.pending },
+    { key: 'approved' as const, label: 'Đã duyệt', count: counts.approved },
+    { key: 'rejected' as const, label: 'Đã từ chối', count: counts.rejected },
+    { key: '' as const, label: 'Tất cả', count: counts.all },
+  ]
+
+  // Chuyển trạng thái thành nội dung hiển thị
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Chưa duyệt'
+      case 'approved':
+        return 'Đã duyệt'
+      case 'rejected':
+        return 'Đã từ chối'
+      default:
+        return 'Không xác định'
+    }
+  }
+
+  // CSS theo trạng thái
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-amber-100 text-amber-700'
+      case 'approved':
+        return 'bg-emerald-100 text-emerald-700'
+      case 'rejected':
+        return 'bg-red-100 text-red-700'
+      default:
+        return 'bg-gray-100 text-gray-600'
+    }
+  }
+
+  const startIndex =
+    filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+
+  const endIndex = Math.min(
+    currentPage * PAGE_SIZE,
+    filtered.length,
+  )
+
+  return (
+    <div className="w-full space-y-4">
+      {/* Thanh bộ lọc */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 xl:flex-row xl:items-center xl:justify-between">
+
+          {/* Tabs trạng thái */}
+          <div className="flex flex-wrap items-center gap-2">
+            {tabs.map((tab) => {
+              const active = tabStatus === tab.key
+
+              return (
+                <button
+                  key={tab.key || 'all'}
+                  type="button"
+                  onClick={() => {
+                    setTabStatus(tab.key)
+                    setCurrentPage(1)
+                  }}
+                  className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${active
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-slate-600 hover:text-blue-600'
+                    }`}
+                >
+                  {tab.label}
+
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${active
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-slate-600'
+                      }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
           </div>
-        ) : (
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4 w-12 text-center">STT</th>
-                <th className="py-3 px-4 min-w-[200px]">Sinh viên</th>
-                <th className="py-3 px-4 min-w-[220px]">Đề tài nguyện vọng</th>
-                <th className="py-3 px-4 min-w-[130px]">Thời gian nộp</th>
-                {showStatusCol && (
-                  <th className="py-3 px-4 min-w-[140px] text-center">Trạng thái</th>
+
+          {/* Tìm kiếm, chọn học kỳ và deadline */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {/* Chọn học kỳ */}
+            <div className="min-w-[220px]">
+              <select
+                value={selectedSemesterPublicId}
+                onChange={(event) => {
+                  setSelectedSemesterPublicId(event.target.value)
+                  setCurrentPage(1)
+                }}
+                disabled={semesterLoading || semesters.length === 0}
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                {semesters.length === 0 ? (
+                  <option value="">Chưa có học kỳ</option>
+                ) : (
+                  semesters.map((item) => (
+                    <option key={item.publicId} value={item.publicId}>
+                      {item.name}
+                    </option>
+                  ))
                 )}
-                {showActionCol && (
-                  <th className="py-3 px-4 min-w-[160px] text-right">Thao tác</th>
-                )}
+              </select>
+            </div>
+
+            {/* Tìm kiếm */}
+            <div className="relative min-w-0 flex-1 xl:w-[350px]">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setCurrentPage(1)
+                }}
+                placeholder="Tìm theo mã sinh viên, tên sinh viên,..."
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            {/* Deadline đăng ký GVHD */}
+            <div className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-800">
+              <Clock size={16} />
+
+              {deadline ? (
+                <>
+                  <span>
+                    Hạn: {formatDeadlineDate(deadline.endDate)}
+                  </span>
+
+                  <span className="h-4 w-px bg-amber-300" />
+
+                  <span
+                    className={
+                      getRemainingTime(deadline.endDate) === 'Đã hết hạn'
+                        ? 'text-red-600'
+                        : 'text-amber-800'
+                    }
+                  >
+                    {getDeadlineStatus()}
+                  </span>
+                </>
+              ) : (
+                <span>Chưa có thông tin deadline</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Thông báo lỗi */}
+        {error && (
+          <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Bảng dữ liệu */}
+        <div
+          ref={scrollContainerRef}
+          className="w-full overflow-x-auto"
+        >
+          <table className="w-full min-w-[1150px] border-collapse text-left">
+            <thead className="sticky top-0 z-10 bg-slate-50">
+              <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="w-16 px-5 py-4 text-center">STT</th>
+
+                <th className="w-[220px] px-5 py-4">
+                  Sinh viên
+                </th>
+
+                <th className="w-[190px] px-5 py-4">
+                  Bộ môn
+                </th>
+
+                <th className="px-5 py-4">
+                  Đề tài đăng ký
+                </th>
+
+                <th className="w-[180px] px-5 py-4">
+                  Ngày gửi đơn
+                </th>
+
+                <th className="w-[180px] px-5 py-4">
+                  Thời gian xử lý
+                </th>
+
+                <th className="w-[200px] px-5 py-4 text-center">
+                  Thao tác
+                </th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-slate-100">
-              {pageData.map((item, idx) => {
-                const globalIndex = (currentPage - 1) * 15 + idx + 1
-                return (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-7 w-7 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+
+                      <span className="text-sm text-slate-500">
+                        Đang tải danh sách yêu cầu...
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : pageData.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-16 text-center">
+                    <div className="text-sm font-medium text-slate-500">
+                      Không tìm thấy đơn đăng ký nào.
+                    </div>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      Thử thay đổi trạng thái hoặc từ khóa tìm kiếm.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                pageData.map((request, index) => (
                   <tr
-                    key={item.id}
-                    className="hover:bg-slate-50/70 transition-colors group"
+                    key={request.id}
+                    className="transition-colors hover:bg-blue-50/40"
                   >
-                    {/* STT */}
-                    <td className="py-3 px-4 text-center font-medium text-slate-400 text-xs">
-                      {globalIndex}
+                    <td className="px-5 py-5 text-center text-sm text-slate-400">
+                      {startIndex + index}
                     </td>
 
-                    {/* Thông tin Sinh viên */}
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 group-hover:text-[#1565C0] transition-colors">
-                        {item.name}
-                      </div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                        <span className="font-mono text-slate-600 font-semibold">{item.mssv}</span>
-                        <span>·</span>
-                        <span>{item.major}</span>
-                      </div>
+                    <td className="px-5 py-5">
+                      <p className="text-sm font-bold text-slate-900">
+                        {request.name}
+                      </p>
+
+                      <p className="mt-1 font-mono text-xs text-slate-500">
+                        {request.mssv}
+                      </p>
                     </td>
 
-                    {/* Đề tài đăng ký */}
-                    <td className="py-3 px-4">
-                      <div className="text-slate-800 line-clamp-2 leading-relaxed" title={item.topic}>
-                        {item.topic}
-                      </div>
+                    <td className="px-5 py-5 text-sm text-slate-600">
+                      {request.major || '—'}
                     </td>
 
-                    {/* Ngày nộp */}
-                    <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <Clock size={13} className="text-slate-400" />
-                        <span>{formatSubmittedDate(item.submittedDate)}</span>
-                      </div>
-                    </td>
-
-                    {/* Trạng thái duyệt */}
-                    {showStatusCol && (
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {item.status === 'approved' && (
-                          <div className="inline-flex flex-col items-center gap-1">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Đã duyệt
-                            </span>
-                            {item.approvedAt && (
-                              <span className="text-[11px] text-slate-400 font-medium">
-                                {item.approvedAt}
-                              </span>
-                            )}
-                          </div>
+                    <td className="max-w-[400px] px-5 py-5">
+                      <p
+                        className="line-clamp-2 text-sm leading-6 text-slate-800"
+                        title={request.topic?.trim() || 'Sinh viên chưa đăng ký tên đề tài'}
+                      >
+                        {request.topic?.trim() ? (
+                          request.topic
+                        ) : (
+                          <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            Chưa có đề tài
+                          </span>
                         )}
-                        {item.status === 'rejected' && (
-                          <div className="inline-flex flex-col items-center gap-1">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              Đã từ chối
-                            </span>
-                            {item.rejectedAt && (
-                              <span className="text-[11px] text-slate-400 font-medium">
-                                {item.rejectedAt}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {item.status === 'pending' && null}
-                      </td>
-                    )}
+                      </p>
+                    </td>
 
-                    {/* Cột Thao tác */}
-                    {showActionCol && (
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {item.status === 'pending' ? (
-                          <div className="inline-flex items-center gap-2 justify-end">
+                    {/* Ngày gửi đơn */}
+                    <td className="whitespace-nowrap px-5 py-5 text-sm text-slate-600">
+                      {formatDateTime(request.submittedDate)}
+                    </td>
+
+                    {/* Thời gian xử lý */}
+                    <td className="whitespace-nowrap px-5 py-5 text-sm text-slate-600">
+                      {request.processedAt
+                        ? formatDateTime(request.processedAt)
+                        : (
+                          <span className="text-amber-600">
+                            Chưa xử lý
+                          </span>
+                        )}
+                    </td>
+
+                    <td className="px-5 py-5">
+                      <div className="flex items-center justify-center gap-2">
+                        {request.status === 'pending' ? (
+                          <>
                             <button
                               type="button"
-                              onClick={() => setApproveTarget(item)}
-                              className="px-3 py-1.5 rounded-lg text-[12px] font-bold bg-[#1565C0] text-white hover:bg-[#0D47A1] transition shadow-xs cursor-pointer active:scale-95"
+                              onClick={() => setApproveTarget(request)}
+                              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 active:scale-95"
                             >
                               Duyệt
                             </button>
+
                             <button
                               type="button"
-                              onClick={() => setRejectTarget(item)}
-                              className="px-3 py-1.5 rounded-lg text-[12px] font-bold bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer active:scale-95"
+                              onClick={() => setRejectTarget(request)}
+                              className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 active:scale-95"
                             >
                               Từ chối
                             </button>
-                          </div>
-                        ) : null}
-                      </td>
-                    )}
+                          </>
+                        ) : (
+                          <span
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(
+                              request.status,
+                            )}`}
+                          >
+                            {getStatusLabel(request.status)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                )
-              })}
+                ))
+              )}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
 
-      {/* ========================================================
-          3. FOOTER PHÂN TRANG
-          ======================================================== */}
-      {filtered.length > 0 && (
-        <div className="p-3.5 sm:px-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 shrink-0 bg-white">
-          <div>
+        {/* Footer phân trang */}
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">
             Hiển thị{' '}
             <span className="font-semibold text-slate-800">
-              {filtered.length === 0 ? 0 : (currentPage - 1) * 15 + 1}
+              {startIndex}–{endIndex}
             </span>{' '}
-            -{' '}
+            trên{' '}
             <span className="font-semibold text-slate-800">
-              {Math.min(currentPage * 15, filtered.length)}
+              {filtered.length}
             </span>{' '}
-            trong tổng số{' '}
-            <span className="font-semibold text-slate-800">{filtered.length}</span> sinh viên
-          </div>
+            đơn đăng ký
+          </p>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              disabled={currentPage <= 1}
-              onClick={() => {
-                setCurrentPage((p) => Math.max(1, p - 1))
-                scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-              }}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              disabled={currentPage <= 1 || loading}
+              onClick={() => setCurrentPage(currentPage - 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Trang trước"
             >
-              Trước
+              <ChevronLeft size={18} />
             </button>
-            <span className="px-3 py-1 text-slate-700 font-bold text-[12px]">
-              {currentPage} / {totalPages}
+
+            <span className="flex h-9 min-w-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white">
+              {currentPage}
             </span>
+
             <button
               type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => {
-                setCurrentPage((p) => Math.min(totalPages, p + 1))
-                scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-              }}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              disabled={currentPage >= totalPages || loading}
+              onClick={() => setCurrentPage(currentPage + 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Trang sau"
             >
-              Sau
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Modals Popup xác nhận duyệt / từ chối */}
+      {/* Modal duyệt */}
       <ApproveSupervisorModal
         item={approveTarget}
         onClose={() => setApproveTarget(null)}
         onConfirm={handleConfirmApprove}
       />
+
+      {/* Modal từ chối */}
       <RejectSupervisorModal
         item={rejectTarget}
         onClose={() => setRejectTarget(null)}
