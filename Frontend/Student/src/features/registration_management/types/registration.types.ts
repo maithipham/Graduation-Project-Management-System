@@ -15,6 +15,7 @@ export interface AvailableAdvisor {
   maxStudents: number
   occupiedStudents: number
   remainingSlots: number
+  pendingCount: number
 }
 
 export interface AdvisorRegistrationResponse {

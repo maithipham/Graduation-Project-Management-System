@@ -97,6 +97,7 @@ export const API_ENDPOINTS = {
 
     // Quản lý yêu cầu đăng ký GVHD
     base: '/api/teacher/advisor-registrations',
+    deadline: '/api/teacher/advisor-registrations/deadline',
 
     // GET: chi tiết yêu cầu
     detail: (publicId: string) =>

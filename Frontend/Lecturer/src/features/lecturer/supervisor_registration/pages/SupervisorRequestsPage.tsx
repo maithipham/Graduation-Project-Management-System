@@ -6,8 +6,8 @@ import { Search, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { semesterService } from '@/shared/services/semester.service'
 import type { SemesterResponse } from '@/shared/types/semester.types'
 
-import { mockDeadlineService } from '../services/mockDeadline.service'
-import type { RegistrationDeadline } from '../services/mockDeadline.service'
+import { supervisorDeadlineService } from '../services/supervisorDeadline.service'
+import type { RegistrationDeadline } from '../services/supervisorDeadline.service'
 
 import { useSupervisorRequests } from '../hooks/useSupervisorRequests'
 
@@ -24,12 +24,13 @@ export default function SupervisorRequestsPage() {
   const [semesterLoading, setSemesterLoading] = useState(true)
   const [semesterError, setSemesterError] = useState<string | null>(null)
 
-  // Deadline đăng ký GVHD (dữ liệu giả)
+  // Deadline đăng ký GVHD lấy từ Backend
   const [deadline, setDeadline] = useState<RegistrationDeadline | null>(null)
+  const [deadlineLoading, setDeadlineLoading] = useState(false)
+  const [deadlineError, setDeadlineError] = useState<string | null>(null)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Lấy học kỳ hiện tại từ Backend
   // Lấy danh sách học kỳ và xác định học kỳ mặc định
   useEffect(() => {
     const fetchSemesters = async () => {
@@ -67,19 +68,51 @@ export default function SupervisorRequestsPage() {
     fetchSemesters()
   }, [])
 
-  // Lấy deadline đăng ký GVHD từ dữ liệu giả
+  // Lấy deadline đăng ký GVHD theo học kỳ đang chọn
   useEffect(() => {
+    if (!selectedSemesterPublicId) {
+      setDeadline(null)
+      setDeadlineError(null)
+      setDeadlineLoading(false)
+      return
+    }
+
+    let isMounted = true
+
     const fetchDeadline = async () => {
       try {
-        const result = await mockDeadlineService.getRegistrationDeadline()
-        setDeadline(result)
+        setDeadlineLoading(true)
+        setDeadlineError(null)
+        setDeadline(null)
+
+        const result =
+          await supervisorDeadlineService.getRegistrationDeadline(
+            selectedSemesterPublicId,
+          )
+
+        if (isMounted) {
+          setDeadline(result)
+        }
       } catch (error) {
         console.error('Không thể tải deadline đăng ký GVHD:', error)
+
+        if (isMounted) {
+          setDeadline(null)
+          setDeadlineError('Không thể tải thông tin deadline.')
+        }
+      } finally {
+        if (isMounted) {
+          setDeadlineLoading(false)
+        }
       }
     }
 
     fetchDeadline()
-  }, [])
+
+    return () => {
+      isMounted = false
+    }
+  }, [selectedSemesterPublicId])
 
   const {
     tabStatus,
@@ -130,15 +163,30 @@ export default function SupervisorRequestsPage() {
   }
 
   // Định dạng ngày deadline
-  const formatDeadlineDate = (value: string) => {
-    const [year, month, day] = value.split('-')
-    return `${day}/${month}/${year}`
+  const formatDeadlineDate = (value?: string | null) => {
+    if (!value) return '—'
+
+    const date = new Date(value)
+
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
+
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
   }
 
   // Tính thời gian còn lại đến hạn đăng ký
   const getRemainingTime = (endDate: string) => {
     const now = new Date()
-    const end = new Date(`${endDate}T23:59:59`)
+    const end = new Date(endDate)
+
+    if (Number.isNaN(end.getTime())) {
+      return 'Không xác định thời hạn'
+    }
 
     const diff = end.getTime() - now.getTime()
 
@@ -155,13 +203,31 @@ export default function SupervisorRequestsPage() {
     return `Còn ${totalDays} ngày`
   }
 
-  // Trạng thái deadline
+  // Trạng thái deadline do Backend trả về
   const getDeadlineStatus = () => {
     if (!deadline) return 'Chưa có thông tin deadline'
 
-    if (!deadline.isActive) return 'Đã đóng đăng ký'
+    switch (deadline.status) {
+      case 'NOT_CONFIGURED':
+        return 'Chưa cấu hình deadline'
 
-    return getRemainingTime(deadline.endDate)
+      case 'INACTIVE':
+        return 'Deadline đã bị vô hiệu hóa'
+
+      case 'NOT_STARTED':
+        return 'Chưa đến thời gian đăng ký'
+
+      case 'CLOSED':
+        return 'Đã đóng đăng ký'
+
+      case 'OPEN':
+        return deadline.endDate
+          ? getRemainingTime(deadline.endDate)
+          : 'Đang mở đăng ký'
+
+      default:
+        return 'Không xác định'
+    }
   }
 
   // Hiển thị loading khi tải học kỳ
@@ -231,17 +297,13 @@ export default function SupervisorRequestsPage() {
   const startIndex =
     filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
 
-  const endIndex = Math.min(
-    currentPage * PAGE_SIZE,
-    filtered.length,
-  )
+  const endIndex = Math.min(currentPage * PAGE_SIZE, filtered.length)
 
   return (
     <div className="w-full space-y-4">
       {/* Thanh bộ lọc */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 xl:flex-row xl:items-center xl:justify-between">
-
           {/* Tabs trạng thái */}
           <div className="flex flex-wrap items-center gap-2">
             {tabs.map((tab) => {
@@ -255,18 +317,20 @@ export default function SupervisorRequestsPage() {
                     setTabStatus(tab.key)
                     setCurrentPage(1)
                   }}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${active
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-slate-600 hover:text-blue-600'
-                    }`}
+                  className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${
+                    active
+                      ? 'border-blue-600 text-blue-700'
+                      : 'border-transparent text-slate-600 hover:text-blue-600'
+                  }`}
                 >
                   {tab.label}
 
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${active
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-slate-100 text-slate-600'
-                      }`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      active
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
                   >
                     {tab.count}
                   </span>
@@ -320,10 +384,16 @@ export default function SupervisorRequestsPage() {
             </div>
 
             {/* Deadline đăng ký GVHD */}
-            <div className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-800">
+            <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
               <Clock size={16} />
 
-              {deadline ? (
+              {deadlineLoading ? (
+                <span>Đang tải deadline...</span>
+              ) : deadlineError ? (
+                <span className="text-red-600">{deadlineError}</span>
+              ) : deadline?.status === 'NOT_CONFIGURED' || !deadline ? (
+                <span>Chưa cấu hình deadline</span>
+              ) : (
                 <>
                   <span>
                     Hạn: {formatDeadlineDate(deadline.endDate)}
@@ -333,7 +403,8 @@ export default function SupervisorRequestsPage() {
 
                   <span
                     className={
-                      getRemainingTime(deadline.endDate) === 'Đã hết hạn'
+                      deadline.status === 'CLOSED' ||
+                      deadline.status === 'INACTIVE'
                         ? 'text-red-600'
                         : 'text-amber-800'
                     }
@@ -341,14 +412,12 @@ export default function SupervisorRequestsPage() {
                     {getDeadlineStatus()}
                   </span>
                 </>
-              ) : (
-                <span>Chưa có thông tin deadline</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Thông báo lỗi */}
+        {/* Thông báo lỗi danh sách đơn */}
         {error && (
           <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
             {error}
@@ -406,7 +475,7 @@ export default function SupervisorRequestsPage() {
                 </tr>
               ) : pageData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center">
+                  <td colSpan={7} className="px-5 py-16 text-center">
                     <div className="text-sm font-medium text-slate-500">
                       Không tìm thấy đơn đăng ký nào.
                     </div>
@@ -443,7 +512,10 @@ export default function SupervisorRequestsPage() {
                     <td className="max-w-[400px] px-5 py-5">
                       <p
                         className="line-clamp-2 text-sm leading-6 text-slate-800"
-                        title={request.topic?.trim() || 'Sinh viên chưa đăng ký tên đề tài'}
+                        title={
+                          request.topic?.trim() ||
+                          'Sinh viên chưa đăng ký tên đề tài'
+                        }
                       >
                         {request.topic?.trim() ? (
                           request.topic
@@ -462,13 +534,13 @@ export default function SupervisorRequestsPage() {
 
                     {/* Thời gian xử lý */}
                     <td className="whitespace-nowrap px-5 py-5 text-sm text-slate-600">
-                      {request.processedAt
-                        ? formatDateTime(request.processedAt)
-                        : (
-                          <span className="text-amber-600">
-                            Chưa xử lý
-                          </span>
-                        )}
+                      {request.processedAt ? (
+                        formatDateTime(request.processedAt)
+                      ) : (
+                        <span className="text-amber-600">
+                          Chưa xử lý
+                        </span>
+                      )}
                     </td>
 
                     <td className="px-5 py-5">
