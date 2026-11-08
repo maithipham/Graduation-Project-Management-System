@@ -4,11 +4,12 @@ import type { LoginResponse, UserInfo } from '../types'
 
 // Giống một @Service: chỉ gọi API và bóc wrapper ApiResponse, không xử lý giao diện
 export const authService = {
-  // POST /login { code } → BE đổi code với Google, set cookie access_token
+  // POST /login { code, redirectUri } → BE đổi code với Google, set cookie access_token
+  // redirectUri phải trùng URL đã gửi Google lúc mở trang chọn tài khoản (Google so khớp từng ký tự)
   async login(code: string): Promise<UserInfo> {
     const res = await apiClient.post<ApiResponse<LoginResponse>>(
       API_ENDPOINTS.auth.login,
-      { code },
+      { code, redirectUri: import.meta.env.VITE_GOOGLE_REDIRECT_URI },
       // Trang /authenticate tự hiện lỗi; 401 ở đây không phải "token hết hạn" nên không refresh
       { skipErrorToast: true, skipAuthRefresh: true },
     )

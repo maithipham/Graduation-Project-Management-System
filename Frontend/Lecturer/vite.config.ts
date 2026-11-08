@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
       clearMocks: true,
       fileParallelism: false,
     },
+    // Lecturer chạy cổng 5173, Student chạy 5174 — chạy song song được
+    server: { port: 5173, strictPort: true },
+    preview: { port: 5173, strictPort: true },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

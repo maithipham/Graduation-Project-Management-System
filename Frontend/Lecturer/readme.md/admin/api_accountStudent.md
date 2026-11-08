@@ -8,17 +8,17 @@
 
 ## 1. Tổng quan API
 
-| #   | API                                  | Dùng cho                                        | Trạng thái FE         |
-| :-- | :----------------------------------- | :---------------------------------------------- | :-------------------- |
-| 1   | `GET /student/account`               | Bảng danh sách tài khoản sinh viên + bộ lọc     | ⏳ Cần nối (Mục 4)    |
-| 2   | `GET /student/account/{publicId}`    | Popup chi tiết khi bấm vào 1 sinh viên          | ⏳ Cần nối (Mục 5)    |
-| 3   | `GET /major`                         | Dropdown "Tất cả bộ môn"                        | ✅ Đã gọi (`useMajors`) |
-| 4   | `GET /student/batch/all`             | Dropdown "Tất cả khóa"                          | ✅ Đã gọi (`useAllStudentBatches`) |
-| 5   | `DELETE /student/account/{publicId}` | Icon thùng rác: xóa hẳn hoặc khóa tài khoản     | ⏳ Cần nối (Mục 6.2)  |
-| 6   | `PUT /student/account/{publicId}`    | Icon bút chì: sửa 8 trường (có Ngành) + mở / khóa tài khoản | ⏳ Cần nối (Mục 6.1) |
-| 7   | `GET /student/account/export`        | Nút Xuất Excel (cùng bộ lọc với bảng, không phân trang) | ⏳ Cần nối (Mục 9) |
-| 8   | `POST /student/account`              | Nút Thêm sinh viên: chỉ tạo tài khoản           | ⏳ Cần nối (Mục 10.1) |
-| 9   | `POST /student/account/import`       | Nút Import file: chỉ tạo tài khoản              | ⏳ Cần nối (Mục 10.2) |
+| #   | API                                  | Dùng cho                                                    | Trạng thái FE                      |
+| :-- | :----------------------------------- | :---------------------------------------------------------- | :--------------------------------- |
+| 1   | `GET /student/account`               | Bảng danh sách tài khoản sinh viên + bộ lọc                 | ⏳ Cần nối (Mục 4)                 |
+| 2   | `GET /student/account/{publicId}`    | Popup chi tiết khi bấm vào 1 sinh viên                      | ⏳ Cần nối (Mục 5)                 |
+| 3   | `GET /major`                         | Dropdown "Tất cả bộ môn"                                    | ✅ Đã gọi (`useMajors`)            |
+| 4   | `GET /student/batch/all`             | Dropdown "Tất cả khóa"                                      | ✅ Đã gọi (`useAllStudentBatches`) |
+| 5   | `DELETE /student/account/{publicId}` | Icon thùng rác: xóa hẳn hoặc khóa tài khoản                 | ⏳ Cần nối (Mục 6.2)               |
+| 6   | `PUT /student/account/{publicId}`    | Icon bút chì: sửa 8 trường (có Ngành) + mở / khóa tài khoản | ⏳ Cần nối (Mục 6.1)               |
+| 7   | `GET /student/account/export`        | Nút Xuất Excel (cùng bộ lọc với bảng, không phân trang)     | ⏳ Cần nối (Mục 9)                 |
+| 8   | `POST /student/account`              | Nút Thêm sinh viên: chỉ tạo tài khoản                       | ⏳ Cần nối (Mục 10.1)              |
+| 9   | `POST /student/account/import`       | Nút Import file: chỉ tạo tài khoản                          | ⏳ Cần nối (Mục 10.2)              |
 
 Khác với `GET /student` của Trưởng bộ môn (lọc theo **học kì**, mỗi dòng là 1 đề tài), API `/student/account`
 liệt kê **mọi sinh viên có tài khoản trong hệ thống**, không phụ thuộc học kì, không có thông tin đề tài.
@@ -40,22 +40,23 @@ Các API ghi của Admin (thêm, import, sửa, xóa) **tách riêng hoàn toàn
   - `DELETE_ACCOUNT`: xóa (thùng rác)
 
   Thiếu quyền → `403`, `code 2001`.
+
 - Dải `11xx` (HTTP 200) là thành công kèm cảnh báo, interceptor tự hiện toast vàng (ở màn này chỉ có `1103`).
 - Định danh sinh viên luôn là **`publicId` (UUID dạng chuỗi)**, không có `id` số.
 
 ### Mã lỗi có thể gặp
 
-| HTTP | code | Khi nào                                                        | Message                                       |
-| :--- | :--- | :------------------------------------------------------------- | :-------------------------------------------- |
-| 400  | 1006 | `majorId` không phải UUID, `status` không phải `true/false`    | Yêu cầu không hợp lệ                          |
-| 400  | 1008 | `sort` theo trường không có trong danh sách cho phép (Mục 4.1) | Trường sắp xếp không hợp lệ                   |
-| 401  | 2000 | Hết phiên đăng nhập                                            | Phiên đăng nhập của bạn đã hết hạn            |
-| 400  | 4000 | Dữ liệu thêm / sửa sai định dạng, ngành không tồn tại, file import lỗi (Mục 6.1, 10) | Message lỗi cụ thể |
-| 403  | 2001 | Tài khoản không có permission tương ứng                        | Bạn không có quyền truy cập (access denied)   |
-| 404  | 3008 | `publicId` sai định dạng hoặc sinh viên không tồn tại (Mục 5, 6) | Sinh viên không tồn tại                     |
-| 409  | 3014 | Mã SV / email / SĐT trùng tài khoản khác (Mục 6.1, 10)          | `<các trường> trùng với tài khoản đã tồn tại trong hệ thống` |
-| 409  | 3033 | Đổi ngành khi sinh viên đang làm đồ án (Mục 6.1)                | Sinh viên đang làm đồ án, không thể đổi ngành |
-| 500  | 4000 | Lỗi tạo file Excel khi xuất (Mục 9)                            | Không tạo được file Excel, vui lòng thử lại   |
+| HTTP | code | Khi nào                                                                              | Message                                                      |
+| :--- | :--- | :----------------------------------------------------------------------------------- | :----------------------------------------------------------- |
+| 400  | 1006 | `majorId` không phải UUID, `status` không phải `true/false`                          | Yêu cầu không hợp lệ                                         |
+| 400  | 1008 | `sort` theo trường không có trong danh sách cho phép (Mục 4.1)                       | Trường sắp xếp không hợp lệ                                  |
+| 401  | 2000 | Hết phiên đăng nhập                                                                  | Phiên đăng nhập của bạn đã hết hạn                           |
+| 400  | 4000 | Dữ liệu thêm / sửa sai định dạng, ngành không tồn tại, file import lỗi (Mục 6.1, 10) | Message lỗi cụ thể                                           |
+| 403  | 2001 | Tài khoản không có permission tương ứng                                              | Bạn không có quyền truy cập (access denied)                  |
+| 404  | 3008 | `publicId` sai định dạng hoặc sinh viên không tồn tại (Mục 5, 6)                     | Sinh viên không tồn tại                                      |
+| 409  | 3014 | Mã SV / email / SĐT trùng tài khoản khác (Mục 6.1, 10)                               | `<các trường> trùng với tài khoản đã tồn tại trong hệ thống` |
+| 409  | 3033 | Đổi ngành khi sinh viên đang làm đồ án (Mục 6.1)                                     | Sinh viên đang làm đồ án, không thể đổi ngành                |
+| 500  | 4000 | Lỗi tạo file Excel khi xuất (Mục 9)                                                  | Không tạo được file Excel, vui lòng thử lại                  |
 
 ---
 
@@ -84,15 +85,15 @@ admin: {
 
 Mọi tham số đều **không bắt buộc**; bỏ trống / không gửi = không lọc theo điều kiện đó.
 
-| Param     | Kiểu              | Ý nghĩa                                                                                     | Lấy giá trị từ                                       |
-| :-------- | :---------------- | :------------------------------------------------------------------------------------------ | :--------------------------------------------------- |
-| `keyword` | string            | Ô tìm kiếm: khớp một phần **mã SV**, **họ tên đầy đủ** hoặc **email**, không phân biệt hoa thường | Ô search của toolbar                          |
-| `batch`   | string            | Lọc theo khóa, ví dụ `K65` (không phân biệt hoa thường)                                     | Dropdown "Tất cả khóa" ← `GET /student/batch/all`    |
-| `majorId` | string (UUID)     | Lọc theo bộ môn — **`publicId` của ngành, KHÔNG phải tên ngành**                            | Dropdown "Tất cả bộ môn" ← `GET /major` (`publicId`) |
-| `status`  | `true` \| `false` | `true` = Hoạt động, `false` = Không hoạt động                                               | Dropdown "Trạng thái" (`AccountStatusFilter`)        |
-| `page`    | number            | Trang, **bắt đầu từ 0** (mặc định 0)                                                        | `currentPage - 1`                                    |
-| `size`    | number            | Số dòng / trang (mặc định 10)                                                               | `PAGE_SIZE`                                          |
-| `sort`    | string            | `<field>,asc\|desc`, có thể gửi nhiều lần                                                   | (tùy chọn)                                           |
+| Param     | Kiểu              | Ý nghĩa                                                                                           | Lấy giá trị từ                                       |
+| :-------- | :---------------- | :------------------------------------------------------------------------------------------------ | :--------------------------------------------------- |
+| `keyword` | string            | Ô tìm kiếm: khớp một phần **mã SV**, **họ tên đầy đủ** hoặc **email**, không phân biệt hoa thường | Ô search của toolbar                                 |
+| `batch`   | string            | Lọc theo khóa, ví dụ `K65` (không phân biệt hoa thường)                                           | Dropdown "Tất cả khóa" ← `GET /student/batch/all`    |
+| `majorId` | string (UUID)     | Lọc theo bộ môn — **`publicId` của ngành, KHÔNG phải tên ngành**                                  | Dropdown "Tất cả bộ môn" ← `GET /major` (`publicId`) |
+| `status`  | `true` \| `false` | `true` = Hoạt động, `false` = Không hoạt động                                                     | Dropdown "Trạng thái" (`AccountStatusFilter`)        |
+| `page`    | number            | Trang, **bắt đầu từ 0** (mặc định 0)                                                              | `currentPage - 1`                                    |
+| `size`    | number            | Số dòng / trang (mặc định 10)                                                                     | `PAGE_SIZE`                                          |
+| `sort`    | string            | `<field>,asc\|desc`, có thể gửi nhiều lần                                                         | (tùy chọn)                                           |
 
 - `sort` cho phép: `name` (sắp theo Tên rồi Họ), `email`, `studentCode`, `majorName`, `className`, `batch`, `accountStatus`.
   Trường khác → `400 1008`. Không gửi `sort` → sinh viên **mới tạo lên trước**.
@@ -130,16 +131,16 @@ BE trả `Page` dạng **PagedModel** (`content` + `page`), dùng `toSpringPage`
 }
 ```
 
-| Field           | Kiểu           | Ghi chú                                                            |
-| :-------------- | :------------- | :----------------------------------------------------------------- |
-| `publicId`      | string (UUID)  | Không hiển thị; dùng làm `key` của dòng và để gọi API chi tiết     |
-| `studentCode`   | string         | Không hiện trên bảng (hiện trong popup chi tiết)                   |
-| `name`          | string         | Họ + Tên, ví dụ "Lê Trung Đức"                                     |
-| `email`         | string         | Hiện **dưới tên** ở cột Họ và tên                                  |
-| `className`     | string         | Lớp                                                                |
-| `batch`         | string         | Khóa                                                               |
-| `majorName`     | string \| null | Tên ngành (cột Bộ môn); hiện `—` nếu null                          |
-| `accountStatus` | boolean        | `true` = Hoạt động, `false` = Không hoạt động (bị khóa đăng nhập)  |
+| Field           | Kiểu           | Ghi chú                                                           |
+| :-------------- | :------------- | :---------------------------------------------------------------- |
+| `publicId`      | string (UUID)  | Không hiển thị; dùng làm `key` của dòng và để gọi API chi tiết    |
+| `studentCode`   | string         | Không hiện trên bảng (hiện trong popup chi tiết)                  |
+| `name`          | string         | Họ + Tên, ví dụ "Lê Trung Đức"                                    |
+| `email`         | string         | Hiện **dưới tên** ở cột Họ và tên                                 |
+| `className`     | string         | Lớp                                                               |
+| `batch`         | string         | Khóa                                                              |
+| `majorName`     | string \| null | Tên ngành (cột Bộ môn); hiện `—` nếu null                         |
+| `accountStatus` | boolean        | `true` = Hoạt động, `false` = Không hoạt động (bị khóa đăng nhập) |
 
 Không có kết quả → `content: []`, `totalElements: 0`.
 
@@ -148,13 +149,13 @@ Không có kết quả → `content: []`, `totalElements: 0`.
 | STT | Họ và tên | Bộ môn | Lớp / Khóa | Trạng thái | Thao tác |
 | :-- | :-------- | :----- | :--------- | :--------- | :------- |
 
-| Cột            | Dữ liệu                                                                                                          |
-| :------------- | :--------------------------------------------------------------------------------------------------------------- |
-| **STT**        | `page.number * page.size + index + 1` (đánh số liên tục qua các trang)                                           |
-| **Họ và tên**  | Dòng 1: `name` (đậm). Dòng 2: `email` (chữ nhỏ, màu xám)                                                         |
-| **Bộ môn**     | `majorName ?? '—'`                                                                                               |
-| **Lớp / Khóa** | `` `${className} / ${batch}` `` (ví dụ `65CNTT1 / K65`)                                                          |
-| **Trạng thái** | `accountStatus === true` → badge xanh "Hoạt động"; `false` → badge xám "Không hoạt động" (giữ `getStatusBadge`) |
+| Cột            | Dữ liệu                                                                                                                         |
+| :------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| **STT**        | `page.number * page.size + index + 1` (đánh số liên tục qua các trang)                                                          |
+| **Họ và tên**  | Dòng 1: `name` (đậm). Dòng 2: `email` (chữ nhỏ, màu xám)                                                                        |
+| **Bộ môn**     | `majorName ?? '—'`                                                                                                              |
+| **Lớp / Khóa** | `` `${className} / ${batch}` `` (ví dụ `65CNTT1 / K65`)                                                                         |
+| **Trạng thái** | `accountStatus === true` → badge xanh "Hoạt động"; `false` → badge xám "Không hoạt động" (giữ `getStatusBadge`)                 |
 | **Thao tác**   | 2 icon: **bút chì** (`Pencil` của `lucide-react`, sửa) và **thùng rác** (`Trash2`, xóa) — thay cho menu `MoreVertical` hiện tại |
 
 - Bấm vào **dòng** (trừ vùng 2 icon) → mở popup chi tiết (Mục 5). Ở 2 icon gọi `e.stopPropagation()` để không mở popup.
@@ -162,7 +163,11 @@ Không có kết quả → `content: []`, `totalElements: 0`.
 - Hành vi của bút chì / thùng rác xem Mục 6.
 
 ```tsx
-<TableRow key={student.publicId} onClick={() => onViewDetail(student)} className="cursor-pointer">
+<TableRow
+  key={student.publicId}
+  onClick={() => onViewDetail(student)}
+  className="cursor-pointer"
+>
   ...
   <TableCell>
     <div className="font-semibold text-slate-900 text-sm">{student.name}</div>
@@ -171,12 +176,24 @@ Không có kết quả → `content: []`, `totalElements: 0`.
   ...
   <TableCell className="text-center">
     <div className="flex items-center justify-center gap-1">
-      <button type="button" aria-label="Sửa sinh viên"
-        onClick={(e) => { e.stopPropagation(); onEdit(student) }}>
+      <button
+        type="button"
+        aria-label="Sửa sinh viên"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(student);
+        }}
+      >
         <Pencil className="h-4 w-4" />
       </button>
-      <button type="button" aria-label="Xóa sinh viên"
-        onClick={(e) => { e.stopPropagation(); onDelete(student) }}>
+      <button
+        type="button"
+        aria-label="Xóa sinh viên"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(student);
+        }}
+      >
         <Trash2 className="h-4 w-4 text-red-600" />
       </button>
     </div>
@@ -283,11 +300,11 @@ Khác bản của Trưởng bộ môn: **đổi được Ngành**, **mở / khó
 }
 ```
 
-| Field           | Ghi chú                                                                                  |
-| :-------------- | :--------------------------------------------------------------------------------------- |
-| 7 trường đầu    | Cùng quy tắc định dạng với form Thêm (Mục 10.1)                                          |
-| `major`         | **Tên ngành** (dropdown `GET /major`, gửi `name`), không phân biệt hoa thường            |
-| `accountStatus` | `true` = mở khóa, `false` = khóa đăng nhập, **không gửi / `null` = giữ nguyên**           |
+| Field           | Ghi chú                                                                         |
+| :-------------- | :------------------------------------------------------------------------------ |
+| 7 trường đầu    | Cùng quy tắc định dạng với form Thêm (Mục 10.1)                                 |
+| `major`         | **Tên ngành** (dropdown `GET /major`, gửi `name`), không phân biệt hoa thường   |
+| `accountStatus` | `true` = mở khóa, `false` = khóa đăng nhập, **không gửi / `null` = giữ nguyên** |
 
 - Mở khóa tự do, không kiểm tra học kì.
 - Đổi ngành bị chặn khi sinh viên **đang làm đồ án**: còn đề tài ở bất kỳ học kì nào chưa `COMPLETED` / `DISQUALIFIED` / `CANCELLED`.
@@ -295,14 +312,14 @@ Khác bản của Trưởng bộ môn: **đổi được Ngành**, **mở / khó
 
 **Response**:
 
-| Tình huống                                   | HTTP | code     | message                                                        |
-| :------------------------------------------- | :--- | :------- | :------------------------------------------------------------- |
-| Có thay đổi – xanh                           | 200  | 1000     | `Đã cập nhật: <các trường đã đổi>` (VD `Đã cập nhật: Ngành, Trạng thái tài khoản`) |
-| Không đổi gì – vàng                          | 200  | **1103** | Thông tin sinh viên không thay đổi                             |
-| SV không có                                  | 404  | 3008     | Sinh viên không tồn tại                                        |
-| Lỗi định dạng / ngành không tồn tại          | 400  | 4000     | Message lỗi cụ thể / `<các trường> không hợp lệ, vui lòng kiểm tra lại` |
+| Tình huống                                   | HTTP | code     | message                                                                              |
+| :------------------------------------------- | :--- | :------- | :----------------------------------------------------------------------------------- |
+| Có thay đổi – xanh                           | 200  | 1000     | `Đã cập nhật: <các trường đã đổi>` (VD `Đã cập nhật: Ngành, Trạng thái tài khoản`)   |
+| Không đổi gì – vàng                          | 200  | **1103** | Thông tin sinh viên không thay đổi                                                   |
+| SV không có                                  | 404  | 3008     | Sinh viên không tồn tại                                                              |
+| Lỗi định dạng / ngành không tồn tại          | 400  | 4000     | Message lỗi cụ thể / `<các trường> không hợp lệ, vui lòng kiểm tra lại`              |
 | Trùng mã SV / email / SĐT với tài khoản khác | 409  | 3014     | `<Mã sinh viên, Email, Số điện thoại> trùng với tài khoản đã tồn tại trong hệ thống` |
-| Đổi ngành khi đang làm đồ án                 | 409  | **3033** | Sinh viên đang làm đồ án, không thể đổi ngành                  |
+| Đổi ngành khi đang làm đồ án                 | 409  | **3033** | Sinh viên đang làm đồ án, không thể đổi ngành                                        |
 
 Tên trường trong message `Đã cập nhật: ...`: Mã sinh viên, Họ, Tên, Email, Số điện thoại, Khóa, Lớp, Ngành, Trạng thái tài khoản.
 
@@ -320,12 +337,12 @@ API riêng cho Admin, **không theo học kì**. **Không dùng** `DELETE /stude
 
 **BE tự quyết định xóa hay khóa** theo dữ liệu đồ án (bảng `thesis_topic`):
 
-| Tình huống                                              | BE làm gì                                        | HTTP | code | message                                                                      |
-| :------------------------------------------------------ | :----------------------------------------------- | :--- | :--- | :--------------------------------------------------------------------------- |
-| Sinh viên **chưa có** đề tài / đăng ký đồ án nào         | Xóa hẳn hồ sơ sinh viên + tài khoản + thông báo  | 200  | 1000 | Xóa tài khoản sinh viên thành công                                           |
-| Sinh viên **đã có** dữ liệu đồ án (bất kỳ học kì nào)   | Giữ hồ sơ, chỉ khóa tài khoản (`accountStatus = false`) | 200  | 1000 | Sinh viên đã có dữ liệu đồ án nên không thể xóa, tài khoản đã bị khóa đăng nhập |
-| Đã có dữ liệu đồ án và tài khoản **đã khóa từ trước**   | Không đổi gì                                     | 200  | 1000 | Sinh viên đã có dữ liệu đồ án, tài khoản đã bị khóa từ trước                 |
-| `publicId` sai / sinh viên không tồn tại                | —                                                | 404  | 3008 | Sinh viên không tồn tại                                                      |
+| Tình huống                                            | BE làm gì                                               | HTTP | code | message                                                                         |
+| :---------------------------------------------------- | :------------------------------------------------------ | :--- | :--- | :------------------------------------------------------------------------------ |
+| Sinh viên **chưa có** đề tài / đăng ký đồ án nào      | Xóa hẳn hồ sơ sinh viên + tài khoản + thông báo         | 200  | 1000 | Xóa tài khoản sinh viên thành công                                              |
+| Sinh viên **đã có** dữ liệu đồ án (bất kỳ học kì nào) | Giữ hồ sơ, chỉ khóa tài khoản (`accountStatus = false`) | 200  | 1000 | Sinh viên đã có dữ liệu đồ án nên không thể xóa, tài khoản đã bị khóa đăng nhập |
+| Đã có dữ liệu đồ án và tài khoản **đã khóa từ trước** | Không đổi gì                                            | 200  | 1000 | Sinh viên đã có dữ liệu đồ án, tài khoản đã bị khóa từ trước                    |
+| `publicId` sai / sinh viên không tồn tại              | —                                                       | 404  | 3008 | Sinh viên không tồn tại                                                         |
 
 ```json
 { "code": 1000, "message": "Xóa tài khoản sinh viên thành công" }
@@ -334,8 +351,8 @@ API riêng cho Admin, **không theo học kì**. **Không dùng** `DELETE /stude
 **Hành vi FE**:
 
 1. Bấm thùng rác → **dừng lan sự kiện** (`e.stopPropagation()`) để không mở popup chi tiết của dòng.
-2. Mở dialog xác nhận, ví dụ: *"Xóa tài khoản sinh viên **{name}** ({studentCode})? Nếu sinh viên đã có dữ liệu đồ án,
-   tài khoản sẽ chỉ bị khóa đăng nhập thay vì xóa."*
+2. Mở dialog xác nhận, ví dụ: _"Xóa tài khoản sinh viên **{name}** ({studentCode})? Nếu sinh viên đã có dữ liệu đồ án,
+   tài khoản sẽ chỉ bị khóa đăng nhập thay vì xóa."_
 3. Xác nhận → gọi API, nút "Xóa" disable + spinner khi đang gọi.
 4. Thành công → **toast xanh hiển thị đúng `message` BE trả về** (vì message cho biết đã xóa hay chỉ khóa),
    đóng dialog, `invalidateQueries(ACCOUNT_KEYS.all)` để tải lại danh sách (dòng biến mất hoặc chuyển "Không hoạt động").
@@ -350,30 +367,30 @@ API riêng cho Admin, **không theo học kì**. **Không dùng** `DELETE /stude
 ```ts
 /** 1 dòng của GET /student/account */
 export interface StudentAccountItem {
-  publicId: string
-  studentCode: string
-  name: string
-  email: string
-  className: string
-  batch: string
-  majorName: string | null
-  accountStatus: boolean
+  publicId: string;
+  studentCode: string;
+  name: string;
+  email: string;
+  className: string;
+  batch: string;
+  majorName: string | null;
+  accountStatus: boolean;
 }
 
 /** data của GET /student/account/{publicId} */
 export interface StudentAccountDetail extends StudentAccountItem {
-  phone: string | null
+  phone: string | null;
 }
 
 /** Query của GET /student/account */
 export interface StudentAccountListParams {
-  keyword?: string
-  batch?: string
-  majorId?: string
-  status?: boolean
-  page: number // 0-based
-  size: number
-  sort?: string | string[]
+  keyword?: string;
+  batch?: string;
+  majorId?: string;
+  status?: boolean;
+  page: number; // 0-based
+  size: number;
+  sort?: string | string[];
 }
 ```
 
@@ -407,37 +424,41 @@ deleteStudentAccount: async (publicId: string): Promise<string> => {
 ```ts
 export const ACCOUNT_KEYS = {
   // ...
-  studentList: (params: StudentAccountListParams) => [...ACCOUNT_KEYS.all, 'students', params] as const,
-  studentDetail: (publicId: string) => [...ACCOUNT_KEYS.all, 'students', 'detail', publicId] as const,
-}
+  studentList: (params: StudentAccountListParams) =>
+    [...ACCOUNT_KEYS.all, "students", params] as const,
+  studentDetail: (publicId: string) =>
+    [...ACCOUNT_KEYS.all, "students", "detail", publicId] as const,
+};
 
 export function useStudentAccounts(params: StudentAccountListParams) {
   return useQuery({
     queryKey: ACCOUNT_KEYS.studentList(params),
     queryFn: () => accountService.getStudentAccounts(params),
     placeholderData: keepPreviousData,
-  })
+  });
 }
 
 export function useStudentAccountDetail(publicId: string | null) {
   return useQuery({
-    queryKey: ACCOUNT_KEYS.studentDetail(publicId ?? ''),
+    queryKey: ACCOUNT_KEYS.studentDetail(publicId ?? ""),
     queryFn: () => accountService.getStudentAccountDetail(publicId!),
     enabled: Boolean(publicId),
-  })
+  });
 }
 
 export function useDeleteStudentAccount() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (publicId: string) => accountService.deleteStudentAccount(publicId),
+    mutationFn: (publicId: string) =>
+      accountService.deleteStudentAccount(publicId),
     onSuccess: (message) => {
-      toast.success(message)
-      queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.all })
+      toast.success(message);
+      queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.all });
     },
     // Lỗi: interceptor đã toast; vẫn tải lại để bỏ dòng đã bị xóa ở nơi khác
-    onError: () => queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.all }),
-  })
+    onError: () =>
+      queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.all }),
+  });
 }
 ```
 
@@ -448,10 +469,10 @@ const { data, isLoading } = useStudentAccounts({
   keyword: debouncedSearch.trim() || undefined,
   batch: selectedBatch || undefined,
   majorId: selectedMajor || undefined, // publicId ngành
-  status: selectedStatus === '' ? undefined : selectedStatus === 'true',
+  status: selectedStatus === "" ? undefined : selectedStatus === "true",
   page: currentPage - 1,
   size: PAGE_SIZE,
-})
+});
 // data.content → bảng, data.totalElements → totalCount, data.totalPages → phân trang
 ```
 
@@ -525,9 +546,9 @@ Body giống `POST /student` của Trưởng bộ môn (`StudentCreationRequest`
 }
 ```
 
-| Tình huống                                     | HTTP | code | message                                                                              |
-| :--------------------------------------------- | :--- | :--- | :----------------------------------------------------------------------------------- |
-| Tạo mới                                        | 200  | 1000 | Tạo tài khoản sinh viên thành công                                                   |
+| Tình huống                                      | HTTP | code | message                                                                              |
+| :---------------------------------------------- | :--- | :--- | :----------------------------------------------------------------------------------- |
+| Tạo mới                                         | 200  | 1000 | Tạo tài khoản sinh viên thành công                                                   |
 | Lỗi định dạng (1 lỗi / ≥ 2 lỗi), ngành không có | 400  | 4000 | Message lỗi cụ thể / `<các trường> không hợp lệ, vui lòng kiểm tra lại`              |
 | Trùng mã SV / email / SĐT với tài khoản đã có   | 409  | 3014 | `<Mã sinh viên, Email, Số điện thoại> trùng với tài khoản đã tồn tại trong hệ thống` |
 
