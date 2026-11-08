@@ -270,7 +270,8 @@ export default function StudentRegistrationPage() {
     setEditingRegistration(null)
   }
 
-  // 13. Mở form tạo đơn mới
+
+  // 13. Mở form tạo đơn mới hoặc chỉnh sửa đơn hiện tại
   const handlePrimaryAction = () => {
     if (!isCurrentSemester) {
       setSubmitError(
@@ -296,24 +297,30 @@ export default function StudentRegistrationPage() {
       return
     }
 
-    const hasUnresolvedRegistration = requests.some(
-      (request) =>
-        request.status === 'PENDING' ||
-        request.status === 'TEACHER_APPROVED',
-    )
+    // Nếu đã có đơn PENDING thì mở form chỉnh sửa đơn đó
+    if (pendingRegistration) {
+      setEditingRegistration(pendingRegistration)
+      setIsEditingPending(true)
+      setSubmitError(null)
+      setModalOpen(true)
+      return
+    }
 
-    if (hasUnresolvedRegistration) {
+    // Nếu đơn đã được giảng viên duyệt và đang chờ Trưởng bộ môn
+    if (waitingApprovalRegistration) {
       setSubmitError(
-        'Bạn đã có đơn đăng ký chưa bị từ chối. Vui lòng kiểm tra đơn trong bảng lịch sử.',
+        'Đơn đăng ký của bạn đang chờ Trưởng bộ môn xử lý.',
       )
       return
     }
 
+    // Không còn đơn chưa được xử lý thì cho phép tạo đơn mới
     setIsEditingPending(false)
     setEditingRegistration(null)
     setSubmitError(null)
     setModalOpen(true)
   }
+
 
   // 14. Mở form chỉnh sửa đơn PENDING
   const handleEditRegistration = (
