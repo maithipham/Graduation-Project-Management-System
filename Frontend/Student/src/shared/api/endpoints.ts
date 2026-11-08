@@ -34,4 +34,14 @@ export const API_ENDPOINTS = {
     council: '/lecturer/council',
     department: '/lecturer/department',
   },
+  semester: {
+    base: '/semester',
+    current: '/semester/current',
+  },
+  major: {
+    base: '/major',
+  },
+  advisor: {
+    advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
+  },
 } as const

@@ -1,23 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
-  DEFAULT_DEPARTMENT,
   DEFAULT_ORIGIN,
   LECTURER_PAGE_SIZE,
   type Lecturer,
   type LecturerFilterState,
   type LecturerOriginFilter,
 } from '../types/lecturer.types'
-import { LECTURERS_MOCK, normalizeDepartment } from '../services/lecturer.service'
+import {
+  LECTURERS_MOCK,
+  isDepartmentMatch,
+} from '../services/lecturer.service'
 
 const FILTER_STORAGE_KEY = 'student_lecturer_filters_v1'
 
-const DEFAULT_FILTER_STATE: LecturerFilterState = {
+const createDefaultFilterState = (defaultDept: string = ''): LecturerFilterState => ({
   search: '',
-  department: DEFAULT_DEPARTMENT,
+  department: defaultDept,
   origin: DEFAULT_ORIGIN,
   currentPage: 1,
-}
+})
 
 // Đánh dấu lần nạp tài liệu đầu tiên: chỉ khôi phục sessionStorage khi F5 (reload trình duyệt),
 // còn khi chuyển trang từ Sidebar trong SPA hoặc vào lại từ menu sẽ nhận giá trị lọc mặc định.
@@ -37,7 +39,7 @@ function isBrowserReload(): boolean {
   return false
 }
 
-function getInitialFilterState(): LecturerFilterState {
+function getInitialFilterState(defaultDept: string = ''): LecturerFilterState {
   if (!hasConsumedInitialDocumentLoad) {
     hasConsumedInitialDocumentLoad = true
     if (isBrowserReload()) {
@@ -56,7 +58,7 @@ function getInitialFilterState(): LecturerFilterState {
               : DEFAULT_ORIGIN
           return {
             search: typeof parsed.search === 'string' ? parsed.search : '',
-            department: typeof parsed.dept === 'string' ? parsed.dept : DEFAULT_DEPARTMENT,
+            department: typeof parsed.dept === 'string' ? parsed.dept : defaultDept,
             origin: validOrigin,
             currentPage: typeof parsed.page === 'number' && parsed.page > 0 ? parsed.page : 1,
           }
@@ -66,18 +68,37 @@ function getInitialFilterState(): LecturerFilterState {
       }
     }
   }
-  return DEFAULT_FILTER_STATE
+  return createDefaultFilterState(defaultDept)
 }
 
-export function useLecturerFilters(lecturers: Lecturer[] = LECTURERS_MOCK) {
+export function useLecturerFilters(
+  lecturers: Lecturer[] = LECTURERS_MOCK,
+  defaultDepartment?: string,
+) {
+  const effectiveDefaultDept = defaultDepartment || ''
   const location = useLocation()
   const [prevLocationKey, setPrevLocationKey] = useState(location.key)
-  const [filters, setFilters] = useState<LecturerFilterState>(getInitialFilterState)
+  const [filters, setFilters] = useState<LecturerFilterState>(() =>
+    getInitialFilterState(effectiveDefaultDept),
+  )
+
+  const [prevDefaultDept, setPrevDefaultDept] = useState(defaultDepartment)
+
+  // Cập nhật department khi defaultDepartment thay đổi
+  if (defaultDepartment !== prevDefaultDept) {
+    setPrevDefaultDept(defaultDepartment)
+    if (defaultDepartment) {
+      setFilters((prev) => ({
+        ...prev,
+        department: defaultDepartment,
+      }))
+    }
+  }
 
   // Khi bấm lại mục "Danh sách GVHD" trên Sidebar (location.key thay đổi), đặt lại bộ lọc mặc định
   if (prevLocationKey !== location.key) {
     setPrevLocationKey(location.key)
-    setFilters(DEFAULT_FILTER_STATE)
+    setFilters(createDefaultFilterState(effectiveDefaultDept))
   }
 
   // Lưu trạng thái lọc vào sessionStorage để khi nhấn F5 giữ nguyên giá trị đang chọn
@@ -107,9 +128,7 @@ export function useLecturerFilters(lecturers: Lecturer[] = LECTURERS_MOCK) {
           (field ?? '').toLowerCase().includes(query),
         )
 
-      const matchDept =
-        filters.department === '' ||
-        normalizeDepartment(lec.department) === normalizeDepartment(filters.department)
+      const matchDept = isDepartmentMatch(lec.department, filters.department)
 
       const lecOrigin = lec.origin || 'internal'
       const matchOrigin =
@@ -136,25 +155,20 @@ export function useLecturerFilters(lecturers: Lecturer[] = LECTURERS_MOCK) {
     }))
   }
 
-  // Đồng bộ lọc Bộ môn -> Đơn vị:
-  // Khi chọn bất kỳ bộ môn cụ thể nào, tự động chuyển Đơn vị về "Trong trường"
+  // Lọc theo ngành độc lập
   const handleDepartmentChange = (department: string) => {
     setFilters((prev) => ({
       ...prev,
       department,
-      origin: department !== '' ? 'internal' : prev.origin,
       currentPage: 1,
     }))
   }
 
-  // Đồng bộ lọc Đơn vị -> Bộ môn:
-  // - Khi chọn "Ngoài trường": Bộ môn tự động về "Tất cả bộ môn"
-  // - Khi chọn lại "Trong trường" / "Tất cả đơn vị": giữ nguyên lựa chọn Bộ môn hiện tại (không tự đổi)
+  // Lọc theo trong trường / ngoài trường độc lập
   const handleOriginChange = (origin: LecturerOriginFilter) => {
     setFilters((prev) => ({
       ...prev,
       origin,
-      department: origin === 'external' ? '' : prev.department,
       currentPage: 1,
     }))
   }

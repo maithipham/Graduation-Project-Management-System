@@ -240,6 +240,16 @@ export default function SupervisorAssignmentPage() {
     const target =
       overviewLecturers.find((l) => l.id === id) ||
       workspaceLecturers.find((l) => l.id === id)
+
+    // Ràng buộc số lượng SV: Chặn nếu hạn mức mới nhỏ hơn số lượng SV đang hướng dẫn
+    const currentAssigned = target?.assigned ?? 0
+    if (target && quota < currentAssigned) {
+      toast.warning(
+        `Không thể giảm hạn mức xuống ${quota} vì giảng viên ${target.name} hiện đang hướng dẫn ${currentAssigned} sinh viên.`,
+      )
+      return
+    }
+
     const targetIdentifier =
       target?.teacherId ??
       target?.advisorId ??

@@ -114,7 +114,7 @@ export function TeacherFormFields({
         </Select>
       </FormField>
 
-      <FormField label="Học hàm / Học vị" error={errors.academicTitle?.message}>
+      <FormField label="Học hàm / Học vị" required error={errors.academicTitle?.message}>
         <Select {...register('academicTitle')}>
           <option value="">-- Chọn học hàm / học vị --</option>
           {titles.map((t) => (

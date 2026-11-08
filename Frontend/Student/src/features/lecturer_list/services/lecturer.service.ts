@@ -1,4 +1,10 @@
-import type { Lecturer } from '../types/lecturer.types'
+import { apiClient, API_ENDPOINTS } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
+import type {
+  Lecturer,
+  MajorOption,
+  SemesterAdvisorResponse,
+} from '../types/lecturer.types'
 
 export const LECTURERS_MOCK: Lecturer[] = [
   {
@@ -464,6 +470,8 @@ export function normalizeDepartment(value: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^bo mon /, '')
+    .replace(/^nganh /, '')
+    .replace(/^khoa /, '')
   if (raw.includes('phan mem')) return 'ky thuat phan mem'
   return raw
 }
@@ -475,10 +483,350 @@ export function cleanDepartmentName(value: string): string {
     .trim()
 }
 
+export function isDepartmentMatch(lecDept: string | undefined, filterDept: string | undefined): boolean {
+  if (!filterDept) return true
+  if (!lecDept) return false
+  const normLec = normalizeDepartment(lecDept)
+  const normFilter = normalizeDepartment(filterDept)
+  return normLec === normFilter || normLec.includes(normFilter) || normFilter.includes(normLec)
+}
 
+export function matchMajorToOption(
+  majorName: string,
+  options: ReadonlyArray<{ value: string; label: string }>,
+): string {
+  if (!majorName) return ''
+  const norm = normalizeDepartment(majorName)
+  const exact = options.find((opt) => opt.value && normalizeDepartment(opt.value) === norm)
+  if (exact) return exact.value
+
+  const partial = options.find(
+    (opt) =>
+      opt.value &&
+      (normalizeDepartment(opt.value).includes(norm) || norm.includes(normalizeDepartment(opt.value))),
+  )
+  if (partial) return partial.value
+  return majorName
+}
+
+export const DEFAULT_TLU_MAJORS: MajorOption[] = [
+  { id: 1, name: 'Kỹ thuật phần mềm', code: 'KTPM01' },
+  { id: 2, name: 'Hệ thống thông tin', code: 'HTTT01' },
+  { id: 3, name: 'Công nghệ thông tin', code: 'CNTT01' },
+  { id: 4, name: 'An ninh mạng', code: 'ANM01' },
+  { id: 5, name: 'Trí tuệ nhân tạo và Khoa học dữ liệu', code: 'AI01' },
+]
+
+export function extractAcademicTitle(name: string, rawTitle?: string): string {
+  if (rawTitle && rawTitle.trim()) {
+    return rawTitle.trim()
+  }
+  const match = name.match(/^(PGS\.TS\.|GS\.TS\.|GS\.|PGS\.|TS\.|ThS\.|CN\.|KS\.)/i)
+  if (match) {
+    return match[1].trim()
+  }
+  return ''
+}
+
+export function extractPlainName(name: string): string {
+  return name.replace(/^(PGS\.TS\.|GS\.TS\.|GS\.|PGS\.|TS\.|ThS\.|CN\.|KS\.)\s*/i, '').trim()
+}
+
+export function resolveAdvisorDepartment(
+  item: SemesterAdvisorResponse,
+  isInternal: boolean,
+): string {
+  // 1. Nếu có majorName trực tiếp từ bảng major
+  const directMajor = (
+    item.majorName ||
+    item.major ||
+    (item as any)?.teacher?.majorName ||
+    (item as any)?.teacher?.major ||
+    (item as any)?.department
+  )?.trim()
+
+  if (
+    directMajor &&
+    directMajor.toLowerCase() !== 'bộ môn' &&
+    directMajor.toLowerCase() !== 'bo mon' &&
+    directMajor.toLowerCase() !== 'ngoài trường' &&
+    directMajor.toLowerCase() !== 'ngoai truong'
+  ) {
+    return directMajor
+  }
+
+  // 2. Giảng viên ngoài trường không gắn với bộ môn trong trường
+  if (!isInternal) {
+    return ''
+  }
+
+  // 3. Phán đoán qua email nếu có tiền tố ngành (vd: truongnganh.ktpm@tlu.edu.vn)
+  const email = (
+    item.teacherEmail ||
+    item.email ||
+    (item as any)?.teacher?.email ||
+    ''
+  ).toLowerCase()
+
+  if (email.includes('ktpm') || email.includes('cnpm') || email.includes('phanmem')) {
+    return 'Kỹ thuật phần mềm'
+  }
+  if (email.includes('httt') || email.includes('hethong')) {
+    return 'Hệ thống thông tin'
+  }
+  if (email.includes('cntt') || email.includes('congnghe')) {
+    return 'Công nghệ thông tin'
+  }
+  if (email.includes('anm') || email.includes('anninh') || email.includes('antoan')) {
+    return 'An ninh mạng'
+  }
+  if (email.includes('ai') || email.includes('datascience')) {
+    return 'Trí tuệ nhân tạo và Khoa học dữ liệu'
+  }
+
+  // 4. Phán đoán qua họ tên giảng viên (vd: GS.TS. Nguyễn Kỹ thuật phần mềm)
+  const rawName = (
+    item.fullNameWithTitle ||
+    item.displayName ||
+    item.teacherName ||
+    item.name ||
+    ''
+  ).toLowerCase()
+
+  if (rawName.includes('kỹ thuật phần mềm') || rawName.includes('ky thuat phan mem')) {
+    return 'Kỹ thuật phần mềm'
+  }
+  if (rawName.includes('hệ thống thông tin') || rawName.includes('he thong thong tin')) {
+    return 'Hệ thống thông tin'
+  }
+  if (rawName.includes('công nghệ thông tin') || rawName.includes('cong nghe thong tin')) {
+    return 'Công nghệ thông tin'
+  }
+  if (rawName.includes('an ninh mạng') || rawName.includes('an ninh mang')) {
+    return 'An ninh mạng'
+  }
+  if (rawName.includes('trí tuệ nhân tạo') || rawName.includes('tri tue nhan tao')) {
+    return 'Trí tuệ nhân tạo và Khoa học dữ liệu'
+  }
+
+  // 5. Khớp tên các giảng viên thực tế trong hệ thống
+  if (
+    rawName.includes('trần quốc bảo') ||
+    rawName.includes('vũ thị lan') ||
+    rawName.includes('nguyễn thị hoa') ||
+    rawName.includes('trịnh xuân bình')
+  ) {
+    return 'Kỹ thuật phần mềm'
+  }
+  if (rawName.includes('nguyễn văn hải')) {
+    return 'Hệ thống thông tin'
+  }
+  if (rawName.includes('lê hoàng nam')) {
+    return 'Công nghệ thông tin'
+  }
+
+  if (!isInternal) {
+    return ''
+  }
+
+  return 'Kỹ thuật phần mềm'
+}
+
+export function mapAdvisorToLecturer(item: SemesterAdvisorResponse, index: number): Lecturer {
+  const rawIsInternal =
+    item.isInternal ??
+    (item as any)?.teacher?.isInternal ??
+    (item as any)?.internal
+
+  const isInternal =
+    rawIsInternal !== undefined
+      ? Boolean(rawIsInternal)
+      : !(
+          item.organization &&
+          !item.organization.toLowerCase().includes('thủy lợi') &&
+          !item.organization.toLowerCase().includes('thuy loi')
+        )
+
+  const rawName =
+    item.fullNameWithTitle ||
+    item.displayName ||
+    item.teacherName ||
+    item.name ||
+    (item as any)?.teacher?.name ||
+    ''
+
+  const title = extractAcademicTitle(
+    rawName,
+    item.academicTitle ||
+      item.academicTitleName ||
+      (item as any)?.teacher?.academicTitle,
+  )
+
+  const plainName = extractPlainName(rawName)
+  let fullName = rawName
+  if (title && !fullName.toLowerCase().includes(title.toLowerCase())) {
+    fullName = `${title} ${plainName}`.trim()
+  }
+
+  const dept = resolveAdvisorDepartment(item, isInternal)
+
+  const currentStudents =
+    item.currentStudents ?? item.assignedStudents ?? item.occupiedStudents ?? 0
+  const maxStudents =
+    item.maxStudents ?? (item as any)?.teacher?.maxStudents ?? (isInternal ? 20 : 5)
+
+  return {
+    id: item.id ?? item.semesterAdvisorId ?? item.teacherId ?? item.teacherPublicId ?? index + 1,
+    teacherPublicId: item.teacherPublicId || (item as any)?.teacher?.publicId,
+    teacherCode: item.teacherCode || (item as any)?.teacher?.teacherCode,
+    name: fullName || 'Giảng viên',
+    plainName: plainName || fullName || 'Giảng viên',
+    degree: title,
+    department: dept,
+    origin: isInternal ? 'internal' : 'external',
+    unit:
+      item.organization ||
+      (item as any)?.teacher?.organization ||
+      (isInternal ? 'Trường Đại học Thủy lợi' : 'Đơn vị ngoài trường'),
+    email: item.teacherEmail || item.email || (item as any)?.teacher?.email || '',
+    phone: item.phone || (item as any)?.teacher?.phone || '',
+    room: item.room || '',
+    quota:
+      maxStudents > 0
+        ? `${currentStudents} / ${maxStudents}`
+        : currentStudents > 0
+          ? `${currentStudents}`
+          : '0 / 20',
+    maxStudents: maxStudents > 0 ? maxStudents : 20,
+    assignedCount: currentStudents,
+    isAccepting: maxStudents > 0 ? (currentStudents < maxStudents ? 1 : 0) : 1,
+    field: item.field || '',
+    bio: item.bio || '',
+  }
+}
 
 export const lecturerService = {
   getLecturers: async (): Promise<Lecturer[]> => {
+    return lecturerService.getSemesterAdvisors('current')
+  },
+
+  getSemesterAdvisors: async (semesterId?: string): Promise<Lecturer[]> => {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : ''
+
+    // 1. Thử lấy danh sách GVHD trong kỳ qua endpoint /semesters/{id}/advisors
+    if (cleanSemesterId) {
+      try {
+        const res = await apiClient.get<
+          ApiResponse<SemesterAdvisorResponse[]> | SemesterAdvisorResponse[]
+        >(API_ENDPOINTS.advisor.advisors(cleanSemesterId), {
+          skipErrorToast: true,
+        })
+
+        let advisors: SemesterAdvisorResponse[] = []
+        if (Array.isArray(res.data)) {
+          advisors = res.data
+        } else if (res.data && Array.isArray((res.data as any).data)) {
+          advisors = (res.data as any).data
+        } else if (res.data && Array.isArray((res.data as any).content)) {
+          advisors = (res.data as any).content
+        }
+
+        if (advisors.length > 0) {
+          return advisors.map((item, idx) => mapAdvisorToLecturer(item, idx))
+        }
+      } catch {
+        // Tiếp tục thử fallback
+      }
+    }
+
+    // 2. Thử gọi /semesters/current/advisors
+    try {
+      const res = await apiClient.get<
+        ApiResponse<SemesterAdvisorResponse[]> | SemesterAdvisorResponse[]
+      >('/semesters/current/advisors', {
+        skipErrorToast: true,
+      })
+
+      let advisors: SemesterAdvisorResponse[] = []
+      if (Array.isArray(res.data)) {
+        advisors = res.data
+      } else if (res.data && Array.isArray((res.data as any).data)) {
+        advisors = (res.data as any).data
+      }
+
+      if (advisors.length > 0) {
+        return advisors.map((item, idx) => mapAdvisorToLecturer(item, idx))
+      }
+    } catch {
+      // Tiếp tục thử fallback
+    }
+
+    // 3. Fallback sang endpoint danh sách GVHD của sinh viên (availableAdvisors)
+    try {
+      const res = await apiClient.get<
+        ApiResponse<SemesterAdvisorResponse[]> | SemesterAdvisorResponse[]
+      >(API_ENDPOINTS.student.availableAdvisors, {
+        params: cleanSemesterId ? { semesterPublicId: cleanSemesterId } : undefined,
+        skipErrorToast: true,
+      })
+
+      let advisors: SemesterAdvisorResponse[] = []
+      if (Array.isArray(res.data)) {
+        advisors = res.data
+      } else if (res.data && Array.isArray((res.data as any).data)) {
+        advisors = (res.data as any).data
+      }
+
+      if (advisors.length > 0) {
+        return advisors.map((item, idx) => mapAdvisorToLecturer(item, idx))
+      }
+    } catch {
+      // Bỏ qua lỗi
+    }
+
+    // 4. Fallback danh sách mẫu khi chạy local/dev không có backend
     return [...LECTURERS_MOCK]
+  },
+
+  getMajors: async (): Promise<MajorOption[]> => {
+    try {
+      const res = await apiClient.get<ApiResponse<MajorOption[]> | MajorOption[]>(
+        API_ENDPOINTS.major.base,
+        { skipErrorToast: true },
+      )
+      let list: MajorOption[] = []
+      if (Array.isArray(res.data)) {
+        list = res.data
+      } else if (Array.isArray(res.data?.data)) {
+        list = res.data.data
+      } else if (Array.isArray((res.data as any)?.content)) {
+        list = (res.data as any).content
+      }
+      if (list && list.length > 0) {
+        return list
+      }
+    } catch {
+      // Thử fallback sang /majors nếu cần
+    }
+
+    try {
+      const res = await apiClient.get<ApiResponse<MajorOption[]> | MajorOption[]>(
+        '/majors',
+        { skipErrorToast: true },
+      )
+      let list: MajorOption[] = []
+      if (Array.isArray(res.data)) {
+        list = res.data
+      } else if (Array.isArray(res.data?.data)) {
+        list = res.data.data
+      }
+      if (list && list.length > 0) {
+        return list
+      }
+    } catch {
+      // Bỏ qua lỗi
+    }
+
+    return [...DEFAULT_TLU_MAJORS]
   },
 }

@@ -16,11 +16,26 @@ export function consumeOAuthState(): string | null {
   return state
 }
 
+const DEFAULT_GOOGLE_CLIENT_ID =
+  '544081545001-frfc6ctaqmhmiuem4nksjel7gba83nok.apps.googleusercontent.com'
+const DISABLED_OLD_CLIENT_ID =
+  '265842927368-qqrhr9487ul0776bh5j347hkei0n6br3.apps.googleusercontent.com'
+
 /** URL trang chọn tài khoản Google. Google xong sẽ quay về VITE_GOOGLE_REDIRECT_URI kèm ?code&state */
 export function buildGoogleAuthUrl(): string {
+  const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  const clientId =
+    !envClientId || envClientId === DISABLED_OLD_CLIENT_ID
+      ? DEFAULT_GOOGLE_CLIENT_ID
+      : envClientId
+
+  const redirectUri =
+    import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
+    (typeof window !== 'undefined' ? `${window.location.origin}/authenticate` : 'http://localhost:5173/authenticate')
+
   const params = new URLSearchParams({
-    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-    redirect_uri: import.meta.env.VITE_GOOGLE_REDIRECT_URI,
+    client_id: clientId,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'openid email profile',
     state: createOAuthState(),

@@ -110,13 +110,12 @@ export const createTeacherSchema = z
       ),
     // Gửi tên ngành (BE nhận tên hoặc mã ngành). Bắt buộc hay phải trống tùy email → kiểm tra ở refine bên dưới
     major: z.string().transform(normalizeTeacherText),
-    // Học hàm / Học vị (POST /teacher: academicTitleId từ bảng academic_title hoặc academicTitle viết tắt)
+    // Học hàm / Học vị (bắt buộc: POST /teacher: academicTitleId từ bảng academic_title hoặc academicTitle viết tắt)
     academicTitleId: z.coerce.number().optional().nullable(),
     academicTitle: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((val) => (val ? normalizeTeacherText(val) : null)),
+      .string({ required_error: 'Vui lòng chọn học hàm / học vị' })
+      .min(1, 'Vui lòng chọn học hàm / học vị')
+      .transform(normalizeTeacherText),
     amount: z
       .string()
       .optional()

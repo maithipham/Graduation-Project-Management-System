@@ -1,5 +1,5 @@
 VITE_API_BASE_URL=http://localhost:8080
 
 # Google OAuth2 (lấy từ Google Cloud Console)
-VITE_GOOGLE_CLIENT_ID=265842927368-qqrhr9487ul0776bh5j347hkei0n6br3.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=544081545001-frfc6ctaqmhmiuem4nksjel7gba83nok.apps.googleusercontent.com
 VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/authenticate
