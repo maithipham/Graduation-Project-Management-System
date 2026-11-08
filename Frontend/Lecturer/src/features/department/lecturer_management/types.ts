@@ -298,6 +298,16 @@ export interface LecturerAssignmentItem {
   isFull: boolean
 }
 
+export interface RegistrationDeadlineInfo {
+  deadlineName?: string
+  startDate?: string | null
+  endDate?: string | null
+  isActive?: boolean
+  isEnded: boolean
+  status: 'OPEN' | 'CLOSED' | 'NOT_STARTED' | 'NOT_CONFIGURED' | 'INACTIVE' | string
+  statusMessage?: string
+}
+
 export interface AdvisorAssignmentWorkspaceResponse {
   semesterPublicId: string
   semesterName: string
@@ -307,6 +317,7 @@ export interface AdvisorAssignmentWorkspaceResponse {
   lockedAt?: string | null
   lockedByName?: string | null
   counts: AdvisorAssignmentCounts
+  registrationDeadline?: RegistrationDeadlineInfo | null
   students: StudentAssignmentItem[]
   lecturers: LecturerAssignmentItem[]
 }

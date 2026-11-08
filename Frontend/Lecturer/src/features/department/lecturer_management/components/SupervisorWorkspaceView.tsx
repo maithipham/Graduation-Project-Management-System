@@ -11,11 +11,56 @@ import {
   Search,
   X,
   AlertTriangle,
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react'
 import { toast } from '@/shared/components/feedback'
 import { cn } from '@/shared/utils/cn'
 import type { SemesterOption } from '@/features/department/student_management'
-import type { SupervisorLecturer, SupervisorStudent } from '../types'
+import type { SupervisorLecturer, SupervisorStudent, RegistrationDeadlineInfo } from '../types'
+
+function formatDeadlineDateTime(val?: string | null): string {
+  if (!val) return ''
+  const d = new Date(val)
+  if (Number.isNaN(d.getTime())) return val
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const yr = d.getFullYear()
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${yr} ${hours}:${minutes}`
+}
+
+function calculateTimeRemaining(targetDateStr?: string | null) {
+  if (!targetDateStr) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true, formattedText: '' }
+  }
+  const end = new Date(targetDateStr).getTime()
+  if (Number.isNaN(end)) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true, formattedText: '' }
+  }
+  const diff = end - Date.now()
+  if (diff <= 0) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true, formattedText: 'Đã hết hạn' }
+  }
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+  let text = ''
+  if (days > 0) {
+    text = `Còn ${days} ngày ${hours} giờ`
+  } else if (hours > 0) {
+    text = `Còn ${hours} giờ ${minutes} phút`
+  } else {
+    text = `Còn ${minutes} phút ${seconds} giây`
+  }
+  return { days, hours, minutes, seconds, isPast: false, formattedText: text }
+}
 
 interface SupervisorWorkspaceViewProps {
   lecturers: SupervisorLecturer[]
@@ -30,6 +75,7 @@ interface SupervisorWorkspaceViewProps {
   isLocked: boolean
   lockedAt?: string | null
   lockedByName?: string | null
+  registrationDeadline?: RegistrationDeadlineInfo | null
   counts?: { received: number; unassigned: number; approved: number }
   isLoading?: boolean
   onBack: () => void
@@ -38,7 +84,7 @@ interface SupervisorWorkspaceViewProps {
   onRejectRegistrations: (registrationPublicIds: string[]) => void
   onChangeSupervisor: (studentId: string, newSupervisor: SupervisorLecturer) => void | Promise<void>
   onChangeCoSupervisor: (studentId: string, coSupervisor: SupervisorLecturer | null) => void
-  onToggleLock: (isLocked: boolean) => void
+  onToggleLock: (isLocked: boolean) => Promise<boolean | void> | void
 }
 
 export function SupervisorWorkspaceView({
@@ -54,6 +100,7 @@ export function SupervisorWorkspaceView({
   isLocked: propIsLocked,
   lockedAt: propLockedAt,
   lockedByName: propLockedByName,
+  registrationDeadline,
   counts,
   onBack,
   onAssignStudents,
@@ -79,6 +126,29 @@ export function SupervisorWorkspaceView({
   useEffect(() => {
     setLockedByName(propLockedByName)
   }, [propLockedByName])
+
+  // Trạng thái đếm ngược thời hạn đăng ký
+  const [countdown, setCountdown] = useState(() =>
+    calculateTimeRemaining(registrationDeadline?.endDate),
+  )
+
+  useEffect(() => {
+    if (!registrationDeadline?.endDate) return
+    setCountdown(calculateTimeRemaining(registrationDeadline.endDate))
+    const timer = setInterval(() => {
+      setCountdown(calculateTimeRemaining(registrationDeadline.endDate))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [registrationDeadline?.endDate])
+
+  const isDeadlineEnded =
+    Boolean(registrationDeadline?.isEnded) ||
+    registrationDeadline?.status === 'CLOSED' ||
+    (registrationDeadline?.endDate ? countdown.isPast : false)
+
+  const isDeadlineOpen = registrationDeadline?.status === 'OPEN' && !isDeadlineEnded
+  const deadlineEndDateFormatted = formatDeadlineDateTime(registrationDeadline?.endDate)
+
   // Tabs: 1. "received" (Đã nhận GV) | 2. "unassigned" (Chưa nhận GV) | 3. "approved" (Đã phân công)
   // Mặc định chọn tab "received" nếu có đơn cần duyệt, nếu không chọn "unassigned"
   const [currentTab, setCurrentTab] = useState<'received' | 'unassigned' | 'approved'>(() => {
@@ -122,6 +192,63 @@ export function SupervisorWorkspaceView({
     () => counts?.approved ?? students.filter((s) => s.status === 'approved').length,
     [counts, students],
   )
+
+  // Điều kiện để được phép khóa danh sách:
+  // 1. Phải hết hạn đăng ký (!isDeadlineOpen)
+  // 2. Không còn đơn PENDING (tab Đang nhận: countReceived === 0)
+  // 3. 100% sinh viên đã có GVHD (tab Chưa nhận: countUnassigned === 0)
+  const canLock = !isDeadlineOpen && countReceived === 0 && countUnassigned === 0
+
+  let lockDisabledReason = ''
+  if (isDeadlineOpen) {
+    lockDisabledReason = 'Chưa thể khóa do đang trong thời gian sinh viên nộp đơn.'
+  } else if (countReceived > 0 && countUnassigned > 0) {
+    lockDisabledReason = `Còn ${countUnassigned} sinh viên chưa có GVHD và ${countReceived} đơn chờ duyệt.`
+  } else if (countReceived > 0) {
+    lockDisabledReason = `Còn ${countReceived} đơn đăng ký đang chờ duyệt. Cần xử lý hết đơn trước khi khóa danh sách.`
+  } else if (countUnassigned > 0) {
+    lockDisabledReason = `Còn ${countUnassigned} sinh viên chưa có GVHD. Cần phân công đủ 100% sinh viên trước khi khóa danh sách.`
+  }
+
+  const [isSubmittingLock, setIsSubmittingLock] = useState(false)
+  const [isSubmittingUnlock, setIsSubmittingUnlock] = useState(false)
+
+  const handleConfirmLock = async () => {
+    setIsSubmittingLock(true)
+    try {
+      const res = await onToggleLock(true)
+      if (res !== false) {
+        const nowStr = new Date().toLocaleString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+        setIsLocked(true)
+        setLockedAt(nowStr)
+        setLockedByName('Trưởng bộ môn')
+        setLockModalOpen(false)
+      }
+    } finally {
+      setIsSubmittingLock(false)
+    }
+  }
+
+  const handleConfirmUnlock = async () => {
+    setIsSubmittingUnlock(true)
+    try {
+      const res = await onToggleLock(false)
+      if (res !== false) {
+        setIsLocked(false)
+        setLockedAt(null)
+        setLockedByName(null)
+        setUnlockModalOpen(false)
+      }
+    } finally {
+      setIsSubmittingUnlock(false)
+    }
+  }
 
   // Lọc sinh viên theo tab & tìm kiếm
   const filteredStudents = useMemo(() => {
@@ -200,7 +327,7 @@ export function SupervisorWorkspaceView({
 
   // Checkbox toggle sinh viên
   const toggleSelectStudent = (id: string) => {
-    if (isLocked) return
+    if (isLocked || isDeadlineOpen) return
     setSelectedStudentIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -210,7 +337,7 @@ export function SupervisorWorkspaceView({
   }
 
   const toggleSelectAllStudents = () => {
-    if (isLocked) return
+    if (isLocked || isDeadlineOpen) return
     const currentTabIds = filteredStudents.map((s) => s.id)
     const isAllSelected =
       currentTabIds.length > 0 && currentTabIds.every((id) => selectedStudentIds.has(id))
@@ -234,6 +361,10 @@ export function SupervisorWorkspaceView({
 
   // Hành động Gán GVHD (Gán mới hoặc Đổi GVHD trực tiếp từ bảng phải, không qua popup)
   const handleAssignAction = async () => {
+    if (isDeadlineOpen) {
+      toast.warning('Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.')
+      return
+    }
     if (isLocked) {
       toast.warning('Danh sách phân công đã được khóa! Vui lòng mở khóa để chỉnh sửa.')
       return
@@ -332,6 +463,10 @@ export function SupervisorWorkspaceView({
 
   // Hành động Phê duyệt (tab Đã nhận GV)
   const handleApproveAction = () => {
+    if (isDeadlineOpen) {
+      toast.warning('Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.')
+      return
+    }
     if (isLocked) {
       toast.warning('Danh sách phân công đã được khóa! Vui lòng mở khóa để chỉnh sửa.')
       return
@@ -359,6 +494,10 @@ export function SupervisorWorkspaceView({
 
   // Hành động Từ chối (tab Đã nhận GV)
   const handleRejectAction = () => {
+    if (isDeadlineOpen) {
+      toast.warning('Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.')
+      return
+    }
     if (isLocked) {
       toast.warning('Danh sách phân công đã được khóa! Vui lòng mở khóa để chỉnh sửa.')
       return
@@ -387,6 +526,27 @@ export function SupervisorWorkspaceView({
   const selectedCount = selectedStudentIds.size
   const isAllStudentsSelected =
     filteredStudents.length > 0 && filteredStudents.every((s) => selectedStudentIds.has(s.id))
+
+  // Điều kiện để được phép nhấn nút Gán
+  const canAssign =
+    !isLocked &&
+    !isDeadlineOpen &&
+    selectedLecturer !== null &&
+    ((currentTab === 'unassigned' && selectedCount > 0) ||
+      (currentTab === 'approved' && (selectedCount > 0 || editingTarget !== null)))
+
+  let assignDisabledReason = ''
+  if (isDeadlineOpen) {
+    assignDisabledReason = 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+  } else if (isLocked) {
+    assignDisabledReason = 'Danh sách phân công đã được khóa! Vui lòng mở khóa để chỉnh sửa.'
+  } else if (currentTab === 'received') {
+    assignDisabledReason = 'Tab Đã nhận GV dùng nút Phê duyệt / Từ chối'
+  } else if (!selectedLecturer) {
+    assignDisabledReason = 'Vui lòng chọn 1 giảng viên bên bảng phải để gán!'
+  } else if (selectedCount === 0 && !editingTarget) {
+    assignDisabledReason = 'Vui lòng chọn ít nhất 1 sinh viên bên bảng trái để gán!'
+  }
 
   const sortIcon =
     lecturerSort === 'asc' ? (
@@ -462,8 +622,56 @@ export function SupervisorWorkspaceView({
           </div>
         </div>
 
-        {/* Nút Khóa / Mở khóa danh sách */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Cụm góc trên bên phải: Khối Thời hạn đăng ký + Nút Khóa / Mở khóa */}
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Khối Thông tin Thời hạn đăng ký (Registration Deadline Badge) */}
+          {registrationDeadline ? (
+            isDeadlineOpen ? (
+              <div
+                className="rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 bg-amber-50 border-amber-200 text-amber-800 shadow-2xs select-none cursor-help transition"
+                title="Hệ thống đang mở cho sinh viên đăng ký. Trưởng bộ môn chỉ được gán, đổi và chốt danh sách sau khi kết thúc thời hạn này."
+              >
+                <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                <div className="flex flex-col text-left leading-tight">
+                  <div className="font-semibold text-slate-800 text-[11.5px]">
+                    Hạn đăng ký SV: {deadlineEndDateFormatted || 'Chưa thiết lập'}
+                  </div>
+                  <div className="text-[10.5px] font-medium text-amber-700">
+                    {countdown.formattedText ? `${countdown.formattedText} (Chưa mở khóa thao tác)` : 'Đang mở (Chưa mở khóa thao tác)'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 bg-slate-50 border-slate-200 text-slate-700 shadow-2xs select-none cursor-help transition"
+                title="Thời hạn đăng ký của sinh viên đã kết thúc. Bạn có thể tiến hành gán, đổi giảng viên và chốt danh sách."
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="flex flex-col text-left leading-tight">
+                  <div className="font-semibold text-slate-800 text-[11.5px]">
+                    Hạn đăng ký SV: {deadlineEndDateFormatted || 'Đã kết thúc'}
+                  </div>
+                  <div className="text-[10.5px] font-medium text-slate-500 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                    <span>Đã kết thúc thời hạn</span>
+                  </div>
+                </div>
+              </div>
+            )
+          ) : (
+            <div
+              className="rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 bg-slate-50 border-slate-200 text-slate-500 shadow-2xs select-none cursor-default"
+              title="Chưa cấu hình đợt đăng ký GVHD cho học kỳ này"
+            >
+              <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
+              <div className="flex flex-col text-left leading-tight">
+                <div className="font-medium text-slate-700 text-[11.5px]">Hạn đăng ký SV</div>
+                <div className="text-[10.5px] text-slate-400">Chưa cấu hình thời hạn</div>
+              </div>
+            </div>
+          )}
+
+          {/* Nút Khóa / Mở khóa danh sách */}
           {isLocked ? (
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
@@ -471,7 +679,7 @@ export function SupervisorWorkspaceView({
                   Trạng thái: Đã khóa {lockedByName ? `(${lockedByName})` : ''}
                 </div>
                 <div className="text-[10.5px] text-slate-500 font-medium">
-                  {lockedAt || '20:15 26/10/2026'}
+                  {lockedAt || ''}
                 </div>
               </div>
               <button
@@ -484,17 +692,77 @@ export function SupervisorWorkspaceView({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setLockModalOpen(true)}
-              className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs shadow-emerald-600/25 shrink-0"
+            <div
+              className="inline-block"
+              title={lockDisabledReason || 'Khóa danh sách phân công GVHD và công bố chính thức'}
             >
-              <Lock className="w-4 h-4" />
-              <span>Khóa danh sách</span>
-            </button>
+              <button
+                type="button"
+                disabled={!canLock}
+                onClick={() => {
+                  if (!canLock) {
+                    toast.warning(lockDisabledReason)
+                    return
+                  }
+                  setLockModalOpen(true)
+                }}
+                className={cn(
+                  'h-9 px-4 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0',
+                  canLock
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/25'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300',
+                )}
+              >
+                <Lock className="w-4 h-4" />
+                <span>Khóa danh sách</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Banner Cảnh báo Trạng thái Thời hạn Đăng ký */}
+      {isDeadlineOpen && (
+        <div className="shrink-0 p-3 px-4 rounded-xl bg-amber-50 border border-amber-300/80 text-amber-900 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4.5 h-4.5" />
+            </div>
+            <div className="text-[13px] leading-snug">
+              <span className="font-bold text-amber-900">
+                Đang trong thời gian đăng ký GVHD
+                {deadlineEndDateFormatted ? ` (Hạn chót: ${deadlineEndDateFormatted})` : ''}.
+              </span>{' '}
+              <span className="text-amber-800">
+                Trưởng bộ môn chỉ được thực hiện gán, đổi giảng viên và chốt danh sách sau khi thời hạn đăng ký kết thúc.
+              </span>
+            </div>
+          </div>
+          {countdown.formattedText && (
+            <div className="shrink-0 px-3 py-1 rounded-lg bg-amber-100/90 border border-amber-300 text-amber-800 text-xs font-bold flex items-center gap-1.5 whitespace-nowrap">
+              <Clock className="w-3.5 h-3.5 text-amber-700 animate-pulse" />
+              <span>{countdown.formattedText}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isDeadlineEnded && !isLocked && (
+        <div className="shrink-0 p-3 px-4 rounded-xl bg-emerald-50 border border-emerald-300/80 text-emerald-900 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-4.5 h-4.5" />
+            </div>
+            <div className="text-[13px] leading-snug text-emerald-800">
+              <span className="font-bold text-emerald-950">Đã hết hạn đăng ký GVHD</span>
+              {deadlineEndDateFormatted ? ` (Hạn chót: ${deadlineEndDateFormatted})` : ''}. Sẵn sàng thực hiện rà soát, phân công và khóa danh sách.
+            </div>
+          </div>
+          <span className="shrink-0 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300 tracking-wide uppercase">
+            Hết hạn đăng ký
+          </span>
+        </div>
+      )}
 
       {/* 2. KHU VỰC CHÍNH 2 CỘT: CẢ 2 CỘT CUỘN ĐỘC LẬP */}
       <div className="flex-1 min-h-0 flex flex-row items-stretch gap-3.5 w-full">
@@ -515,24 +783,59 @@ export function SupervisorWorkspaceView({
 
             {currentTab === 'received' && (
               <>
-                <button
-                  type="button"
-                  onClick={handleApproveAction}
-                  disabled={selectedCount === 0 || isLocked}
-                  className="h-9 px-3.5 rounded-lg bg-[#10B981] hover:bg-[#059669] text-white text-[13px] font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center justify-center shrink-0"
-                  title={isLocked ? 'Danh sách đã khóa, không thể phê duyệt' : ''}
+                <div
+                  className="inline-block shrink-0"
+                  title={
+                    isDeadlineOpen
+                      ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                      : isLocked
+                        ? 'Danh sách đã khóa, không thể phê duyệt'
+                        : selectedCount === 0
+                          ? 'Vui lòng chọn sinh viên để phê duyệt'
+                          : 'Phê duyệt đơn đăng ký'
+                  }
                 >
-                  <span>Phê duyệt ({selectedCount})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRejectAction}
-                  disabled={selectedCount === 0 || isLocked}
-                  className="h-9 px-3 rounded-lg bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 text-[13px] font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
-                  title={isLocked ? 'Danh sách đã khóa, không thể từ chối' : ''}
+                  <button
+                    type="button"
+                    onClick={handleApproveAction}
+                    disabled={selectedCount === 0 || isLocked || isDeadlineOpen}
+                    className={cn(
+                      'h-9 px-3.5 rounded-lg text-white text-[13px] font-semibold transition shadow-xs flex items-center justify-center shrink-0',
+                      selectedCount > 0 && !isLocked && !isDeadlineOpen
+                        ? 'bg-[#10B981] hover:bg-[#059669] cursor-pointer'
+                        : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none',
+                    )}
+                  >
+                    <span>Phê duyệt ({selectedCount})</span>
+                  </button>
+                </div>
+
+                <div
+                  className="inline-block shrink-0"
+                  title={
+                    isDeadlineOpen
+                      ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                      : isLocked
+                        ? 'Danh sách đã khóa, không thể từ chối'
+                        : selectedCount === 0
+                          ? 'Vui lòng chọn sinh viên để từ chối'
+                          : 'Từ chối đơn đăng ký'
+                  }
                 >
-                  <span>Từ chối</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleRejectAction}
+                    disabled={selectedCount === 0 || isLocked || isDeadlineOpen}
+                    className={cn(
+                      'h-9 px-3 rounded-lg border text-[13px] font-semibold transition shadow-xs shrink-0',
+                      selectedCount > 0 && !isLocked && !isDeadlineOpen
+                        ? 'bg-white border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 cursor-pointer'
+                        : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed pointer-events-none',
+                    )}
+                  >
+                    <span>Từ chối</span>
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -635,9 +938,15 @@ export function SupervisorWorkspaceView({
                           type="checkbox"
                           checked={isAllStudentsSelected}
                           onChange={toggleSelectAllStudents}
-                          disabled={isLocked}
+                          disabled={isLocked || isDeadlineOpen}
                           className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed align-middle"
-                          title="Chọn tất cả sinh viên trong tab"
+                          title={
+                            isDeadlineOpen
+                              ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                              : isLocked
+                                ? 'Danh sách đã khóa'
+                                : 'Chọn tất cả sinh viên trong tab'
+                          }
                         />
                       </th>
                     )}
@@ -676,7 +985,7 @@ export function SupervisorWorkspaceView({
                       <tr
                         key={s.id}
                         onClick={() => {
-                          if (isApprovedTab && !isLocked) {
+                          if (isApprovedTab && !isLocked && !isDeadlineOpen) {
                             if (editingTarget?.student.id === s.id && editingTarget.slot === 1) {
                               setEditingTarget(null)
                               setSelectedStudentIds(new Set())
@@ -694,7 +1003,7 @@ export function SupervisorWorkspaceView({
                             : isChecked
                               ? 'bg-blue-50/60 hover:bg-blue-50/80'
                               : 'hover:bg-slate-50/70',
-                          isApprovedTab && !isLocked && 'cursor-pointer',
+                          isApprovedTab && !isLocked && !isDeadlineOpen && 'cursor-pointer',
                         )}
                       >
                         {/* Cột 1: Tên & MSSV */}
@@ -748,9 +1057,10 @@ export function SupervisorWorkspaceView({
                                 {!isLocked && (
                                   <button
                                     type="button"
+                                    disabled={isDeadlineOpen}
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      if (isLocked) return
+                                      if (isLocked || isDeadlineOpen) return
                                       if (isEditingThis1) {
                                         setEditingTarget(null)
                                         setSelectedStudentIds(new Set())
@@ -764,15 +1074,19 @@ export function SupervisorWorkspaceView({
                                       }
                                     }}
                                     className={cn(
-                                      'p-0.5 rounded transition cursor-pointer shrink-0',
-                                      isEditingThis1
-                                        ? 'bg-white/20 text-white hover:bg-white/30'
-                                        : 'text-blue-600 hover:text-blue-800 hover:bg-white',
+                                      'p-0.5 rounded transition shrink-0',
+                                      isDeadlineOpen
+                                        ? 'text-slate-400 cursor-not-allowed opacity-40'
+                                        : isEditingThis1
+                                          ? 'bg-white/20 text-white hover:bg-white/30 cursor-pointer'
+                                          : 'text-blue-600 hover:text-blue-800 hover:bg-white cursor-pointer',
                                     )}
                                     title={
-                                      isEditingThis1
-                                        ? 'Đang chọn đổi GVHD 1 (nhấn để hủy)'
-                                        : 'Chọn sinh viên này để đổi GVHD 1'
+                                      isDeadlineOpen
+                                        ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                        : isEditingThis1
+                                          ? 'Đang chọn đổi GVHD 1 (nhấn để hủy)'
+                                          : 'Chọn sinh viên này để đổi GVHD 1'
                                     }
                                   >
                                     <Edit3 className="w-3 h-3" />
@@ -819,9 +1133,10 @@ export function SupervisorWorkspaceView({
                                   <div className="flex items-center gap-0.5 shrink-0">
                                     <button
                                       type="button"
+                                      disabled={isDeadlineOpen}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        if (isLocked) return
+                                        if (isLocked || isDeadlineOpen) return
                                         if (isEditingThis2) {
                                           setEditingTarget(null)
                                           setSelectedStudentIds(new Set())
@@ -835,24 +1150,29 @@ export function SupervisorWorkspaceView({
                                         }
                                       }}
                                       className={cn(
-                                        'p-0.5 rounded transition cursor-pointer',
-                                        isEditingThis2
-                                          ? 'bg-white/20 text-white hover:bg-white/30'
-                                          : 'text-purple-600 hover:text-purple-800 hover:bg-white',
+                                        'p-0.5 rounded transition',
+                                        isDeadlineOpen
+                                          ? 'text-slate-400 cursor-not-allowed opacity-40'
+                                          : isEditingThis2
+                                            ? 'bg-white/20 text-white hover:bg-white/30 cursor-pointer'
+                                            : 'text-purple-600 hover:text-purple-800 hover:bg-white cursor-pointer',
                                       )}
                                       title={
-                                        isEditingThis2
-                                          ? 'Đang chọn đổi GVHD 2 (nhấn để hủy)'
-                                          : 'Chọn sinh viên này để đổi GVHD 2'
+                                        isDeadlineOpen
+                                          ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                          : isEditingThis2
+                                            ? 'Đang chọn đổi GVHD 2 (nhấn để hủy)'
+                                            : 'Chọn sinh viên này để đổi GVHD 2'
                                       }
                                     >
                                       <Edit3 className="w-3 h-3" />
                                     </button>
                                     <button
                                       type="button"
+                                      disabled={isDeadlineOpen}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        if (isLocked) return
+                                        if (isLocked || isDeadlineOpen) return
                                         if (
                                           confirm(
                                             `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
@@ -862,12 +1182,18 @@ export function SupervisorWorkspaceView({
                                         }
                                       }}
                                       className={cn(
-                                        'p-0.5 rounded transition cursor-pointer',
-                                        isEditingThis2
-                                          ? 'text-white/80 hover:text-white'
-                                          : 'text-slate-400 hover:text-rose-600 hover:bg-white',
+                                        'p-0.5 rounded transition',
+                                        isDeadlineOpen
+                                          ? 'text-slate-400 cursor-not-allowed opacity-40'
+                                          : isEditingThis2
+                                            ? 'text-white/80 hover:text-white cursor-pointer'
+                                            : 'text-slate-400 hover:text-rose-600 hover:bg-white cursor-pointer',
                                       )}
-                                      title="Gỡ bỏ GVHD 2"
+                                      title={
+                                        isDeadlineOpen
+                                          ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                          : 'Gỡ bỏ GVHD 2'
+                                      }
                                     >
                                       <X className="w-3 h-3" />
                                     </button>
@@ -877,9 +1203,10 @@ export function SupervisorWorkspaceView({
                             ) : !isLocked ? (
                               <button
                                 type="button"
+                                disabled={isDeadlineOpen}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  if (isLocked) return
+                                  if (isLocked || isDeadlineOpen) return
                                   if (isEditingThis2) {
                                     setEditingTarget(null)
                                     setSelectedStudentIds(new Set())
@@ -893,12 +1220,18 @@ export function SupervisorWorkspaceView({
                                   }
                                 }}
                                 className={cn(
-                                  'h-7 px-2.5 rounded-md border border-dashed transition flex items-center justify-center gap-1 cursor-pointer text-[11.5px] font-semibold',
-                                  isEditingThis2
-                                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                                    : 'border-purple-300 hover:border-purple-500 bg-white hover:bg-purple-50 text-purple-700 shadow-2xs',
+                                  'h-7 px-2.5 rounded-md border border-dashed transition flex items-center justify-center gap-1 text-[11.5px] font-semibold',
+                                  isDeadlineOpen
+                                    ? 'opacity-40 cursor-not-allowed border-slate-300 text-slate-400 bg-slate-50'
+                                    : isEditingThis2
+                                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs cursor-pointer'
+                                      : 'border-purple-300 hover:border-purple-500 bg-white hover:bg-purple-50 text-purple-700 shadow-2xs cursor-pointer',
                                 )}
-                                title="Chỉ định GVHD 2"
+                                title={
+                                  isDeadlineOpen
+                                    ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                    : 'Chỉ định GVHD 2'
+                                }
                               >
                                 <Plus className="w-3 h-3" />
                                 <span>Thêm GVHD 2</span>
@@ -915,8 +1248,15 @@ export function SupervisorWorkspaceView({
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => toggleSelectStudent(s.id)}
-                              disabled={isLocked}
+                              disabled={isLocked || isDeadlineOpen}
                               className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={
+                                isDeadlineOpen
+                                  ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                  : isLocked
+                                    ? 'Danh sách đã khóa'
+                                    : undefined
+                              }
                             />
                           </td>
                         )}
@@ -945,33 +1285,30 @@ export function SupervisorWorkspaceView({
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           </div>
 
-          <button
-            type="button"
-            onClick={handleAssignAction}
-            disabled={
-              isLocked ||
-              !selectedLecturer ||
-              (currentTab === 'unassigned' && selectedCount === 0) ||
-              (currentTab === 'approved' && selectedCount === 0 && !editingTarget) ||
-              currentTab === 'received'
-            }
-            className="h-9 px-4 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[13px] font-semibold transition cursor-pointer shadow-xs flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={
-              isLocked
-                ? 'Danh sách đã khóa'
-                : currentTab === 'received'
-                  ? 'Tab Đã nhận GV dùng nút Phê duyệt / Từ chối'
-                  : 'Gán giảng viên cho sinh viên'
-            }
+          <div
+            className="inline-block shrink-0"
+            title={canAssign ? 'Gán giảng viên cho sinh viên' : assignDisabledReason}
           >
-            <span>
-              {currentTab === 'approved' && editingTarget?.slot === 2
-                ? 'Gán GVHD 2'
-                : currentTab === 'approved' && (editingTarget || selectedCount > 0)
-                  ? `Đổi GVHD (${selectedCount || 1} SV)`
-                  : `Gán (${selectedCount} SV)`}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={handleAssignAction}
+              disabled={!canAssign}
+              className={cn(
+                'h-9 px-4 rounded-lg text-white text-[13px] font-semibold transition shadow-xs flex items-center justify-center shrink-0',
+                canAssign
+                  ? 'bg-[#1565C0] hover:bg-[#0D47A1] cursor-pointer'
+                  : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none',
+              )}
+            >
+              <span>
+                {currentTab === 'approved' && editingTarget?.slot === 2
+                  ? 'Gán GVHD 2'
+                  : currentTab === 'approved' && (editingTarget || selectedCount > 0)
+                    ? `Đổi GVHD (${selectedCount || 1} SV)`
+                    : `Gán (${selectedCount} SV)`}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Bar Lọc Nhanh Đơn Vị */}
@@ -1077,6 +1414,7 @@ export function SupervisorWorkspaceView({
                       : 'bg-slate-100 text-slate-600'
                 const canSelect =
                   !isLocked &&
+                  !isDeadlineOpen &&
                   (currentTab === 'unassigned' ||
                     currentTab === 'approved' ||
                     editingTarget !== null)
@@ -1192,7 +1530,7 @@ export function SupervisorWorkspaceView({
       {/* ================================================================= */}
       {lockModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-[480px] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-[500px] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs">
@@ -1200,7 +1538,7 @@ export function SupervisorWorkspaceView({
                 </div>
                 <div>
                   <h3 className="text-[16px] font-bold text-slate-900 leading-snug">
-                    Khóa danh sách phân công
+                    Xác nhận Khóa danh sách & Công bố chính thức
                   </h3>
                   <p className="text-[12px] text-slate-500 mt-0.5">
                     Năm học {year} ({semesterName})
@@ -1209,8 +1547,9 @@ export function SupervisorWorkspaceView({
               </div>
               <button
                 type="button"
+                disabled={isSubmittingLock}
                 onClick={() => setLockModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer hover:bg-slate-200/50 transition"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer hover:bg-slate-200/50 transition disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1238,52 +1577,40 @@ export function SupervisorWorkspaceView({
                 </div>
               </div>
 
-              <div className="p-3.5 bg-amber-50/90 border border-amber-200/80 rounded-xl text-amber-900 leading-relaxed text-[12.5px]">
-                <p className="font-bold flex items-center gap-1.5 text-amber-800 mb-1 text-[13px]">
+              <div className="p-4 bg-emerald-50/80 border border-emerald-200/80 rounded-xl text-emerald-950 text-[13px] leading-relaxed">
+                Sau khi khóa danh sách, toàn bộ đơn duyệt hợp lệ sẽ được chuyển sang trạng thái chính thức, thông tin GVHD được cập nhật vào đề tài và hệ thống sẽ gửi thông báo đến toàn bộ sinh viên, giảng viên liên quan. Bạn có chắc chắn muốn thực hiện?
+              </div>
+
+              <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl text-amber-900 leading-relaxed text-[12px]">
+                <p className="font-bold flex items-center gap-1.5 text-amber-800 mb-1">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 inline-block" />
-                  Lưu ý khi khóa danh sách:
+                  Lưu ý sau khi khóa:
                 </p>
-                <ul className="list-disc pl-5 space-y-1 text-slate-700 text-[12px]">
-                  <li>Không cho phép sửa đổi GVHD 1 và GVHD 2 của sinh viên.</li>
-                  <li>Không cho phép gán thêm sinh viên mới cho các giảng viên.</li>
-                  <li>
-                    Danh sách sẽ được dùng làm căn cứ chính thức gửi Ban Chủ nhiệm Khoa ban hành
-                    quyết định.
-                  </li>
+                <ul className="list-disc pl-5 space-y-0.5 text-slate-700 text-[11.5px]">
+                  <li>Toàn bộ đơn đã được duyệt sẽ chuyển sang trạng thái chính thức.</li>
+                  <li>Cập nhật GVHD vào đề tài và chuyển đề tài sang giai đoạn đã phân công GVHD.</li>
+                  <li>Hệ thống gửi thông báo phân công chính thức đến sinh viên và giảng viên.</li>
                 </ul>
               </div>
-              <p className="text-slate-500 text-[11.5px] italic">
-                Trưởng bộ môn vẫn có thể mở khóa lại để điều chỉnh nếu có phát sinh.
-              </p>
             </div>
 
             <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
               <button
                 type="button"
+                disabled={isSubmittingLock}
                 onClick={() => setLockModalOpen(false)}
-                className="h-9 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer"
+                className="h-9 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
               >
                 Hủy
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  const nowStr = new Date().toLocaleString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })
-                  setIsLocked(true)
-                  setLockedAt(nowStr)
-                  setLockedByName('Trưởng bộ môn')
-                  setLockModalOpen(false)
-                  onToggleLock(true)
-                }}
-                className="h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold transition flex items-center justify-center cursor-pointer shadow-xs"
+                disabled={isSubmittingLock}
+                onClick={handleConfirmLock}
+                className="h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Xác nhận
+                {isSubmittingLock && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{isSubmittingLock ? 'Đang khóa danh sách...' : 'Xác nhận khóa'}</span>
               </button>
             </div>
           </div>
@@ -1312,8 +1639,9 @@ export function SupervisorWorkspaceView({
               </div>
               <button
                 type="button"
+                disabled={isSubmittingUnlock}
                 onClick={() => setUnlockModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer hover:bg-slate-200/50 transition"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer hover:bg-slate-200/50 transition disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1332,23 +1660,20 @@ export function SupervisorWorkspaceView({
             <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
               <button
                 type="button"
+                disabled={isSubmittingUnlock}
                 onClick={() => setUnlockModalOpen(false)}
-                className="h-9 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer"
+                className="h-9 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
               >
                 Đóng
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setIsLocked(false)
-                  setLockedAt(null)
-                  setLockedByName(null)
-                  setUnlockModalOpen(false)
-                  onToggleLock(false)
-                }}
-                className="h-9 px-5 rounded-xl bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[13px] font-bold transition flex items-center justify-center cursor-pointer shadow-xs"
+                disabled={isSubmittingUnlock}
+                onClick={handleConfirmUnlock}
+                className="h-9 px-5 rounded-xl bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[13px] font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Xác nhận
+                {isSubmittingUnlock && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{isSubmittingUnlock ? 'Đang mở khóa...' : 'Xác nhận'}</span>
               </button>
             </div>
           </div>

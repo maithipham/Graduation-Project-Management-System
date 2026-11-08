@@ -389,51 +389,57 @@ export default function SupervisorAssignmentPage() {
     }
   }
 
-  const handleToggleLock = async (nextLockState: boolean) => {
-    const nowStr = new Date().toLocaleString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-
-    setLocalLockOverride(nextLockState)
-    if (nextLockState) {
-      setLocalLockedAt(nowStr)
-      setLocalLockedBy('Trưởng bộ môn')
-      try {
-        localStorage.setItem(lockStorageKey, 'true')
-        localStorage.setItem(
-          `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
-          nowStr,
-        )
-        localStorage.setItem(
-          `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
-          'Trưởng bộ môn',
-        )
-      } catch {}
-      toast.success('Đã khóa danh sách phân công GVHD thành công!')
-    } else {
-      setLocalLockedAt(null)
-      setLocalLockedBy(null)
-      try {
-        localStorage.setItem(lockStorageKey, 'false')
-        localStorage.removeItem(
-          `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
-        )
-        localStorage.removeItem(
-          `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
-        )
-      } catch {}
-      toast.info('Đã mở khóa danh sách phân công. Bạn có thể chỉnh sửa GVHD 1 và 2.')
-    }
-
+  const handleToggleLock = async (nextLockState: boolean): Promise<boolean> => {
     try {
       await supervisorService.toggleLockAssignment(effectiveSemesterId, nextLockState)
-      queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
+
+      const nowStr = new Date().toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+
+      setLocalLockOverride(nextLockState)
+      if (nextLockState) {
+        setLocalLockedAt(nowStr)
+        setLocalLockedBy('Trưởng bộ môn')
+        try {
+          localStorage.setItem(lockStorageKey, 'true')
+          localStorage.setItem(
+            `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
+            nowStr,
+          )
+          localStorage.setItem(
+            `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
+            'Trưởng bộ môn',
+          )
+        } catch {}
+        toast.success('Đã khóa danh sách phân công GVHD & công bố chính thức thành công!')
+      } else {
+        setLocalLockedAt(null)
+        setLocalLockedBy(null)
+        try {
+          localStorage.setItem(lockStorageKey, 'false')
+          localStorage.removeItem(
+            `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
+          )
+          localStorage.removeItem(
+            `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
+          )
+        } catch {}
+        toast.info('Đã mở khóa danh sách phân công. Bạn có thể chỉnh sửa GVHD 1 và 2.')
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
+      return true
     } catch (err: unknown) {
-      console.warn('Backend toggleLockAssignment warning:', err)
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Không thể thay đổi trạng thái khóa danh sách phân công'
+      toast.error(msg)
+      return false
     }
   }
 
@@ -479,6 +485,7 @@ export default function SupervisorAssignmentPage() {
           isLocked={isLocked}
           lockedAt={lockedAt}
           lockedByName={lockedByName}
+          registrationDeadline={workspace?.registrationDeadline}
           counts={counts}
           isLoading={workspaceLoading || lecturersLoading}
           onBack={() => setView('overview')}

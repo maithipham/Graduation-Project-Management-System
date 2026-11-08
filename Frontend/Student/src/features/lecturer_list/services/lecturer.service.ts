@@ -536,7 +536,7 @@ export function resolveAdvisorDepartment(
   item: SemesterAdvisorResponse,
   isInternal: boolean,
 ): string {
-  // 1. Nếu có majorName trực tiếp từ bảng major
+  // 1. Nếu có majorName trực tiếp
   const directMajor = (
     item.majorName ||
     item.major ||
@@ -548,16 +548,20 @@ export function resolveAdvisorDepartment(
   if (
     directMajor &&
     directMajor.toLowerCase() !== 'bộ môn' &&
-    directMajor.toLowerCase() !== 'bo mon' &&
-    directMajor.toLowerCase() !== 'ngoài trường' &&
-    directMajor.toLowerCase() !== 'ngoai truong'
+    directMajor.toLowerCase() !== 'bo mon'
   ) {
     return directMajor
   }
 
-  // 2. Giảng viên ngoài trường không gắn với bộ môn trong trường
-  if (!isInternal) {
-    return ''
+  // 2. Nếu là giảng viên ngoài trường và có organization cụ thể
+  const org = (item.organization || (item as any)?.teacher?.organization || '').trim()
+  if (
+    !isInternal &&
+    org &&
+    !org.toLowerCase().includes('thủy lợi') &&
+    !org.toLowerCase().includes('thuy loi')
+  ) {
+    return org
   }
 
   // 3. Phán đoán qua email nếu có tiền tố ngành (vd: truongnganh.ktpm@tlu.edu.vn)
@@ -626,7 +630,7 @@ export function resolveAdvisorDepartment(
   }
 
   if (!isInternal) {
-    return ''
+    return org || 'Đơn vị ngoài trường'
   }
 
   return 'Kỹ thuật phần mềm'
