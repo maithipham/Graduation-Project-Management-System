@@ -479,7 +479,8 @@ export default function StudentRegistrationPage() {
         onPrimaryAction={handlePrimaryAction}
       />
 
-      {/* Thông báo khi đang xem học kỳ cũ */}
+      {/* Thông báo lỗi khi tải danh sách học kỳ */}
+      {/* Thông báo khi đang xem học kỳ cũ
       {!isCurrentSemester && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
           <p className="text-sm text-blue-700">
@@ -487,7 +488,7 @@ export default function StudentRegistrationPage() {
             đơn đăng ký chỉ khả dụng trong học kỳ hiện tại.
           </p>
         </div>
-      )}
+      )} */}
 
       {/* Thông báo lỗi khi tải lịch sử */}
       {isHistoryError && (

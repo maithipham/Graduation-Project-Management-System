@@ -74,7 +74,7 @@ export const RegistrationHistoryTable: React.FC<
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
       <h3 className="text-base font-bold text-slate-900">
-        Lịch sử đơn đăng ký GVHD
+        Lịch sử đăng ký
       </h3>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200">

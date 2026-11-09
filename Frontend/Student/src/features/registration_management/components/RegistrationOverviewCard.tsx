@@ -133,11 +133,8 @@ export const RegistrationOverviewCard: React.FC<
           </div>
 
           <div className="flex items-center h-10 min-w-0">
-            <span
-              className="text-[14px] font-bold text-slate-900 leading-tight truncate"
-              title={mentor || 'Chưa có GVHD'}
-            >
-              {mentor || 'Chưa có GVHD'}
+            <span className="text-[14px] font-bold text-slate-900 leading-tight truncate">
+              {mentor || 'Chưa có'}
             </span>
           </div>
         </div>
@@ -145,15 +142,13 @@ export const RegistrationOverviewCard: React.FC<
         {/* Tên đề tài */}
         <div className="xl:border-l xl:border-slate-100 xl:pl-5 flex flex-col justify-center min-w-0">
           <div className="text-xs font-semibold text-slate-500 mb-2">
-            Tên đề tài chính thức
+            Đề tài đăng ký
           </div>
 
           <div className="flex items-center h-10 min-w-0">
             <span
-              className="text-[14px] font-bold text-slate-900 leading-tight truncate w-full"
-              title={topic || 'Chưa đăng ký'}
-            >
-              {topic || 'Chưa đăng ký'}
+              className="text-[14px] font-bold text-slate-900 leading-tight truncate w-full">
+              {topic || 'Chưa có'}
             </span>
           </div>
         </div>
@@ -161,7 +156,7 @@ export const RegistrationOverviewCard: React.FC<
         {/* Hạn đăng ký */}
         <div className="xl:border-l xl:border-slate-100 xl:pl-5 flex flex-col justify-center min-w-0">
           <div className="text-xs font-semibold text-slate-500 mb-2">
-            Hạn đăng ký GVHD
+            Hạn đăng ký
           </div>
 
           <div className="flex flex-col justify-center gap-1 min-w-0">
