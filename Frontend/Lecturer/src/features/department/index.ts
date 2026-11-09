@@ -2,3 +2,4 @@
 export * from './layouts'
 export * from './student_management'
 export * from './lecturer_management'
+export * from './schedule_management'

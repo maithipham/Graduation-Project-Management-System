@@ -15,6 +15,9 @@ const SupervisorAssignmentPage = lazy(
 const ReviewerAssignmentPage = lazy(
   () => import('@/features/department/lecturer_management/pages/ReviewerAssignmentPage'),
 )
+const ScheduleManagementPage = lazy(
+  () => import('@/features/department/schedule_management/pages/ScheduleManagementPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
@@ -42,6 +45,8 @@ export const departmentRoutes: RouteObject = {
     { path: 'supervisors', element: withSuspense(<SupervisorAssignmentPage />) },
     // 3. Giáo viên Nhận xét (GVPB đề cương, danh sách đề tài & phân công)
     { path: 'reviewers', element: withSuspense(<ReviewerAssignmentPage />) },
+    // Kế hoạch & Tiến độ đồ án (Trưởng bộ môn cấu hình Deadline)
+    { path: 'schedule', element: withSuspense(<ScheduleManagementPage />) },
   ],
 }
 

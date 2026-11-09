@@ -119,9 +119,9 @@ export const API_ENDPOINTS = {
     studentAccountExport: '/student/account/export', // GET xuất Excel
     studentAccountImport: '/student/account/import', // POST import file
     studentBatchAll: '/student/batch/all',
-    semesters: '/semesters',
-    faculties: '/faculties',
-    majors: '/majors',
-    majorHead: (majorId: string) => `/majors/${majorId}/head`,
+    semesters: '/semester',
+    faculties: '/faculty',
+    majors: '/major',
+    majorHead: (majorId: string) => `/major/${majorId}/head`,
   },
 } as const

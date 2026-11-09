@@ -211,13 +211,27 @@ export function toSupervisorStudent(
     (l) => s.lecturerName && s.lecturerName.toLowerCase().includes(l.name.toLowerCase()),
   )
 
+  const regStatus = (
+    ((s as any).registrationStatus || (s as any).status || '') as string
+  ).toUpperCase()
+
   let status: 'received' | 'unassigned' | 'approved' = 'unassigned'
-  if (!s.lecturerName) {
-    status = 'unassigned'
-  } else if (s.topicName) {
-    status = 'approved'
-  } else {
+  if (
+    regStatus === 'TEACHER_APPROVED' ||
+    regStatus === 'RECEIVED'
+  ) {
     status = 'received'
+  } else if (
+    regStatus === 'APPROVED' ||
+    regStatus === 'HOD_APPROVED' ||
+    regStatus === 'ASSIGNED_BY_HOD' ||
+    s.topicName
+  ) {
+    status = 'approved'
+  } else if (s.lecturerName) {
+    status = 'received'
+  } else {
+    status = 'unassigned'
   }
 
   return {
@@ -226,10 +240,10 @@ export function toSupervisorStudent(
     name: s.name,
     className: s.className,
     topic: s.topicName || '',
-    supervisorId: matchedSupervisor?.publicId || null,
-    supervisorName: s.lecturerName || null,
+    supervisorId: status === 'unassigned' ? null : (matchedSupervisor?.publicId || null),
+    supervisorName: status === 'unassigned' ? null : (s.lecturerName || null),
     supervisor2Id: null,
-    supervisor2Name: s.coLecturerName || null,
+    supervisor2Name: status === 'unassigned' ? null : (s.coLecturerName || null),
     assignedTime: null,
     status,
     year,
@@ -242,29 +256,65 @@ export function toSupervisorStudentFromWorkspace(
   semesterName = '',
   year = '',
 ): SupervisorStudent {
+  const regStatus = (
+    (item.registrationStatus || (item as any).advisorRegistrationStatus || '') as string
+  ).toUpperCase()
   const rawStatus = (item.status || 'UNASSIGNED').toUpperCase()
+
   let status: 'received' | 'unassigned' | 'approved' = 'unassigned'
-  if (rawStatus === 'RECEIVED') {
+  if (
+    rawStatus === 'TEACHER_APPROVED' ||
+    rawStatus === 'RECEIVED' ||
+    regStatus === 'TEACHER_APPROVED' ||
+    regStatus === 'RECEIVED'
+  ) {
     status = 'received'
-  } else if (rawStatus === 'APPROVED') {
+  } else if (
+    rawStatus === 'APPROVED' ||
+    rawStatus === 'HOD_APPROVED' ||
+    rawStatus === 'ASSIGNED_BY_HOD' ||
+    regStatus === 'APPROVED' ||
+    regStatus === 'HOD_APPROVED' ||
+    regStatus === 'ASSIGNED_BY_HOD'
+  ) {
     status = 'approved'
+  } else {
+    status = 'unassigned'
   }
+
+  const registrationPublicId =
+    item.registrationPublicId ||
+    (item as any).advisorRegistrationPublicId ||
+    (item as any).registrationId ||
+    (item as any).advisorRegistrationId ||
+    null
+
+  const resolvedRegStatus =
+    regStatus ||
+    (status === 'received'
+      ? 'TEACHER_APPROVED'
+      : status === 'approved'
+        ? rawStatus === 'ASSIGNED_BY_HOD'
+          ? 'ASSIGNED_BY_HOD'
+          : 'HOD_APPROVED'
+        : null)
 
   return {
     id: item.studentPublicId,
     studentPublicId: item.studentPublicId,
-    registrationPublicId: item.registrationPublicId,
+    registrationPublicId,
     topicPublicId: item.topicPublicId,
     code: item.studentCode,
     name: item.fullName,
     className: item.className || '',
     topic: item.topicName || '',
-    supervisorId: item.supervisor?.teacherPublicId || null,
-    supervisorName: item.supervisor?.fullName || null,
-    supervisor2Id: item.coSupervisor?.teacherPublicId || null,
-    supervisor2Name: item.coSupervisor?.fullName || null,
+    supervisorId: status === 'unassigned' ? null : (item.supervisor?.teacherPublicId || null),
+    supervisorName: status === 'unassigned' ? null : (item.supervisor?.fullName || null),
+    supervisor2Id: status === 'unassigned' ? null : (item.coSupervisor?.teacherPublicId || null),
+    supervisor2Name: status === 'unassigned' ? null : (item.coSupervisor?.fullName || null),
     assignedTime: item.assignedAt || null,
     status,
+    registrationStatus: resolvedRegStatus,
     year,
     semester: semesterName,
   }
@@ -349,7 +399,12 @@ export const supervisorService = {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
     await apiClient.put<ApiResponse<void>>(
       API_ENDPOINTS.advisorAssignment.approve(cleanSemesterId),
-      { registrationPublicIds },
+      {
+        registrationPublicIds,
+        registrationIds: registrationPublicIds,
+        studentPublicIds: registrationPublicIds,
+        ids: registrationPublicIds,
+      },
     )
   },
 
@@ -358,7 +413,12 @@ export const supervisorService = {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
     await apiClient.put<ApiResponse<void>>(
       API_ENDPOINTS.advisorAssignment.reject(cleanSemesterId),
-      { registrationPublicIds },
+      {
+        registrationPublicIds,
+        registrationIds: registrationPublicIds,
+        studentPublicIds: registrationPublicIds,
+        ids: registrationPublicIds,
+      },
     )
   },
 

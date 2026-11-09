@@ -231,6 +231,7 @@ export interface SupervisorStudent {
   id: string
   studentPublicId?: string
   registrationPublicId?: string | null
+  advisorRegistrationId?: string | number | null
   topicPublicId?: string | null
   code: string
   name: string
@@ -238,10 +239,14 @@ export interface SupervisorStudent {
   topic: string
   supervisorId: string | null
   supervisorName: string | null
+  teacherName?: string | null
+  academicTitle?: string | null
+  teacherCode?: string | null
   supervisor2Id?: string | null
   supervisor2Name?: string | null
   assignedTime: string | null
   status: 'received' | 'unassigned' | 'approved'
+  registrationStatus?: 'PENDING' | 'TEACHER_APPROVED' | 'HOD_APPROVED' | 'ASSIGNED_BY_HOD' | 'REJECTED' | string | null
   year: string
   semester: string
 }
@@ -269,6 +274,8 @@ export interface StudentAssignmentItem {
   studentPublicId: string
   topicPublicId?: string | null
   registrationPublicId?: string | null
+  advisorRegistrationId?: string | number | null
+  registrationStatus?: string | null
   studentCode: string
   fullName: string
   className?: string
@@ -276,7 +283,17 @@ export interface StudentAssignmentItem {
   majorName?: string
   topicName?: string | null
   topicDescription?: string | null
-  status: 'RECEIVED' | 'UNASSIGNED' | 'APPROVED' | string
+  teacherName?: string | null
+  academicTitle?: string | null
+  teacherCode?: string | null
+  status:
+    | 'RECEIVED'
+    | 'UNASSIGNED'
+    | 'APPROVED'
+    | 'TEACHER_APPROVED'
+    | 'HOD_APPROVED'
+    | 'ASSIGNED_BY_HOD'
+    | string
   supervisor?: AdvisorSimpleItem | null
   coSupervisor?: AdvisorSimpleItem | null
   assignedAt?: string | null

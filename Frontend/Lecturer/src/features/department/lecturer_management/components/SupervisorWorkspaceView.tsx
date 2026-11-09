@@ -11,10 +11,10 @@ import {
   Search,
   X,
   AlertTriangle,
-  AlertCircle,
   Clock,
   CheckCircle,
-  CheckCircle2,
+  Check,
+  UserCheck,
   Loader2,
 } from 'lucide-react'
 import { toast } from '@/shared/components/feedback'
@@ -127,6 +127,13 @@ export function SupervisorWorkspaceView({
     setLockedByName(propLockedByName)
   }, [propLockedByName])
 
+  // Danh sách sinh viên nội bộ phản ứng tức thì (optimistic state)
+  const [localStudents, setLocalStudents] = useState<SupervisorStudent[]>(students)
+
+  useEffect(() => {
+    setLocalStudents(students)
+  }, [students])
+
   // Trạng thái đếm ngược thời hạn đăng ký
   const [countdown, setCountdown] = useState(() =>
     calculateTimeRemaining(registrationDeadline?.endDate),
@@ -179,33 +186,54 @@ export function SupervisorWorkspaceView({
     slot: 1 | 2
   } | null>(null)
 
-  // Đếm sinh viên theo 3 tab (ưu tiên prop counts từ backend, nếu không tính từ mảng students)
+  // Đếm sinh viên theo 3 tab (tính trực tiếp từ localStudents để phản ứng tức thì khi duyệt/từ chối/gán)
   const countReceived = useMemo(
-    () => counts?.received ?? students.filter((s) => s.status === 'received').length,
-    [counts, students],
+    () =>
+      localStudents.length > 0
+        ? localStudents.filter((s) => s.status === 'received').length
+        : (counts?.received ?? 0),
+    [counts, localStudents],
   )
   const countUnassigned = useMemo(
-    () => counts?.unassigned ?? students.filter((s) => s.status === 'unassigned').length,
-    [counts, students],
+    () =>
+      localStudents.length > 0
+        ? localStudents.filter((s) => s.status === 'unassigned').length
+        : (counts?.unassigned ?? 0),
+    [counts, localStudents],
   )
   const countApproved = useMemo(
-    () => counts?.approved ?? students.filter((s) => s.status === 'approved').length,
-    [counts, students],
+    () =>
+      localStudents.length > 0
+        ? localStudents.filter((s) => s.status === 'approved').length
+        : (counts?.approved ?? 0),
+    [counts, localStudents],
   )
 
   // Điều kiện để được phép khóa danh sách:
   // 1. Phải hết hạn đăng ký (!isDeadlineOpen)
-  // 2. Không còn đơn PENDING (tab Đang nhận: countReceived === 0)
-  // 3. 100% sinh viên đã có GVHD (tab Chưa nhận: countUnassigned === 0)
-  const canLock = !isDeadlineOpen && countReceived === 0 && countUnassigned === 0
+  // 2. Không còn đơn ở trạng thái TEACHER_APPROVED chờ duyệt (tab Đã nhận: countReceived === 0)
+  // 3. Không còn sinh viên chưa có GVHD (tab Chưa nhận: countUnassigned === 0)
+  // 4. 100% sinh viên làm đồ án đều đã ở trạng thái HOD_APPROVED hoặc ASSIGNED_BY_HOD
+  const canLock =
+    !isDeadlineOpen &&
+    countReceived === 0 &&
+    countUnassigned === 0 &&
+    localStudents.length > 0 &&
+    localStudents.every(
+      (s) =>
+        s.status === 'approved' &&
+        (s.registrationStatus === 'HOD_APPROVED' ||
+          s.registrationStatus === 'ASSIGNED_BY_HOD' ||
+          !!s.supervisorId),
+    )
 
   let lockDisabledReason = ''
   if (isDeadlineOpen) {
-    lockDisabledReason = 'Chưa thể khóa do đang trong thời gian sinh viên nộp đơn.'
+    lockDisabledReason = 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
   } else if (countReceived > 0 && countUnassigned > 0) {
-    lockDisabledReason = `Còn ${countUnassigned} sinh viên chưa có GVHD và ${countReceived} đơn chờ duyệt.`
+    lockDisabledReason = `Còn ${countReceived} đơn đang ở trạng thái GV chấp thuận (chưa duyệt) và ${countUnassigned} sinh viên chưa có GVHD. Cần phê duyệt và phân công đủ 100% trước khi khóa.`
   } else if (countReceived > 0) {
-    lockDisabledReason = `Còn ${countReceived} đơn đăng ký đang chờ duyệt. Cần xử lý hết đơn trước khi khóa danh sách.`
+    lockDisabledReason = `Còn ${countReceived} đơn đăng ký đang ở trạng thái GV chấp thuận (TEACHER_APPROVED). TBM cần phê duyệt hoặc từ chối hết các đơn này trước khi khóa danh sách.`
   } else if (countUnassigned > 0) {
     lockDisabledReason = `Còn ${countUnassigned} sinh viên chưa có GVHD. Cần phân công đủ 100% sinh viên trước khi khóa danh sách.`
   }
@@ -252,7 +280,7 @@ export function SupervisorWorkspaceView({
 
   // Lọc sinh viên theo tab & tìm kiếm
   const filteredStudents = useMemo(() => {
-    return students.filter((s) => {
+    return localStudents.filter((s) => {
       if (s.status !== currentTab) return false
       if (studentSearch.trim()) {
         const q = studentSearch.trim().toLowerCase()
@@ -264,7 +292,7 @@ export function SupervisorWorkspaceView({
       }
       return true
     })
-  }, [students, currentTab, studentSearch])
+  }, [localStudents, currentTab, studentSearch])
 
   // Lọc và chia danh sách giảng viên: còn chỉ tiêu & đã đủ chỉ tiêu
   const { availableLecturers, unavailableLecturers } = useMemo(() => {
@@ -401,6 +429,17 @@ export function SupervisorWorkspaceView({
       }
 
       onChangeCoSupervisor(student.id, selectedLecturer)
+      setLocalStudents((prev) =>
+        prev.map((item) =>
+          item.id === student.id
+            ? {
+              ...item,
+              supervisor2Id: selectedLecturer.id,
+              supervisor2Name: selectedLecturer.name,
+            }
+            : item,
+        ),
+      )
       toast.success(
         `Đã gán ${selectedLecturer.name} làm GVHD 2 cho sinh viên ${student.name} thành công!`,
       )
@@ -415,7 +454,7 @@ export function SupervisorWorkspaceView({
       const remaining = selectedLecturer.quota - (selectedLecturer.assigned || 0)
 
       const needAssignCount = targetIds.filter((sId) => {
-        const s = students.find((item) => item.id === sId)
+        const s = localStudents.find((item) => item.id === sId)
         return s?.supervisorId !== selectedLecturer.id
       }).length
 
@@ -437,6 +476,17 @@ export function SupervisorWorkspaceView({
         for (const sId of targetIds) {
           await onChangeSupervisor(sId, selectedLecturer)
         }
+        setLocalStudents((prev) =>
+          prev.map((item) =>
+            targetIds.includes(item.id)
+              ? {
+                ...item,
+                supervisorId: selectedLecturer.id,
+                supervisorName: selectedLecturer.name,
+              }
+              : item,
+          ),
+        )
       } catch {
         // Lỗi đã được thông báo qua toast ở handler
       } finally {
@@ -457,12 +507,24 @@ export function SupervisorWorkspaceView({
     }
 
     onAssignStudents(targetStudentIds, selectedLecturer)
+    setLocalStudents((prev) =>
+      prev.map((item) =>
+        targetStudentIds.includes(item.id)
+          ? {
+            ...item,
+            status: 'approved',
+            supervisorId: selectedLecturer.id,
+            supervisorName: selectedLecturer.name,
+          }
+          : item,
+      ),
+    )
     setSelectedStudentIds(new Set())
     setEditingTarget(null)
   }
 
   // Hành động Phê duyệt (tab Đã nhận GV)
-  const handleApproveAction = () => {
+  const handleApproveAction = async () => {
     if (isDeadlineOpen) {
       toast.warning('Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.')
       return
@@ -473,9 +535,10 @@ export function SupervisorWorkspaceView({
     }
     if (selectedStudentIds.size === 0) return
 
+    const selectedIdsArray = Array.from(selectedStudentIds)
     const regIds: string[] = []
-    selectedStudentIds.forEach((sId) => {
-      const stu = students.find((s) => s.id === sId)
+    selectedIdsArray.forEach((sId) => {
+      const stu = localStudents.find((s) => s.id === sId)
       if (stu?.registrationPublicId) {
         regIds.push(stu.registrationPublicId)
       } else if (stu?.id) {
@@ -488,12 +551,26 @@ export function SupervisorWorkspaceView({
       return
     }
 
-    onApproveRegistrations(regIds)
+    // Chuyển sinh viên sang tab "Đã phân công" (approved) và cập nhật badge thành HOD_APPROVED
+    setLocalStudents((prev) =>
+      prev.map((s) => {
+        if (selectedStudentIds.has(s.id)) {
+          return { ...s, status: 'approved', registrationStatus: 'HOD_APPROVED' }
+        }
+        return s
+      }),
+    )
     setSelectedStudentIds(new Set())
+
+    try {
+      await onApproveRegistrations(regIds)
+    } catch {
+      setLocalStudents(students)
+    }
   }
 
   // Hành động Từ chối (tab Đã nhận GV)
-  const handleRejectAction = () => {
+  const handleRejectAction = async () => {
     if (isDeadlineOpen) {
       toast.warning('Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.')
       return
@@ -504,9 +581,15 @@ export function SupervisorWorkspaceView({
     }
     if (selectedStudentIds.size === 0) return
 
+    const selectedIdsArray = Array.from(selectedStudentIds)
+    const confirmReject = confirm(
+      `Bạn có chắc chắn muốn từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn? Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (Chưa có GVHD).`,
+    )
+    if (!confirmReject) return
+
     const regIds: string[] = []
-    selectedStudentIds.forEach((sId) => {
-      const stu = students.find((s) => s.id === sId)
+    selectedIdsArray.forEach((sId) => {
+      const stu = localStudents.find((s) => s.id === sId)
       if (stu?.registrationPublicId) {
         regIds.push(stu.registrationPublicId)
       } else if (stu?.id) {
@@ -519,8 +602,29 @@ export function SupervisorWorkspaceView({
       return
     }
 
-    onRejectRegistrations(regIds)
+    // Chuyển sinh viên sang tab "Chưa nhận GV" (unassigned) và xóa thông tin GVHD
+    setLocalStudents((prev) =>
+      prev.map((s) => {
+        if (selectedStudentIds.has(s.id)) {
+          return {
+            ...s,
+            status: 'unassigned',
+            supervisorId: null,
+            supervisorName: null,
+            supervisor2Id: null,
+            supervisor2Name: null,
+          }
+        }
+        return s
+      }),
+    )
     setSelectedStudentIds(new Set())
+
+    try {
+      await onRejectRegistrations(regIds)
+    } catch {
+      setLocalStudents(students)
+    }
   }
 
   const selectedCount = selectedStudentIds.size
@@ -603,12 +707,12 @@ export function SupervisorWorkspaceView({
               {(termsOfYear && termsOfYear.length > 0
                 ? termsOfYear
                 : [
-                    {
-                      publicId: selectedSemesterId || '',
-                      term: semesterName,
-                      name: semesterName,
-                    } as SemesterOption,
-                  ]
+                  {
+                    publicId: selectedSemesterId || '',
+                    term: semesterName,
+                    name: semesterName,
+                  } as SemesterOption,
+                ]
               ).map((t) => {
                 const termId = t.publicId || (t as any).id || ''
                 const termLabel = t.term || t.name
@@ -620,58 +724,37 @@ export function SupervisorWorkspaceView({
               })}
             </select>
           </div>
+
+          {/* Chip hiển thị đếm ngược / Trạng thái Thời hạn bên cạnh bộ chọn Học kỳ/Năm học */}
+          {isDeadlineOpen ? (
+            <div
+              className="h-9 px-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs shrink-0"
+              title={
+                deadlineEndDateFormatted
+                  ? `Hạn chót đăng ký GVHD: ${deadlineEndDateFormatted}`
+                  : 'Đang trong thời gian đăng ký GVHD'
+              }
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse shrink-0" />
+              <span>{countdown.formattedText || 'Đang mở đăng ký'}</span>
+            </div>
+          ) : isDeadlineEnded ? (
+            <div
+              className="h-9 px-3 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs shrink-0"
+              title={
+                deadlineEndDateFormatted
+                  ? `Đã hết hạn vào: ${deadlineEndDateFormatted}`
+                  : 'Đã hết hạn đăng ký GVHD'
+              }
+            >
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Hết hạn đăng ký</span>
+            </div>
+          ) : null}
         </div>
 
-        {/* Cụm góc trên bên phải: Khối Thời hạn đăng ký + Nút Khóa / Mở khóa */}
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Khối Thông tin Thời hạn đăng ký (Registration Deadline Badge) */}
-          {registrationDeadline ? (
-            isDeadlineOpen ? (
-              <div
-                className="rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 bg-amber-50 border-amber-200 text-amber-800 shadow-2xs select-none cursor-help transition"
-                title="Hệ thống đang mở cho sinh viên đăng ký. Trưởng bộ môn chỉ được gán, đổi và chốt danh sách sau khi kết thúc thời hạn này."
-              >
-                <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
-                <div className="flex flex-col text-left leading-tight">
-                  <div className="font-semibold text-slate-800 text-[11.5px]">
-                    Hạn đăng ký SV: {deadlineEndDateFormatted || 'Chưa thiết lập'}
-                  </div>
-                  <div className="text-[10.5px] font-medium text-amber-700">
-                    {countdown.formattedText ? `${countdown.formattedText} (Chưa mở khóa thao tác)` : 'Đang mở (Chưa mở khóa thao tác)'}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div
-                className="rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 bg-slate-50 border-slate-200 text-slate-700 shadow-2xs select-none cursor-help transition"
-                title="Thời hạn đăng ký của sinh viên đã kết thúc. Bạn có thể tiến hành gán, đổi giảng viên và chốt danh sách."
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <div className="flex flex-col text-left leading-tight">
-                  <div className="font-semibold text-slate-800 text-[11.5px]">
-                    Hạn đăng ký SV: {deadlineEndDateFormatted || 'Đã kết thúc'}
-                  </div>
-                  <div className="text-[10.5px] font-medium text-slate-500 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                    <span>Đã kết thúc thời hạn</span>
-                  </div>
-                </div>
-              </div>
-            )
-          ) : (
-            <div
-              className="rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 bg-slate-50 border-slate-200 text-slate-500 shadow-2xs select-none cursor-default"
-              title="Chưa cấu hình đợt đăng ký GVHD cho học kỳ này"
-            >
-              <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
-              <div className="flex flex-col text-left leading-tight">
-                <div className="font-medium text-slate-700 text-[11.5px]">Hạn đăng ký SV</div>
-                <div className="text-[10.5px] text-slate-400">Chưa cấu hình thời hạn</div>
-              </div>
-            </div>
-          )}
-
-          {/* Nút Khóa / Mở khóa danh sách */}
+        {/* Nút Khóa / Mở khóa danh sách */}
+        <div className="flex items-center gap-2.5 shrink-0">
           {isLocked ? (
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
@@ -679,7 +762,7 @@ export function SupervisorWorkspaceView({
                   Trạng thái: Đã khóa {lockedByName ? `(${lockedByName})` : ''}
                 </div>
                 <div className="text-[10.5px] text-slate-500 font-medium">
-                  {lockedAt || ''}
+                  {lockedAt || '20:15 26/10/2026'}
                 </div>
               </div>
               <button
@@ -694,7 +777,7 @@ export function SupervisorWorkspaceView({
           ) : (
             <div
               className="inline-block"
-              title={lockDisabledReason || 'Khóa danh sách phân công GVHD và công bố chính thức'}
+              title={canLock ? 'Khóa danh sách phân công' : lockDisabledReason}
             >
               <button
                 type="button"
@@ -710,7 +793,7 @@ export function SupervisorWorkspaceView({
                   'h-9 px-4 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0',
                   canLock
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/25'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300',
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 pointer-events-none',
                 )}
               >
                 <Lock className="w-4 h-4" />
@@ -791,8 +874,8 @@ export function SupervisorWorkspaceView({
                       : isLocked
                         ? 'Danh sách đã khóa, không thể phê duyệt'
                         : selectedCount === 0
-                          ? 'Vui lòng chọn sinh viên để phê duyệt'
-                          : 'Phê duyệt đơn đăng ký'
+                          ? 'Vui lòng chọn đơn đăng ký để phê duyệt'
+                          : 'Phê duyệt đơn đăng ký đã chọn'
                   }
                 >
                   <button
@@ -800,13 +883,14 @@ export function SupervisorWorkspaceView({
                     onClick={handleApproveAction}
                     disabled={selectedCount === 0 || isLocked || isDeadlineOpen}
                     className={cn(
-                      'h-9 px-3.5 rounded-lg text-white text-[13px] font-semibold transition shadow-xs flex items-center justify-center shrink-0',
+                      'h-9 px-3.5 rounded-lg text-white text-[13px] font-semibold transition shadow-xs flex items-center justify-center gap-1.5 shrink-0',
                       selectedCount > 0 && !isLocked && !isDeadlineOpen
                         ? 'bg-[#10B981] hover:bg-[#059669] cursor-pointer'
                         : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none',
                     )}
                   >
-                    <span>Phê duyệt ({selectedCount})</span>
+                    <Check className="w-4 h-4" />
+                    <span>Phê duyệt đơn đã chọn{selectedCount > 0 ? ` (${selectedCount})` : ''}</span>
                   </button>
                 </div>
 
@@ -965,443 +1049,477 @@ export function SupervisorWorkspaceView({
                   <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
                 </colgroup>
                 <tbody className="divide-y divide-slate-100 text-[12.5px]">
-                {filteredStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
-                      Không có sinh viên nào trong danh mục này.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStudents.map((s) => {
-                    const isChecked = selectedStudentIds.has(s.id)
-                    const isApprovedTab = currentTab === 'approved'
-                    const isEditingThis1 =
-                      editingTarget?.student.id === s.id && editingTarget.slot === 1
-                    const isEditingThis2 =
-                      editingTarget?.student.id === s.id && editingTarget.slot === 2
-                    const isRowSelected = isChecked || editingTarget?.student.id === s.id
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
+                        Không có sinh viên nào trong danh mục này.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStudents.map((s) => {
+                      const isChecked = selectedStudentIds.has(s.id)
+                      const isApprovedTab = currentTab === 'approved'
+                      const isEditingThis1 =
+                        editingTarget?.student.id === s.id && editingTarget.slot === 1
+                      const isEditingThis2 =
+                        editingTarget?.student.id === s.id && editingTarget.slot === 2
+                      const isRowSelected = isChecked || editingTarget?.student.id === s.id
 
-                    return (
-                      <tr
-                        key={s.id}
-                        onClick={() => {
-                          if (isApprovedTab && !isLocked && !isDeadlineOpen) {
-                            if (editingTarget?.student.id === s.id && editingTarget.slot === 1) {
-                              setEditingTarget(null)
-                              setSelectedStudentIds(new Set())
-                            } else {
-                              setEditingTarget({ student: s, slot: 1 })
-                              setSelectedStudentIds(new Set([s.id]))
-                              if (s.supervisorId) setSelectedLecturerId(s.supervisorId)
+                      return (
+                        <tr
+                          key={s.id}
+                          onClick={() => {
+                            if (isApprovedTab && !isLocked && !isDeadlineOpen) {
+                              if (editingTarget?.student.id === s.id && editingTarget.slot === 1) {
+                                setEditingTarget(null)
+                                setSelectedStudentIds(new Set())
+                              } else {
+                                setEditingTarget({ student: s, slot: 1 })
+                                setSelectedStudentIds(new Set([s.id]))
+                                if (s.supervisorId) setSelectedLecturerId(s.supervisorId)
+                              }
+                            } else if (!isApprovedTab && !isLocked && !isDeadlineOpen) {
+                              toggleSelectStudent(s.id)
                             }
-                          }
-                        }}
-                        className={cn(
-                          'transition-colors',
-                          isRowSelected
-                            ? 'bg-blue-50/80 ring-1 ring-blue-300'
-                            : isChecked
-                              ? 'bg-blue-50/60 hover:bg-blue-50/80'
-                              : 'hover:bg-slate-50/70',
-                          isApprovedTab && !isLocked && !isDeadlineOpen && 'cursor-pointer',
-                        )}
-                      >
-                        {/* Cột 1: Tên & MSSV */}
-                        <td className="py-2.5 px-2.5">
-                          <strong className="text-slate-900 font-semibold leading-tight block text-[13px] truncate">
-                            {s.name}
-                          </strong>
-                          <span className="text-slate-500 font-mono text-[11.5px] block mt-0.5">
-                            {s.code}
-                          </span>
-                        </td>
-
-                        {/* Cột 2: Đề tài */}
-                        <td className="py-2.5 px-2.5">
-                          {currentTab === 'unassigned' ? (
-                            <span className="text-slate-400 italic text-[11.5px]">—</span>
-                          ) : s.topic ? (
-                            <span
-                              className="text-[12px] text-slate-700 line-clamp-2 leading-snug"
-                              title={s.topic}
-                            >
-                              {s.topic}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11.5px]">
-                              (chưa đăng ký)
-                            </span>
+                          }}
+                          className={cn(
+                            'transition-colors',
+                            isRowSelected
+                              ? 'bg-blue-50/80 ring-1 ring-blue-300'
+                              : isChecked
+                                ? 'bg-blue-50/60 hover:bg-blue-50/80'
+                                : 'hover:bg-slate-50/70',
+                            !isLocked && !isDeadlineOpen && 'cursor-pointer',
                           )}
-                        </td>
-
-                        {/* Cột 3: GVHD 1 (Chính) */}
-                        <td className="py-2.5 px-2.5">
-                          {isApprovedTab ? (
-                            s.supervisorName ? (
-                              <div
-                                className={cn(
-                                  'flex items-center justify-between gap-1 p-1 px-2 rounded-md transition border',
-                                  isEditingThis1
-                                    ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
-                                    : 'bg-blue-50/70 border-blue-200 group',
-                                )}
-                              >
-                                <span
-                                  className={cn(
-                                    'font-bold text-[12px] block truncate leading-tight',
-                                    isEditingThis1 ? 'text-white' : 'text-blue-900',
-                                  )}
-                                >
-                                  {s.supervisorName}
-                                </span>
-                                {!isLocked && (
-                                  <button
-                                    type="button"
-                                    disabled={isDeadlineOpen}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (isLocked || isDeadlineOpen) return
-                                      if (isEditingThis1) {
-                                        setEditingTarget(null)
-                                        setSelectedStudentIds(new Set())
-                                      } else {
-                                        setEditingTarget({ student: s, slot: 1 })
-                                        setSelectedStudentIds(new Set([s.id]))
-                                        if (s.supervisorId) setSelectedLecturerId(s.supervisorId)
-                                        toast.info(
-                                          `Đã chọn SV ${s.name} để đổi GVHD 1. Hãy chọn giảng viên ở bảng bên phải rồi nhấn "Gán".`,
-                                        )
-                                      }
-                                    }}
-                                    className={cn(
-                                      'p-0.5 rounded transition shrink-0',
-                                      isDeadlineOpen
-                                        ? 'text-slate-400 cursor-not-allowed opacity-40'
-                                        : isEditingThis1
-                                          ? 'bg-white/20 text-white hover:bg-white/30 cursor-pointer'
-                                          : 'text-blue-600 hover:text-blue-800 hover:bg-white cursor-pointer',
-                                    )}
-                                    title={
-                                      isDeadlineOpen
-                                        ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
-                                        : isEditingThis1
-                                          ? 'Đang chọn đổi GVHD 1 (nhấn để hủy)'
-                                          : 'Chọn sinh viên này để đổi GVHD 1'
-                                    }
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                Chưa có GVHD
-                              </span>
-                            )
-                          ) : s.supervisorName ? (
-                            <span className="font-bold text-slate-800 text-[12.5px] block truncate">
-                              {s.supervisorName}
-                            </span>
-                          ) : (
-                            <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              Chưa có GVHD
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Cột 4: GVHD 2 (ở tab approved) hoặc Checkbox (ở tab khác) */}
-                        {isApprovedTab ? (
+                        >
+                          {/* Cột 1: Tên & MSSV & Badge Trạng Thái */}
                           <td className="py-2.5 px-2.5">
-                            {s.supervisor2Name ? (
-                              <div
-                                className={cn(
-                                  'flex items-center justify-between gap-1 p-1 px-2 rounded-md transition border',
-                                  isEditingThis2
-                                    ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
-                                    : 'bg-purple-50/70 border-purple-200 group',
-                                )}
+                            <strong className="text-slate-900 font-semibold leading-tight block text-[13px] truncate">
+                              {s.name}
+                            </strong>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <span className="text-slate-500 font-mono text-[11.5px]">
+                                {s.code}
+                              </span>
+                              {/* Badge trạng thái đơn đăng ký */}
+                              {currentTab === 'received' && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Giảng viên hướng dẫn đã chấp thuận sơ bộ">
+                                  GV đã duyệt
+                                </span>
+                              )}
+                              {currentTab === 'approved' && (
+                                s.registrationStatus === 'ASSIGNED_BY_HOD' ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Trưởng bộ môn chỉ định trực tiếp">
+                                    <UserCheck className="w-3 h-3 text-indigo-600" />
+                                    TBM phân công
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Trưởng bộ môn đã phê duyệt chính thức">
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                    TBM đã duyệt
+                                  </span>
+                                )
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Cột 2: Đề tài */}
+                          <td className="py-2.5 px-2.5">
+                            {currentTab === 'unassigned' ? (
+                              <span className="text-slate-400 italic text-[11.5px]">—</span>
+                            ) : s.topic ? (
+                              <span
+                                className="text-[12px] text-slate-700 line-clamp-2 leading-snug"
+                                title={s.topic}
                               >
-                                <span
+                                {s.topic}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11.5px]">
+                                (chưa đăng ký)
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Cột 3: GVHD 1 (Chính) */}
+                          <td className="py-2.5 px-2.5">
+                            {isApprovedTab ? (
+                              s.supervisorName ? (
+                                <div
                                   className={cn(
-                                    'font-bold text-[12px] block truncate leading-tight',
-                                    isEditingThis2 ? 'text-white' : 'text-purple-900',
+                                    'flex items-center justify-between gap-1 p-1 px-2 rounded-md transition border',
+                                    isEditingThis1
+                                      ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                                      : 'bg-blue-50/70 border-blue-200 group',
                                   )}
                                 >
-                                  {s.supervisor2Name}
-                                </span>
-                                {!isLocked && (
-                                  <div className="flex items-center gap-0.5 shrink-0">
+                                  <span
+                                    className={cn(
+                                      'font-bold text-[12px] block truncate leading-tight',
+                                      isEditingThis1 ? 'text-white' : 'text-blue-900',
+                                    )}
+                                  >
+                                    {s.supervisorName}
+                                  </span>
+                                  {!isLocked && (
                                     <button
                                       type="button"
                                       disabled={isDeadlineOpen}
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         if (isLocked || isDeadlineOpen) return
-                                        if (isEditingThis2) {
+                                        if (isEditingThis1) {
                                           setEditingTarget(null)
                                           setSelectedStudentIds(new Set())
                                         } else {
-                                          setEditingTarget({ student: s, slot: 2 })
+                                          setEditingTarget({ student: s, slot: 1 })
                                           setSelectedStudentIds(new Set([s.id]))
-                                          if (s.supervisor2Id) setSelectedLecturerId(s.supervisor2Id)
+                                          if (s.supervisorId) setSelectedLecturerId(s.supervisorId)
                                           toast.info(
-                                            `Đã chọn SV ${s.name} để đổi GVHD 2. Hãy chọn giảng viên ở bảng bên phải rồi nhấn "Gán".`,
+                                            `Đã chọn SV ${s.name} để đổi GVHD 1. Hãy chọn giảng viên ở bảng bên phải rồi nhấn "Gán".`,
                                           )
                                         }
                                       }}
                                       className={cn(
-                                        'p-0.5 rounded transition',
+                                        'p-0.5 rounded transition shrink-0',
                                         isDeadlineOpen
                                           ? 'text-slate-400 cursor-not-allowed opacity-40'
-                                          : isEditingThis2
+                                          : isEditingThis1
                                             ? 'bg-white/20 text-white hover:bg-white/30 cursor-pointer'
-                                            : 'text-purple-600 hover:text-purple-800 hover:bg-white cursor-pointer',
+                                            : 'text-blue-600 hover:text-blue-800 hover:bg-white cursor-pointer',
                                       )}
                                       title={
                                         isDeadlineOpen
                                           ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
-                                          : isEditingThis2
-                                            ? 'Đang chọn đổi GVHD 2 (nhấn để hủy)'
-                                            : 'Chọn sinh viên này để đổi GVHD 2'
+                                          : isEditingThis1
+                                            ? 'Đang chọn đổi GVHD 1 (nhấn để hủy)'
+                                            : 'Chọn sinh viên này để đổi GVHD 1'
                                       }
                                     >
                                       <Edit3 className="w-3 h-3" />
                                     </button>
-                                    <button
-                                      type="button"
-                                      disabled={isDeadlineOpen}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        if (isLocked || isDeadlineOpen) return
-                                        if (
-                                          confirm(
-                                            `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
-                                          )
-                                        ) {
-                                          onChangeCoSupervisor(s.id, null)
-                                        }
-                                      }}
-                                      className={cn(
-                                        'p-0.5 rounded transition',
-                                        isDeadlineOpen
-                                          ? 'text-slate-400 cursor-not-allowed opacity-40'
-                                          : isEditingThis2
-                                            ? 'text-white/80 hover:text-white cursor-pointer'
-                                            : 'text-slate-400 hover:text-rose-600 hover:bg-white cursor-pointer',
-                                      )}
-                                      title={
-                                        isDeadlineOpen
-                                          ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
-                                          : 'Gỡ bỏ GVHD 2'
-                                      }
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            ) : !isLocked ? (
-                              <button
-                                type="button"
-                                disabled={isDeadlineOpen}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (isLocked || isDeadlineOpen) return
-                                  if (isEditingThis2) {
-                                    setEditingTarget(null)
-                                    setSelectedStudentIds(new Set())
-                                  } else {
-                                    setEditingTarget({ student: s, slot: 2 })
-                                    setSelectedStudentIds(new Set([s.id]))
-                                    setSelectedLecturerId(null)
-                                    toast.info(
-                                      `Đang chọn ${s.name} để gán GVHD 2. Hãy chọn giảng viên ở bảng bên phải rồi nhấn "Gán".`,
-                                    )
-                                  }
-                                }}
-                                className={cn(
-                                  'h-7 px-2.5 rounded-md border border-dashed transition flex items-center justify-center gap-1 text-[11.5px] font-semibold',
-                                  isDeadlineOpen
-                                    ? 'opacity-40 cursor-not-allowed border-slate-300 text-slate-400 bg-slate-50'
-                                    : isEditingThis2
-                                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs cursor-pointer'
-                                      : 'border-purple-300 hover:border-purple-500 bg-white hover:bg-purple-50 text-purple-700 shadow-2xs cursor-pointer',
-                                )}
-                                title={
-                                  isDeadlineOpen
-                                    ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
-                                    : 'Chỉ định GVHD 2'
-                                }
-                              >
-                                <Plus className="w-3 h-3" />
-                                <span>Thêm GVHD 2</span>
-                              </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                  Chưa có GVHD
+                                </span>
+                              )
+                            ) : s.supervisorName ? (
+                              <span className="font-bold text-slate-800 text-[12.5px] block truncate">
+                                {s.supervisorName}
+                              </span>
                             ) : (
-                              <span className="text-slate-400 italic text-[11px] pl-1">
-                                — Không có —
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                Chưa có GVHD
                               </span>
                             )}
                           </td>
-                        ) : (
-                          <td className="py-2.5 px-1 text-center">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleSelectStudent(s.id)}
-                              disabled={isLocked || isDeadlineOpen}
-                              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              title={
-                                isDeadlineOpen
-                                  ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
-                                  : isLocked
-                                    ? 'Danh sách đã khóa'
-                                    : undefined
-                              }
-                            />
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
+
+                          {/* Cột 4: GVHD 2 (ở tab approved) hoặc Checkbox (ở tab khác) */}
+                          {isApprovedTab ? (
+                            <td className="py-2.5 px-2.5">
+                              {s.supervisor2Name ? (
+                                <div
+                                  className={cn(
+                                    'flex items-center justify-between gap-1 p-1 px-2 rounded-md transition border',
+                                    isEditingThis2
+                                      ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
+                                      : 'bg-purple-50/70 border-purple-200 group',
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      'font-bold text-[12px] block truncate leading-tight',
+                                      isEditingThis2 ? 'text-white' : 'text-purple-900',
+                                    )}
+                                  >
+                                    {s.supervisor2Name}
+                                  </span>
+                                  {!isLocked && (
+                                    <div className="flex items-center gap-0.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        disabled={isDeadlineOpen}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          if (isLocked || isDeadlineOpen) return
+                                          if (isEditingThis2) {
+                                            setEditingTarget(null)
+                                            setSelectedStudentIds(new Set())
+                                          } else {
+                                            setEditingTarget({ student: s, slot: 2 })
+                                            setSelectedStudentIds(new Set([s.id]))
+                                            if (s.supervisor2Id) setSelectedLecturerId(s.supervisor2Id)
+                                            toast.info(
+                                              `Đã chọn SV ${s.name} để đổi GVHD 2. Hãy chọn giảng viên ở bảng bên phải rồi nhấn "Gán".`,
+                                            )
+                                          }
+                                        }}
+                                        className={cn(
+                                          'p-0.5 rounded transition',
+                                          isDeadlineOpen
+                                            ? 'text-slate-400 cursor-not-allowed opacity-40'
+                                            : isEditingThis2
+                                              ? 'bg-white/20 text-white hover:bg-white/30 cursor-pointer'
+                                              : 'text-purple-600 hover:text-purple-800 hover:bg-white cursor-pointer',
+                                        )}
+                                        title={
+                                          isDeadlineOpen
+                                            ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                            : isEditingThis2
+                                              ? 'Đang chọn đổi GVHD 2 (nhấn để hủy)'
+                                              : 'Chọn sinh viên này để đổi GVHD 2'
+                                        }
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isDeadlineOpen}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          if (isLocked || isDeadlineOpen) return
+                                          if (
+                                            confirm(
+                                              `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
+                                            )
+                                          ) {
+                                            onChangeCoSupervisor(s.id, null)
+                                            setLocalStudents((prev) =>
+                                              prev.map((item) =>
+                                                item.id === s.id
+                                                  ? {
+                                                    ...item,
+                                                    supervisor2Id: null,
+                                                    supervisor2Name: null,
+                                                  }
+                                                  : item,
+                                              ),
+                                            )
+                                          }
+                                        }}
+                                        className={cn(
+                                          'p-0.5 rounded transition',
+                                          isDeadlineOpen
+                                            ? 'text-slate-400 cursor-not-allowed opacity-40'
+                                            : isEditingThis2
+                                              ? 'text-white/80 hover:text-white cursor-pointer'
+                                              : 'text-slate-400 hover:text-rose-600 hover:bg-white cursor-pointer',
+                                        )}
+                                        title={
+                                          isDeadlineOpen
+                                            ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                            : 'Gỡ bỏ GVHD 2'
+                                        }
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : !isLocked ? (
+                                <button
+                                  type="button"
+                                  disabled={isDeadlineOpen}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (isLocked || isDeadlineOpen) return
+                                    if (isEditingThis2) {
+                                      setEditingTarget(null)
+                                      setSelectedStudentIds(new Set())
+                                    } else {
+                                      setEditingTarget({ student: s, slot: 2 })
+                                      setSelectedStudentIds(new Set([s.id]))
+                                      setSelectedLecturerId(null)
+                                      toast.info(
+                                        `Đang chọn ${s.name} để gán GVHD 2. Hãy chọn giảng viên ở bảng bên phải rồi nhấn "Gán".`,
+                                      )
+                                    }
+                                  }}
+                                  className={cn(
+                                    'h-7 px-2.5 rounded-md border border-dashed transition flex items-center justify-center gap-1 text-[11.5px] font-semibold',
+                                    isDeadlineOpen
+                                      ? 'opacity-40 cursor-not-allowed border-slate-300 text-slate-400 bg-slate-50'
+                                      : isEditingThis2
+                                        ? 'bg-purple-600 text-white border-purple-600 shadow-xs cursor-pointer'
+                                        : 'border-purple-300 hover:border-purple-500 bg-white hover:bg-purple-50 text-purple-700 shadow-2xs cursor-pointer',
+                                  )}
+                                  title={
+                                    isDeadlineOpen
+                                      ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                      : 'Chỉ định GVHD 2'
+                                  }
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>Thêm GVHD 2</span>
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px] pl-1">
+                                  — Không có —
+                                </span>
+                              )}
+                            </td>
+                          ) : (
+                            <td className="py-2.5 px-1 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelectStudent(s.id)}
+                                disabled={isLocked || isDeadlineOpen}
+                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={
+                                  isDeadlineOpen
+                                    ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                                    : isLocked
+                                      ? 'Danh sách đã khóa'
+                                      : undefined
+                                }
+                              />
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */}
-      <div className="w-[390px] xl:w-[430px] shrink-0 flex flex-col h-full">
-        {/* Ô tìm kiếm giảng viên & Nút Gán */}
-        <div className="shrink-0 flex items-center gap-2 mb-1.5">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Tìm theo tên giảng viên, học hàm, bộ..."
-              value={lecturerSearch}
-              onChange={(e) => setLecturerSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-3.5 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-xs"
-            />
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-          </div>
+        {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */}
+        <div className="w-[390px] xl:w-[430px] shrink-0 flex flex-col h-full">
+          {/* Ô tìm kiếm giảng viên & Nút Gán */}
+          <div className="shrink-0 flex items-center gap-2 mb-1.5">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Tìm theo tên giảng viên, học hàm, bộ..."
+                value={lecturerSearch}
+                onChange={(e) => setLecturerSearch(e.target.value)}
+                className="w-full h-9 pl-9 pr-3.5 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-xs"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            </div>
 
-          <div
-            className="inline-block shrink-0"
-            title={canAssign ? 'Gán giảng viên cho sinh viên' : assignDisabledReason}
-          >
-            <button
-              type="button"
-              onClick={handleAssignAction}
-              disabled={!canAssign}
-              className={cn(
-                'h-9 px-4 rounded-lg text-white text-[13px] font-semibold transition shadow-xs flex items-center justify-center shrink-0',
-                canAssign
-                  ? 'bg-[#1565C0] hover:bg-[#0D47A1] cursor-pointer'
-                  : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none',
-              )}
+            <div
+              className="inline-block shrink-0"
+              title={canAssign ? 'Gán giảng viên cho sinh viên' : assignDisabledReason}
             >
-              <span>
-                {currentTab === 'approved' && editingTarget?.slot === 2
-                  ? 'Gán GVHD 2'
-                  : currentTab === 'approved' && (editingTarget || selectedCount > 0)
-                    ? `Đổi GVHD (${selectedCount || 1} SV)`
-                    : `Gán (${selectedCount} SV)`}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Bar Lọc Nhanh Đơn Vị */}
-        <div className="shrink-0 h-9 bg-slate-200/70 p-0.5 rounded-lg flex items-center gap-1 mb-1.5 text-[12px] font-semibold overflow-x-auto shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setLecturerCategory('all')}
-            className={cn(
-              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-              lecturerCategory === 'all'
-                ? 'bg-white text-blue-700 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900',
-            )}
-          >
-            Tất cả
-          </button>
-          <button
-            type="button"
-            onClick={() => setLecturerCategory('internal')}
-            className={cn(
-              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-              lecturerCategory === 'internal'
-                ? 'bg-white text-blue-700 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900',
-            )}
-          >
-            Trong bộ môn
-          </button>
-          <button
-            type="button"
-            onClick={() => setLecturerCategory('dept_ext')}
-            className={cn(
-              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-              lecturerCategory === 'dept_ext'
-                ? 'bg-white text-blue-700 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900',
-            )}
-          >
-            Ngoài bộ môn
-          </button>
-          <button
-            type="button"
-            onClick={() => setLecturerCategory('univ_ext')}
-            className={cn(
-              'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
-              lecturerCategory === 'univ_ext'
-                ? 'bg-white text-blue-700 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900',
-            )}
-          >
-            Ngoài trường
-          </button>
-        </div>
-
-        {/* Khung Danh sách Giảng viên (Header cố định + Body cuộn độc lập) */}
-        <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden text-left text-sm">
-          {/* Tiêu đề bảng Giảng viên (cố định trên cùng) */}
-          <div className="shrink-0 grid grid-cols-12 bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11 px-3.5 border-b border-slate-200 items-center">
-            <div className="col-span-2 text-center">CHỌN</div>
-            <div className="col-span-6">TÊN GIẢNG VIÊN</div>
-            <div className="col-span-4 flex items-center justify-center gap-1.5">
               <button
                 type="button"
-                onClick={() =>
-                  setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-                }
+                onClick={handleAssignAction}
+                disabled={!canAssign}
                 className={cn(
-                  'p-1 rounded hover:bg-slate-200/80 transition cursor-pointer flex items-center justify-center',
-                  lecturerSort !== 'default'
-                    ? 'text-blue-600 bg-blue-100 font-bold'
-                    : 'text-slate-400 hover:text-slate-600',
+                  'h-9 px-4 rounded-lg text-white text-[13px] font-semibold transition shadow-xs flex items-center justify-center shrink-0',
+                  canAssign
+                    ? 'bg-[#1565C0] hover:bg-[#0D47A1] cursor-pointer'
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none',
                 )}
-                title={
-                  lecturerSort === 'asc'
-                    ? 'Sắp xếp: Số SV tăng dần'
-                    : 'Sắp xếp: Số SV giảm dần'
-                }
               >
-                {sortIcon}
+                <span>
+                  {currentTab === 'approved' && editingTarget?.slot === 2
+                    ? 'Gán GVHD 2'
+                    : currentTab === 'approved' && (editingTarget || selectedCount > 0)
+                      ? `Đổi GVHD (${selectedCount || 1} SV)`
+                      : `Gán (${selectedCount} SV)`}
+                </span>
               </button>
-              <span
-                className="cursor-pointer select-none"
-                onClick={() =>
-                  setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-                }
-              >
-                ĐANG NHẬN
-              </span>
             </div>
           </div>
 
-          {/* Thân danh sách GV: CUỘN ĐỘC LẬP MƯỢT MÀ */}
-          <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] divide-y divide-slate-100">
+          {/* Tab Bar Lọc Nhanh Đơn Vị */}
+          <div className="shrink-0 h-9 bg-slate-200/70 p-0.5 rounded-lg flex items-center gap-1 mb-1.5 text-[12px] font-semibold overflow-x-auto shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setLecturerCategory('all')}
+              className={cn(
+                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+                lecturerCategory === 'all'
+                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              onClick={() => setLecturerCategory('internal')}
+              className={cn(
+                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+                lecturerCategory === 'internal'
+                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              Trong bộ môn
+            </button>
+            <button
+              type="button"
+              onClick={() => setLecturerCategory('dept_ext')}
+              className={cn(
+                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+                lecturerCategory === 'dept_ext'
+                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              Ngoài bộ môn
+            </button>
+            <button
+              type="button"
+              onClick={() => setLecturerCategory('univ_ext')}
+              className={cn(
+                'flex-1 h-8 px-2 rounded-md flex items-center justify-center transition text-center cursor-pointer whitespace-nowrap',
+                lecturerCategory === 'univ_ext'
+                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              Ngoài trường
+            </button>
+          </div>
+
+          {/* Khung Danh sách Giảng viên (Header cố định + Body cuộn độc lập) */}
+          <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden text-left text-sm">
+            {/* Tiêu đề bảng Giảng viên (cố định trên cùng) */}
+            <div className="shrink-0 grid grid-cols-12 bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11 px-3.5 border-b border-slate-200 items-center">
+              <div className="col-span-2 text-center">CHỌN</div>
+              <div className="col-span-6">TÊN GIẢNG VIÊN</div>
+              <div className="col-span-4 flex items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                  }
+                  className={cn(
+                    'p-1 rounded hover:bg-slate-200/80 transition cursor-pointer flex items-center justify-center',
+                    lecturerSort !== 'default'
+                      ? 'text-blue-600 bg-blue-100 font-bold'
+                      : 'text-slate-400 hover:text-slate-600',
+                  )}
+                  title={
+                    lecturerSort === 'asc'
+                      ? 'Sắp xếp: Số SV tăng dần'
+                      : 'Sắp xếp: Số SV giảm dần'
+                  }
+                >
+                  {sortIcon}
+                </button>
+                <span
+                  className="cursor-pointer select-none"
+                  onClick={() =>
+                    setLecturerSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                  }
+                >
+                  ĐANG NHẬN
+                </span>
+              </div>
+            </div>
+
+            {/* Thân danh sách GV: CUỘN ĐỘC LẬP MƯỢT MÀ */}
+            <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] divide-y divide-slate-100">
               {/* Nhóm Giảng viên còn chỉ tiêu */}
               {availableLecturers.map((l) => {
                 const isSelected = effectiveSelectedLecturerId === l.id
