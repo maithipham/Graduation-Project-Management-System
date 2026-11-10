@@ -8,7 +8,7 @@ Ví dụ dùng feature `admin/semester_management` (học kỳ). Khi làm featur
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse, SpringPage } from '@/shared/types'
 import { toSpringPage, type RawSpringPage } from '@/shared/utils'
-import type { Semester, SemesterListParams, SemesterRequest } from '../types/semester.types'
+import type { Semester, SemesterListParams, SemesterRequest } from '../types'
 
 const BASE_URL = API_ENDPOINTS.admin.semesters
 

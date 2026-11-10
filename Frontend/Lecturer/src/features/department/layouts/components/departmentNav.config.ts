@@ -76,7 +76,7 @@ export const departmentNavItems: DepartmentNavItem[] = [
     icon: SlidersHorizontal,
   },
   {
-    to: '/department/documents',
+    to: '/department/documents-management',
     label: 'Tài liệu & Biểu mẫu',
     icon: FolderArchive,
   },

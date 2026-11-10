@@ -1,6 +1,6 @@
 # Mẫu: type từ DTO Java
 
-Vị trí trong feature: `types/semester.types.ts`
+Vị trí trong feature: `types.ts`
 
 Ví dụ dùng feature `admin/semester_management` (học kỳ). Khi làm feature khác: đổi tên, giữ cấu trúc.
 

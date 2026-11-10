@@ -79,6 +79,13 @@ export const API_ENDPOINTS = {
       `/semesters/${semesterId}/advisor-assignments/students/${studentPublicId}/co-supervisor`,
     toggleLock: (semesterId: string) => `/semesters/${semesterId}/advisor-assignments/lock-status`,
   },
+  // Tài liệu & Biểu mẫu của Trưởng bộ môn (lưu trên Cloudinary)
+  departmentDocument: {
+    // GET: danh sách (phân trang, mọi role đã đăng nhập) · POST: tải lên (multipart, chỉ TBM)
+    base: '/template',
+    // PUT: sửa (multipart) · DELETE: xóa
+    detail: (publicId: string) => `/template/${publicId}`,
+  },
   major: {
     base: '/major',
   },

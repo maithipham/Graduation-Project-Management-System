@@ -16,7 +16,7 @@ Quy tắc chung (kiến trúc, import, giao diện) nằm trong `AGENTS.md` — 
 3. **URL** và **nhãn menu** tiếng Việt (ví dụ `/admin/semesters` — "Quản lý học kỳ").
 4. Có cần gọi API không → nếu có, sau khi tạo khung thì làm tiếp skill `connect-api`.
 
-Kiểm tra `src/features/<role>/` trước: nhiều feature đã có sẵn thư mục rỗng (chỉ có `index.ts` với `export {}`),
+Kiểm tra `src/features/<role>/` trước: nhiều feature đã có sẵn thư mục (có thể chỉ có `index.ts` với `export {}` — khi đó bổ sung cho đủ khung chuẩn ở bước 1),
 ví dụ `admin/semester_management`, `admin/account_management`, `admin/major_management`, `department/student_management`.
 Có rồi thì dùng lại, không tạo trùng.
 
@@ -32,13 +32,22 @@ Menu và route hiện có (kiểm tra lại trong code, có thể đã đổi):
 
 ### 1. Thư mục feature
 
+Luôn tạo **đủ khung chuẩn** sau (kể cả khi chưa có code cho từng phần):
+
 ```
 src/features/<role>/<feature>/
-├── index.ts        # cổng export duy nhất
-└── pages/XxxPage.tsx
+├── components/
+├── hooks/
+├── pages/          # XxxPage.tsx
+├── services/
+├── utils/
+├── index.ts        # cổng export duy nhất — ban đầu: export * from './types'
+└── types.ts        # type tương ứng DTO BE — ban đầu: export {}
 ```
 
-- Chỉ tạo thêm `components/ hooks/ services/ types/ store/` khi thật sự có file đặt vào. Không tạo file rỗng.
+- `store/` chỉ thêm khi feature cần state giao diện (Zustand).
+- Không tạo file `.gitkeep` hay file rỗng trong thư mục con. Git không lưu thư mục rỗng, nên nhắc người dùng
+  rằng thư mục con chỉ được commit khi có file đầu tiên.
 - Feature mới phải được export ở `src/features/<role>/index.ts`: `export * from './<feature>'`.
 
 ### 2. Page
@@ -68,7 +77,7 @@ export default function SemesterListPage() {
 ```ts
 // Public API của sub-feature: semester_management
 // Không export pages: page được nạp bằng lazy() trong app/routes.
-export * from './types/semester.types'
+export * from './types'
 export * from './hooks/useSemesters'
 ```
 
@@ -145,4 +154,4 @@ Làm theo skill `verify-changes`. Nếu có thể, mở trang trong trình duy�
 - Cho nhiều mục con của một nhóm menu dùng chung một page qua prop ở file route — mỗi mục con một page riêng (bước 5).
 - Tự viết chuỗi role (`'admin'`, `'lecturer'`…) — dùng `UserRole` (`ADMIN`, `HEAD_OF_MAJOR`, `SUPERVISOR`),
   `CanAccess`, `useMyInfo` từ `@/features/auth`. Trang mới không cần tự chặn role: route của portal đã nằm trong `ProtectedRoute`.
-- Tạo đủ 6 thư mục con "cho đúng chuẩn" khi chưa có file đặt vào, hoặc viết mock fallback trong service (`catch { return mock }`).
+- Tạo thiếu thư mục trong khung chuẩn (bước 1), hoặc viết mock fallback trong service (`catch { return mock }`).

@@ -55,7 +55,7 @@ Mẫu đầy đủ (đã chạy thử tsc/lint/test) nằm trong `templates/` �
 
 | Bước | File trong feature | Mẫu |
 | --- | --- | --- |
-| 1. Type từ DTO | `types/xxx.types.ts` | `templates/types.md` |
+| 1. Type từ DTO | `types.ts` | `templates/types.md` |
 | 2. Endpoint | `src/shared/api/endpoints.ts` | thêm key theo role: `admin: { semesters: '/admin/semesters' }` |
 | 3. Service | `services/xxx.service.ts` | `templates/service.md` |
 | 4. Hook | `hooks/useXxx.ts` | `templates/hooks.md` |
