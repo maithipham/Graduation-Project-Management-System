@@ -2,8 +2,10 @@ import type { SupervisorRequestItem } from '@/features/lecturer/supervisor_regis
 import type { TopicProposalItem } from '@/features/lecturer/topic_proposal/types/topicProposal.types'
 import type { OutlineReviewItem } from '@/features/lecturer/outline_review/types/outlineReview.types'
 import type { ReportCheckItem } from '@/features/lecturer/report_check/types/reportCheck.types'
-import type { TrackingSheetItem } from '@/features/lecturer/progress_tracking/types/progressTracking.types'
-import type { GuidingScoreItem } from '@/features/lecturer/guiding_score/types/guidingScore.types'
+import type {
+  GuidingEvaluationItem,
+  RubricScores,
+} from '@/features/lecturer/guiding_evaluation/types/guidingEvaluation.types'
 import type {
   DefenseCouncilItem,
   DefenseReviewItem,
@@ -44,8 +46,7 @@ export interface LecturerPortalState {
   topicProposals: TopicProposalItem[]
   outlines: OutlineReviewItem[]
   reports: ReportCheckItem[]
-  trackingSheets: TrackingSheetItem[]
-  guidingScores: GuidingScoreItem[]
+  guidingEvaluations: GuidingEvaluationItem[]
   defenseCouncils: DefenseCouncilItem[]
   defenseReviews: DefenseReviewItem[]
   documentTemplates: LecturerDocumentTemplate[]
@@ -70,9 +71,13 @@ export interface LecturerPortalState {
   submitPlagiarismResult: (id: string, fileName: string, rate: number) => void
   markReportDownloaded: (id: string) => void
 
-  submitTrackingSheet: (id: string, customFileName?: string) => void
-
-  saveGuidingScore: (id: string, score: number | null, comment: string) => void
+  submitEvaluationTrackingFile: (id: string, fileName: string) => void
+  saveEvaluationRubric: (
+    id: string,
+    score: number | null,
+    rubricScores: RubricScores,
+    isDraft?: boolean,
+  ) => void
 
   updateDefenseReviewScore: (id: string, score: number | null) => void
   approveDefenseReview: (id: string) => void
