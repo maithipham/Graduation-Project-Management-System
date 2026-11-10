@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Download, FileText, Minus, Plus, Printer } from 'lucide-react'
 import { useMyInfo } from '@/features/auth'
-import { STUDENT_PROFILE_MOCK } from '@/shared/constants/studentProfile.mock'
+import { useMyTopicOverview } from '../hooks/useTopicTitle'
 
 export default function StudentOutlinePreviewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { data: user } = useMyInfo()
+  const { data: topicOverview } = useMyTopicOverview()
 
   const fileName = searchParams.get('file') || 'De_cuong_DATN_v2.pdf'
   const [scale, setScale] = useState<number>(1.0)
@@ -30,7 +31,16 @@ export default function StudentOutlinePreviewPage() {
     window.setTimeout(() => setToastMsg(''), 2500)
   }
 
-  const studentName = user?.name?.trim() || STUDENT_PROFILE_MOCK.name
+  const studentName =
+    user?.name?.trim() ||
+    topicOverview?.histories?.[0]?.studentName ||
+    'Sinh viên'
+  const studentCode = topicOverview?.histories?.[0]?.studentCode || ''
+  const topicName =
+    topicOverview?.officialName ||
+    topicOverview?.provisionalName ||
+    'Chưa cập nhật tên đề tài'
+  const mentorName = topicOverview?.lecturerName || 'Chưa phân công'
 
   return (
     <div className="bg-slate-700 text-slate-800 min-h-screen flex flex-col">
@@ -139,20 +149,19 @@ export default function StudentOutlinePreviewPage() {
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Tên đề tài:</span>
               <span className="col-span-2 font-semibold text-slate-900">
-                {STUDENT_PROFILE_MOCK.topic}
+                {topicName}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Sinh viên thực hiện:</span>
               <span className="col-span-2">
-                {studentName} - MSSV: {STUDENT_PROFILE_MOCK.mssv} - Lớp:{' '}
-                {STUDENT_PROFILE_MOCK.className}
+                {studentName} {studentCode ? `- MSSV: ${studentCode}` : ''}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Giảng viên hướng dẫn:</span>
               <span className="col-span-2 font-semibold text-[#1565C0]">
-                {STUDENT_PROFILE_MOCK.mentor}
+                {mentorName}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -265,7 +274,7 @@ export default function StudentOutlinePreviewPage() {
               <div>
                 <p className="font-bold text-slate-800">GIẢNG VIÊN HƯỚNG DẪN</p>
                 <p className="text-[11px] text-slate-400 italic mb-12">(Ký và ghi rõ họ tên)</p>
-                <p className="font-semibold text-slate-900">{STUDENT_PROFILE_MOCK.mentor}</p>
+                <p className="font-semibold text-slate-900">{mentorName}</p>
               </div>
               <div>
                 <p className="font-bold text-slate-800">SINH VIÊN THỰC HIỆN</p>

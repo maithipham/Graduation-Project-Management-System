@@ -99,7 +99,9 @@ export const INITIAL_OUTLINE_SUBMISSIONS: OutlineSubmissionItem[] = [
     fileName: 'De_cuong_2151060001_Pham_Mai.docx',
     status: 'Đã duyệt',
     approvedTime: '29/10/2026 14:20',
+    reviewerName: 'TS. Trần Minh Khôi',
     note: 'Đề cương đạt yêu cầu, kế hoạch phân chia rõ ràng và bám sát tiến độ học kỳ.',
+    advisorNote: 'Đồng ý với đề cương và kế hoạch triển khai của sinh viên.',
   },
   {
     id: 2,
@@ -110,7 +112,9 @@ export const INITIAL_OUTLINE_SUBMISSIONS: OutlineSubmissionItem[] = [
     fileName: 'De_cuong_DATN_v2.pdf',
     status: 'Đã từ chối',
     approvedTime: '13/10/2026 09:15',
+    reviewerName: 'TS. Trần Minh Khôi',
     note: 'Bổ sung mục tiêu đo lường cụ thể và làm rõ phạm vi dữ liệu thử nghiệm.',
+    advisorNote: 'Yêu cầu sinh viên sửa lại theo góp ý của GV nhận xét.',
   },
   {
     id: 3,
@@ -121,7 +125,9 @@ export const INITIAL_OUTLINE_SUBMISSIONS: OutlineSubmissionItem[] = [
     fileName: 'De_cuong_DATN_v1.pdf',
     status: 'Đã từ chối',
     approvedTime: '10/10/2026 09:15',
+    reviewerName: 'TS. Trần Minh Khôi',
     note: 'Thiếu phần tài liệu tham khảo và bảng tiến độ thực hiện chưa rõ ràng.',
+    advisorNote: 'Cần thảo luận lại với GVHD trước khi nộp lại.',
   },
   {
     id: 4,
@@ -132,7 +138,9 @@ export const INITIAL_OUTLINE_SUBMISSIONS: OutlineSubmissionItem[] = [
     fileName: 'De_cuong_DATN_HK2_2526.pdf',
     status: 'Đã duyệt',
     approvedTime: '16/03/2026 10:00',
+    reviewerName: 'TS. Lê Văn Cường',
     note: 'Đề cương đạt yêu cầu.',
+    advisorNote: 'Đồng ý thông qua.',
   },
 ]
 

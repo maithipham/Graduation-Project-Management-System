@@ -83,6 +83,8 @@ export interface OutlineSubmissionItem {
   status: OutlineSubmissionStatus
   approvedTime?: string
   note: string
+  reviewerName?: string
+  advisorNote?: string
 }
 
 export interface SignSideBlock {

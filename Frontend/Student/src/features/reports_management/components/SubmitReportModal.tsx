@@ -32,6 +32,7 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
 
   return (
     <div
+      id="submitReportModal"
       className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
@@ -40,15 +41,16 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2">
-            <FileUp size={20} className="text-[#1565C0]" />
+            <FileUp className="w-5 h-5 text-[#1565C0]" />
             <h3 className="text-base font-bold text-slate-900">Nộp báo cáo tiến độ đồ án</h3>
           </div>
           <button
+            id="closeReportModalBtn"
             type="button"
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
           >
-            <X size={20} />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -69,6 +71,7 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
           </div>
 
           <input
+            id="modalReportFileInput"
             ref={fileInputRef}
             type="file"
             accept=".pdf,.doc,.docx"
@@ -81,6 +84,7 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
 
           {/* Drag & Drop Zone */}
           <div
+            id="dropArea"
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault()
@@ -100,7 +104,7 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
             }`}
           >
             <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#1565C0] flex items-center justify-center mx-auto mb-3 shadow-2xs">
-              <UploadCloud size={24} />
+              <UploadCloud className="w-6 h-6" />
             </div>
             <div className="text-xs font-bold text-slate-800">
               Kéo thả tệp báo cáo vào đây, hoặc{' '}
@@ -113,22 +117,32 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
 
           {/* Selected file indicator */}
           {selectedFile && (
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <div
+              id="selectedReportFileBox"
+              className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between"
+            >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center shrink-0">
-                  <FileText size={20} />
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-800 truncate">
+                  <div
+                    id="selectedReportFileName"
+                    className="text-xs font-bold text-slate-800 truncate"
+                  >
                     {selectedFile.name}
                   </div>
-                  <div className="text-[10.5px] text-slate-400 mt-0.5">
+                  <div
+                    id="selectedReportFileSize"
+                    className="text-[10.5px] text-slate-400 mt-0.5"
+                  >
                     {formatReportFileSize(selectedFile.size)}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
+                id="removeReportFileBtn"
                 onClick={() => {
                   setSelectedFile(null)
                   if (fileInputRef.current) fileInputRef.current.value = ''
@@ -146,11 +160,12 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
               Ghi chú gửi Giáo viên hướng dẫn:
             </label>
             <textarea
+              id="modalReportNote"
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Tóm tắt công việc đã hoàn thành hoặc khó khăn cần GVHD giải đáp..."
-              className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition resize-none"
+              className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition resize-none"
             />
           </div>
         </div>
@@ -158,6 +173,7 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2.5">
           <button
             type="button"
+            id="cancelReportModalBtn"
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
           >
@@ -165,6 +181,7 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
           </button>
           <button
             type="button"
+            id="confirmReportSubmitBtn"
             disabled={!selectedFile}
             onClick={() => {
               if (selectedFile) {
@@ -184,4 +201,3 @@ export const SubmitReportModal: React.FC<SubmitReportModalProps> = ({
     </div>
   )
 }
-

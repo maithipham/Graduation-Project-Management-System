@@ -65,9 +65,10 @@ export interface LecturerPortalState {
   updateOutlineFeedback: (id: string, feedback: string) => void
   resetOutlines: () => void
 
-  approveReport: (id: string) => void
+  approveReport: (id: string, comment?: string) => void
   rejectReport: (id: string, comment?: string) => void
   submitPlagiarismResult: (id: string, fileName: string, rate: number) => void
+  markReportDownloaded: (id: string) => void
 
   submitTrackingSheet: (id: string, customFileName?: string) => void
 

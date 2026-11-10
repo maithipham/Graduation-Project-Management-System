@@ -232,12 +232,19 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
           return { outlines: INITIAL_OUTLINES, readOutlineIds: [] }
         }),
 
-      approveReport: (id) =>
+      approveReport: (id, comment) =>
         set((state) => {
           const now = getNowFormatted()
           return {
             reports: state.reports.map((r) =>
-              r.id === id ? { ...r, status: 'approved', approvedAt: now } : r,
+              r.id === id
+                ? {
+                    ...r,
+                    status: 'approved',
+                    approvedAt: now,
+                    comment: comment?.trim() || r.comment,
+                  }
+                : r,
             ),
           }
         }),
@@ -269,6 +276,13 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
                   plagiarismRate: rate,
                 }
               : r,
+          ),
+        })),
+
+      markReportDownloaded: (id) =>
+        set((state) => ({
+          reports: state.reports.map((r) =>
+            r.id === id ? { ...r, hasDownloaded: true } : r,
           ),
         })),
 

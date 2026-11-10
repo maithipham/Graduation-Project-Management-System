@@ -41,6 +41,11 @@ export const API_ENDPOINTS = {
   major: {
     base: '/major',
   },
+  topicTitle: {
+    overview: '/topic/my-title-history',
+    confirmInitial: '/topic/confirm-title',
+    requestChange: '/topic/change-title',
+  },
   advisor: {
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
   },

@@ -6,12 +6,13 @@ export const useReportCheckStore = () => {
   const approveReport = useLecturerPortalStore((s) => s.approveReport)
   const rejectReport = useLecturerPortalStore((s) => s.rejectReport)
   const submitPlagiarismResult = useLecturerPortalStore((s) => s.submitPlagiarismResult)
+  const markReportDownloaded = useLecturerPortalStore((s) => s.markReportDownloaded)
 
   return {
     reports: reports as ReportCheckItem[],
     approveReport,
     rejectReport,
     submitPlagiarismResult,
+    markReportDownloaded,
   }
 }
-

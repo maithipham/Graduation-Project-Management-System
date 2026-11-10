@@ -9,6 +9,7 @@ const VIEWPORT_LOCKED_PATHS = new Set([
   '/lecturer/supervisor-requests',
   '/lecturer/topic-proposals',
   '/lecturer/outline-review',
+  '/lecturer/report-check',
 ])
 
 function loadInitialCollapsed(): boolean {
