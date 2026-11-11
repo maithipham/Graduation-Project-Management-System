@@ -21,7 +21,7 @@ import {
   Input,
 } from '@/shared/components/ui'
 import { useCreateSemester, useUpdateSemester } from '../hooks/useSemesters'
-import type { Semester } from '../types/semester.types'
+import type { Semester } from '../types'
 
 // Mã lỗi BE trả khi trùng mã học kỳ (lấy từ ErrorCode.java của BE — chưa biết thì hỏi, không đoán)
 const SEMESTER_CODE_EXISTED = 3001

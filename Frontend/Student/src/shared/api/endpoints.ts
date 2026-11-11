@@ -24,7 +24,8 @@ export const API_ENDPOINTS = {
     reports: '/api/student/reports',
     schedule: '/api/student/schedule',
     results: '/api/student/results',
-    documents: '/student/documents',
+    // Tài liệu / biểu mẫu sinh viên được xem và tải (chỉ 3 loại: Đề cương, Báo cáo toàn văn, Slide bảo vệ)
+    templates: '/template/shared',
   },
   lecturer: {
     dashboard: '/lecturer/dashboard',

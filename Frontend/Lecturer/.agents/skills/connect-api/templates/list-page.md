@@ -19,7 +19,7 @@ import {
 } from '@/shared/components/ui'
 import { SemesterFormDialog } from '../components/SemesterFormDialog'
 import { useSemesters } from '../hooks/useSemesters'
-import type { Semester, SemesterStatus } from '../types/semester.types'
+import type { Semester, SemesterStatus } from '../types'
 
 const PAGE_SIZE = 10
 

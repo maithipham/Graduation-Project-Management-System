@@ -35,7 +35,9 @@ Trước khi báo "xong" một thay đổi code: làm theo skill **`verify-chang
 src/
 ├── app/routes/<role>.routes.tsx       # Đăng ký URL cho từng role
 ├── features/<role>/<sub_feature>/     # Nghiệp vụ — role ∈ admin | lecturer | department
-│   ├── components/  pages/  hooks/  services/  store/  types/
+│   ├── components/  hooks/  pages/  services/  utils/   # Khung chuẩn, tạo đủ ngay khi tạo feature
+│   ├── store/                         # Chỉ thêm khi cần state giao diện (Zustand)
+│   ├── types.ts                       # Type tương ứng DTO bên BE
 │   └── index.ts                       # Cổng export duy nhất của feature
 ├── features/<role>/layouts/components/<role>Nav.config.ts   # Menu sidebar
 ├── features/auth/                     # Đăng nhập, phân quyền, UserRole
@@ -58,9 +60,10 @@ Quy tắc:
 4. Page component: **`export default`** (để `React.lazy`), đăng ký route bằng `lazy()` + `withSuspense(<XxxPage />)`
    (helper ở `src/app/routes/withSuspense.tsx`, bọc sẵn `<Suspense fallback={<LoadingFallback />}>`).
 5. Tên thư mục feature: `snake_case` (`topic_management`), đặt theo nghiệp vụ. Tên file: `PascalCase.tsx` cho component/page,
-   `useXxx.ts` cho hook, `xxx.service.ts`, `xxx.store.ts`, `xxx.types.ts` hoặc `types.ts`.
-   Feature chưa code chỉ có `index.ts` (`export {}`); chỉ tạo các thư mục con `types/ services/ hooks/ components/ pages/ store/`
-   khi thực sự cần. Không tạo file placeholder rỗng.
+   `useXxx.ts` cho hook, `xxx.service.ts`, `xxx.store.ts`; type đặt chung trong `types.ts` của feature.
+   **Tạo feature mới luôn tạo đủ khung chuẩn:** thư mục `components/ hooks/ pages/ services/ utils/` + `types.ts`
+   (`export {}` khi chưa có type) + `index.ts` (`export * from './types'`). `store/` chỉ thêm khi cần.
+   Git không lưu thư mục rỗng — thư mục con sẽ được commit khi có file đầu tiên.
 6. Ưu tiên dùng component sẵn có trong `@/shared/components/ui` trước khi tự viết. Gộp class bằng `cn()` từ `@/shared/utils/cn`.
 7. Role chỉ khai báo ở `@/features/auth`: `UserRole` = `'ADMIN' | 'HEAD_OF_MAJOR' | 'SUPERVISOR'` (đúng chuỗi BE trả về).
    Người đang đăng nhập: `useMyInfo()` (cache TanStack `['auth','me']`, không có store riêng). Ẩn/hiện theo role: `CanAccess`.

@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { semesterService } from '../services/semester.service'
-import type { SemesterListParams, SemesterRequest } from '../types/semester.types'
+import type { SemesterListParams, SemesterRequest } from '../types'
 
 // Bộ "tên cache" của feature. Sửa dữ liệu xong thì xóa cache theo các key này để danh sách tự tải lại
 export const semesterKeys = {

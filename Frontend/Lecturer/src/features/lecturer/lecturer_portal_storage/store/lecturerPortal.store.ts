@@ -13,12 +13,11 @@ import {
   INITIAL_DEFENSE_COUNCILS,
   INITIAL_DEFENSE_REVIEWS,
   INITIAL_DOCUMENT_TEMPLATES,
-  INITIAL_GUIDING_SCORES,
+  INITIAL_GUIDING_EVALUATIONS,
   INITIAL_OUTLINES,
   INITIAL_REPORTS,
   INITIAL_SUPERVISOR_REQUESTS,
   INITIAL_TOPIC_PROPOSALS,
-  INITIAL_TRACKING_SHEETS,
 } from '../services/lecturerMockData'
 
 const READ_OUTLINE_SESSION_KEY = 'tlu_read_outline_ids_v4'
@@ -63,8 +62,7 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
       topicProposals: INITIAL_TOPIC_PROPOSALS,
       outlines: INITIAL_OUTLINES,
       reports: INITIAL_REPORTS,
-      trackingSheets: INITIAL_TRACKING_SHEETS,
-      guidingScores: INITIAL_GUIDING_SCORES,
+      guidingEvaluations: INITIAL_GUIDING_EVALUATIONS,
       defenseCouncils: INITIAL_DEFENSE_COUNCILS,
       defenseReviews: INITIAL_DEFENSE_REVIEWS,
       documentTemplates: INITIAL_DOCUMENT_TEMPLATES,
@@ -286,37 +284,40 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
           ),
         })),
 
-      submitTrackingSheet: (id, customFileName) =>
+      submitEvaluationTrackingFile: (id, fileName) =>
         set((state) => {
           const now = getNowFormatted()
           return {
-            trackingSheets: state.trackingSheets.map((t) =>
-              t.id === id
+            guidingEvaluations: state.guidingEvaluations.map((item) =>
+              item.id === id
                 ? {
-                    ...t,
-                    status: 'submitted',
+                    ...item,
                     fileName:
-                      customFileName?.trim() ||
-                      `Phieu-theo-doi-${t.name.replace(/\s+/g, '-')}.pdf`,
+                      fileName.trim() || `Phieu_tiendo_${item.mssv}.pdf`,
                     submittedAt: now,
                   }
-                : t,
+                : item,
             ),
           }
         }),
 
-      saveGuidingScore: (id, score, comment) =>
+      saveEvaluationRubric: (id, score, rubricScores, isDraft = false) =>
         set((state) => ({
-          guidingScores: state.guidingScores.map((s) =>
-            s.id === id
-              ? {
-                  ...s,
-                  score,
-                  comment: comment.trim(),
-                  status: score !== null ? 'scored' : 'unscored',
-                }
-              : s,
-          ),
+          guidingEvaluations: state.guidingEvaluations.map((item) => {
+            if (item.id !== id) return item
+            if (isDraft) {
+              return {
+                ...item,
+                rubricScores,
+                score: item.score !== null ? score : item.score,
+              }
+            }
+            return {
+              ...item,
+              score,
+              rubricScores,
+            }
+          }),
         })),
 
       updateDefenseReviewScore: (id, score) =>
@@ -355,8 +356,7 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
         topicProposals: state.topicProposals,
         outlines: state.outlines,
         reports: state.reports,
-        trackingSheets: state.trackingSheets,
-        guidingScores: state.guidingScores,
+        guidingEvaluations: state.guidingEvaluations,
         defenseCouncils: state.defenseCouncils,
         defenseReviews: state.defenseReviews,
       }),

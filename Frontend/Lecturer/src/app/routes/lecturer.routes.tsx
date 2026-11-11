@@ -23,14 +23,11 @@ const OutlineReviewPage = lazy(
 const ReportCheckPage = lazy(
   () => import('@/features/lecturer/report_check/pages/ReportCheckPage'),
 )
-const ProgressTrackingPage = lazy(
+const GuidingEvaluationPage = lazy(
   () =>
     import(
-      '@/features/lecturer/progress_tracking/pages/ProgressTrackingPage'
+      '@/features/lecturer/guiding_evaluation/pages/GuidingEvaluationPage'
     ),
-)
-const GuidingScorePage = lazy(
-  () => import('@/features/lecturer/guiding_score/pages/GuidingScorePage'),
 )
 const ThesisDefensePage = lazy(
   () =>
@@ -90,12 +87,16 @@ export const lecturerRoutes: RouteObject = {
       element: withSuspense(<ReportCheckPage />),
     },
     {
+      path: 'guiding-evaluation',
+      element: withSuspense(<GuidingEvaluationPage />),
+    },
+    {
       path: 'progress-tracking',
-      element: withSuspense(<ProgressTrackingPage />),
+      element: <Navigate to="/lecturer/guiding-evaluation" replace />,
     },
     {
       path: 'guiding-scores',
-      element: withSuspense(<GuidingScorePage />),
+      element: <Navigate to="/lecturer/guiding-evaluation" replace />,
     },
     {
       path: 'defense',
