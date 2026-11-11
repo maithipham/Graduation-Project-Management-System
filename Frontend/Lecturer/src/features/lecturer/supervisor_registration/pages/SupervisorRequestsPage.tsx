@@ -1,118 +1,174 @@
-
-import { useEffect, useRef, useState } from 'react'
-
-import { Search, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
-
-import { semesterService } from '@/shared/services/semester.service'
-import type { SemesterResponse } from '@/shared/types/semester.types'
-
-import { supervisorDeadlineService } from '../services/supervisorDeadline.service'
-import type { RegistrationDeadline } from '../services/supervisorDeadline.service'
-
-import { useSupervisorRequests } from '../hooks/useSupervisorRequests'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Clock, Eye, Search } from 'lucide-react'
+import {
+  Button,
+  Input,
+  Select,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/shared/components/ui'
+import { formatDate, parseDate } from '@/shared/utils'
 
 import {
   ApproveSupervisorModal,
   RejectSupervisorModal,
+  SupervisorDetailModal,
 } from '../components/SupervisorRequestModals'
+import {
+  useLecturerCurrentSemester,
+  useLecturerSemesters,
+  useSupervisorDeadline,
+  useSupervisorRequests,
+} from '../hooks/useSupervisorRequests'
+import type {
+  RegistrationDeadline,
+  SupervisorRequestItem,
+} from '../types/supervisorRegistration.types'
 
 const PAGE_SIZE = 15
 
+function getRemainingTime(endDate: string): string {
+  const end = parseDate(endDate)
+  if (!end) return 'Không xác định thời hạn'
+
+  const diff = end.getTime() - Date.now()
+  if (diff <= 0) return 'Đã hết hạn'
+
+  const totalHours = Math.floor(diff / (1000 * 60 * 60))
+  if (totalHours < 24) {
+    return `Còn ${Math.max(1, totalHours)} giờ`
+  }
+
+  const totalDays = Math.ceil(diff / (1000 * 60 * 60 * 24))
+  return `Còn ${totalDays} ngày`
+}
+
+function getDeadlineStatusText(deadline?: RegistrationDeadline): string {
+  if (!deadline) return 'Chưa có thông tin thời hạn'
+
+  switch (deadline.status) {
+    case 'NOT_CONFIGURED':
+      return 'Chưa có'
+    case 'INACTIVE':
+      return 'Thời hạn đang tạm khóa'
+    case 'NOT_STARTED':
+      return deadline.startDate
+        ? `Mở từ ${formatDate(deadline.startDate, 'short')}`
+        : 'Chưa đến thời gian đăng ký'
+    case 'CLOSED':
+      return 'Đã hết hạn xử lý đơn'
+    case 'OPEN':
+      return deadline.endDate
+        ? getRemainingTime(deadline.endDate)
+        : 'Đang mở đăng ký'
+    default:
+      return 'Không xác định'
+  }
+}
+
+function getStatusLabel(request: SupervisorRequestItem): string {
+  switch (request.apiStatus) {
+    case 'TEACHER_APPROVED':
+      return 'GV đã duyệt'
+    case 'HOD_APPROVED':
+      return 'TBM đã duyệt'
+    case 'ASSIGNED_BY_HOD':
+      return 'TBM phân công'
+    case 'REJECTED':
+      return 'Đã từ chối'
+    default:
+      switch (request.status) {
+        case 'pending':
+          return 'Chưa duyệt'
+        case 'approved':
+          return 'Đã duyệt'
+        case 'rejected':
+          return 'Đã từ chối'
+        default:
+          return 'Không xác định'
+      }
+  }
+}
+
+function getStatusClass(status: SupervisorRequestItem['status']): string {
+  switch (status) {
+    case 'pending':
+      return 'bg-amber-100 text-amber-700'
+    case 'approved':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'rejected':
+      return 'bg-red-100 text-red-700'
+    default:
+      return 'bg-slate-100 text-slate-600'
+  }
+}
+
 export default function SupervisorRequestsPage() {
-  const [semesters, setSemesters] = useState<SemesterResponse[]>([])
-  const [selectedSemesterPublicId, setSelectedSemesterPublicId] = useState('')
-  const [semesterLoading, setSemesterLoading] = useState(true)
-  const [semesterError, setSemesterError] = useState<string | null>(null)
-
-  // Deadline đăng ký GVHD lấy từ Backend
-  const [deadline, setDeadline] = useState<RegistrationDeadline | null>(null)
-  const [deadlineLoading, setDeadlineLoading] = useState(false)
-  const [deadlineError, setDeadlineError] = useState<string | null>(null)
-
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [pickedSemesterPublicId, setPickedSemesterPublicId] = useState<
+    string | undefined
+  >()
 
-  // Lấy danh sách học kỳ và xác định học kỳ mặc định
-  useEffect(() => {
-    const fetchSemesters = async () => {
-      try {
-        setSemesterLoading(true)
-        setSemesterError(null)
+  const {
+    data: semesterList,
+    isPending: semestersLoading,
+    isError: semestersError,
+    refetch: refetchSemesters,
+  } = useLecturerSemesters()
+  const currentSemesterQuery = useLecturerCurrentSemester()
 
-        const [semesterList, currentSemester] = await Promise.all([
-          semesterService.getAllSemesters(),
-          semesterService.getCurrentSemester(),
-        ])
+  // Ghép thêm học kỳ hiện tại nếu chưa nằm trong trang học kỳ đầu tiên
+  const semesters = useMemo(() => {
+    const list = semesterList ?? []
+    const cur = currentSemesterQuery.data
+    return cur && !list.some((item) => item.publicId === cur.publicId)
+      ? [cur, ...list]
+      : list
+  }, [semesterList, currentSemesterQuery.data])
 
-        setSemesters(semesterList)
+  // Đợi kiểm tra học kỳ hiện tại xong mới fallback sang học kỳ mới nhất để tránh gọi API 2 lần
+  const selectedSemesterPublicId =
+    pickedSemesterPublicId ??
+    currentSemesterQuery.data?.publicId ??
+    (currentSemesterQuery.isPending ? '' : (semesters[0]?.publicId ?? ''))
 
-        // Mặc định chọn học kỳ hiện tại
-        const currentSemesterExists = semesterList.some(
-          (item) => item.publicId === currentSemester.publicId,
-        )
+  const selectedSemester =
+    semesters.find((item) => item.publicId === selectedSemesterPublicId) ??
+    currentSemesterQuery.data
 
-        if (currentSemesterExists) {
-          setSelectedSemesterPublicId(currentSemester.publicId)
-        } else if (semesterList.length > 0) {
-          setSelectedSemesterPublicId(semesterList[0].publicId)
-        } else {
-          setSemesterError('Hiện chưa có học kỳ nào.')
-        }
-      } catch (error) {
-        console.error('Không thể tải danh sách học kỳ:', error)
-        setSemesterError('Không thể tải danh sách học kỳ.')
-      } finally {
-        setSemesterLoading(false)
-      }
-    }
+  const academicYears = useMemo(
+    () => [
+      ...new Set(
+        semesters.map((item) => item.academicYear).filter(Boolean),
+      ),
+    ],
+    [semesters],
+  )
 
-    fetchSemesters()
-  }, [])
+  const termsOfYear = useMemo(
+    () =>
+      semesters.filter(
+        (item) => item.academicYear === selectedSemester?.academicYear,
+      ),
+    [semesters, selectedSemester?.academicYear],
+  )
 
-  // Lấy deadline đăng ký GVHD theo học kỳ đang chọn
-  useEffect(() => {
-    if (!selectedSemesterPublicId) {
-      setDeadline(null)
-      setDeadlineError(null)
-      setDeadlineLoading(false)
-      return
-    }
+  const semesterResolved = Boolean(selectedSemesterPublicId)
+  const initialSemesterLoading =
+    !semesterResolved && (semestersLoading || currentSemesterQuery.isPending)
 
-    let isMounted = true
-
-    const fetchDeadline = async () => {
-      try {
-        setDeadlineLoading(true)
-        setDeadlineError(null)
-        setDeadline(null)
-
-        const result =
-          await supervisorDeadlineService.getRegistrationDeadline(
-            selectedSemesterPublicId,
-          )
-
-        if (isMounted) {
-          setDeadline(result)
-        }
-      } catch (error) {
-        console.error('Không thể tải deadline đăng ký GVHD:', error)
-
-        if (isMounted) {
-          setDeadline(null)
-          setDeadlineError('Không thể tải thông tin deadline.')
-        }
-      } finally {
-        if (isMounted) {
-          setDeadlineLoading(false)
-        }
-      }
-    }
-
-    fetchDeadline()
-
-    return () => {
-      isMounted = false
-    }
-  }, [selectedSemesterPublicId])
+  const deadlineQuery = useSupervisorDeadline(
+    selectedSemesterPublicId || undefined,
+  )
+  const deadline = deadlineQuery.data
+  const isDeadlineBlocked =
+    Boolean(deadline) && deadline?.status !== 'OPEN'
+  const canProcess = !deadlineQuery.isPending && !isDeadlineBlocked
 
   const {
     tabStatus,
@@ -126,135 +182,86 @@ export default function SupervisorRequestsPage() {
     filtered,
     pageData,
     loading,
+    isPlaceholderData,
     error,
     approveTarget,
     setApproveTarget,
+    isApproving,
     rejectTarget,
     setRejectTarget,
+    isRejecting,
+    detailTargetId,
+    setDetailTargetId,
+    detailData,
+    detailLoading,
+    detailError,
     handleConfirmApprove,
     handleConfirmReject,
   } = useSupervisorRequests(selectedSemesterPublicId)
 
-  // Cuộn bảng về đầu khi chuyển trang
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = 0
-    }
-  }, [currentPage])
+  const isActionPending = isApproving || isRejecting
 
-  // Định dạng ngày và giờ
-  const formatDateTime = (value?: string | null) => {
-    if (!value) return '—'
-
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-      return value
-    }
-
-    return date.toLocaleString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
+  const handlePageChange = (nextPage: number) => {
+    setCurrentPage(nextPage)
+    scrollContainerRef.current?.scrollTo({ top: 0 })
   }
 
-  // Định dạng ngày deadline
-  const formatDeadlineDate = (value?: string | null) => {
-    if (!value) return '—'
-
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-      return value
-    }
-
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
+  const handleSemesterChange = (publicId: string) => {
+    setPickedSemesterPublicId(publicId)
+    setCurrentPage(1)
   }
 
-  // Tính thời gian còn lại đến hạn đăng ký
-  const getRemainingTime = (endDate: string) => {
-    const now = new Date()
-    const end = new Date(endDate)
-
-    if (Number.isNaN(end.getTime())) {
-      return 'Không xác định thời hạn'
-    }
-
-    const diff = end.getTime() - now.getTime()
-
-    if (diff <= 0) {
-      return 'Đã hết hạn'
-    }
-
-    const totalDays = Math.ceil(diff / (1000 * 60 * 60 * 24))
-
-    if (totalDays === 1) {
-      return 'Còn 1 ngày'
-    }
-
-    return `Còn ${totalDays} ngày`
-  }
-
-  // Trạng thái deadline do Backend trả về
-  const getDeadlineStatus = () => {
-    if (!deadline) return 'Chưa có thông tin deadline'
-
-    switch (deadline.status) {
-      case 'NOT_CONFIGURED':
-        return 'Chưa cấu hình deadline'
-
-      case 'INACTIVE':
-        return 'Deadline đã bị vô hiệu hóa'
-
-      case 'NOT_STARTED':
-        return 'Chưa đến thời gian đăng ký'
-
-      case 'CLOSED':
-        return 'Đã đóng đăng ký'
-
-      case 'OPEN':
-        return deadline.endDate
-          ? getRemainingTime(deadline.endDate)
-          : 'Đang mở đăng ký'
-
-      default:
-        return 'Không xác định'
+  // Đổi năm học → chọn học kỳ mới nhất thuộc năm học đó
+  const handleAcademicYearChange = (academicYear: string) => {
+    const latestOfYear = semesters.find(
+      (item) => item.academicYear === academicYear,
+    )
+    if (latestOfYear) {
+      handleSemesterChange(latestOfYear.publicId)
     }
   }
 
-  // Hiển thị loading khi tải học kỳ
-  if (semesterLoading) {
+  if (initialSemesterLoading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-          <p className="text-sm text-gray-500">Đang tải dữ liệu...</p>
+      <div className="w-full space-y-4">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 flex-1 min-w-[200px]" />
+            <Skeleton className="h-10 w-44" />
+          </div>
+          <Skeleton className="h-11 w-96" />
+          <div className="space-y-3 pt-2">
+            {Array.from({ length: 5 }, (_, index) => (
+              <Skeleton key={index} className="h-10 w-full" />
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
-  // Hiển thị lỗi nếu không lấy được học kỳ
-  if (semesterError || semesters.length === 0) {
+  if (semestersError && semesters.length === 0) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-        {semesterError || 'Không có học kỳ hiện tại.'}
-
-        <button
+      <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 flex items-center justify-between gap-4">
+        <span>Không thể tải danh sách học kỳ. Vui lòng thử lại.</span>
+        <Button
           type="button"
-          onClick={() => window.location.reload()}
-          className="ml-3 font-semibold underline"
+          variant="outline"
+          size="sm"
+          onClick={() => void refetchSemesters()}
         >
           Tải lại
-        </button>
+        </Button>
+      </div>
+    )
+  }
+
+  if (!semesterResolved && semesters.length === 0) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        Hiện chưa có học kỳ nào trong hệ thống.
       </div>
     )
   }
@@ -266,250 +273,239 @@ export default function SupervisorRequestsPage() {
     { key: '' as const, label: 'Tất cả', count: counts.all },
   ]
 
-  // Chuyển trạng thái thành nội dung hiển thị
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Chưa duyệt'
-      case 'approved':
-        return 'Đã duyệt'
-      case 'rejected':
-        return 'Đã từ chối'
-      default:
-        return 'Không xác định'
-    }
-  }
-
-  // CSS theo trạng thái
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-amber-100 text-amber-700'
-      case 'approved':
-        return 'bg-emerald-100 text-emerald-700'
-      case 'rejected':
-        return 'bg-red-100 text-red-700'
-      default:
-        return 'bg-gray-100 text-gray-600'
-    }
-  }
-
   const startIndex =
     filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-
   const endIndex = Math.min(currentPage * PAGE_SIZE, filtered.length)
+
+  const blockedReason = isDeadlineBlocked
+    ? getDeadlineStatusText(deadline)
+    : undefined
 
   return (
     <div className="w-full space-y-4">
-      {/* Thanh bộ lọc */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 xl:flex-row xl:items-center xl:justify-between">
-          {/* Tabs trạng thái */}
-          <div className="flex flex-wrap items-center gap-2">
-            {tabs.map((tab) => {
-              const active = tabStatus === tab.key
-
-              return (
-                <button
-                  key={tab.key || 'all'}
-                  type="button"
-                  onClick={() => {
-                    setTabStatus(tab.key)
-                    setCurrentPage(1)
-                  }}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${
-                    active
-                      ? 'border-blue-600 text-blue-700'
-                      : 'border-transparent text-slate-600 hover:text-blue-600'
-                  }`}
-                >
-                  {tab.label}
-
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      active
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Tìm kiếm, chọn học kỳ và deadline */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {/* Chọn học kỳ */}
-            <div className="min-w-[220px]">
-              <select
-                value={selectedSemesterPublicId}
-                onChange={(event) => {
-                  setSelectedSemesterPublicId(event.target.value)
-                  setCurrentPage(1)
-                }}
-                disabled={semesterLoading || semesters.length === 0}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+        {/* Thanh bộ lọc (dòng 1) và tabs trạng thái (dòng 2) */}
+        <div className="border-b border-slate-200">
+          {/* Dòng 1: Năm học, học kỳ, tìm kiếm và hạn đăng ký */}
+          <div className="flex flex-col gap-2.5 p-4 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Select
+                aria-label="Chọn năm học"
+                containerClassName="w-[140px]"
+                value={selectedSemester?.academicYear ?? ''}
+                onChange={(event) => handleAcademicYearChange(event.target.value)}
+                disabled={academicYears.length === 0}
+                className="h-10 border-slate-200 text-sm text-slate-700"
               >
-                {semesters.length === 0 ? (
-                  <option value="">Chưa có học kỳ</option>
+                {academicYears.length === 0 ? (
+                  <option value="">Chưa có năm học</option>
                 ) : (
-                  semesters.map((item) => (
-                    <option key={item.publicId} value={item.publicId}>
-                      {item.name}
+                  academicYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year.replace('-', '–')}
                     </option>
                   ))
                 )}
-              </select>
+              </Select>
+
+              <Select
+                aria-label="Chọn học kỳ"
+                containerClassName="w-[140px]"
+                value={selectedSemesterPublicId}
+                onChange={(event) => handleSemesterChange(event.target.value)}
+                disabled={termsOfYear.length === 0 && semesters.length === 0}
+                className="h-10 border-slate-200 text-sm text-slate-700"
+              >
+                {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
+                  (item) => (
+                    <option key={item.publicId} value={item.publicId}>
+                      {item.term || item.name}
+                    </option>
+                  ),
+                )}
+              </Select>
             </div>
 
-            {/* Tìm kiếm */}
-            <div className="relative min-w-0 flex-1 xl:w-[350px]">
+            <div className="relative min-w-0 flex-1">
               <Search
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
-
-              <input
+              <Input
                 type="text"
+                aria-label="Tìm kiếm sinh viên"
                 value={searchQuery}
-                onChange={(event) => {
-                  setSearchQuery(event.target.value)
-                  setCurrentPage(1)
-                }}
-                placeholder="Tìm theo mã sinh viên, tên sinh viên,..."
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Tìm theo mã sinh viên, tên sinh viên..."
+                className="h-10 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 focus-visible:bg-white"
               />
             </div>
 
             {/* Deadline đăng ký GVHD */}
-            <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+            <div
+              className={`flex min-h-10 shrink-0 flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                isDeadlineBlocked
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}
+            >
               <Clock size={16} />
 
-              {deadlineLoading ? (
-                <span>Đang tải deadline...</span>
-              ) : deadlineError ? (
-                <span className="text-red-600">{deadlineError}</span>
-              ) : deadline?.status === 'NOT_CONFIGURED' || !deadline ? (
-                <span>Chưa cấu hình deadline</span>
+              {deadlineQuery.isPending ? (
+                <Skeleton className="h-4 w-32 bg-amber-200/70" />
+              ) : deadlineQuery.isError ? (
+                <span className="text-red-600">Không tải được thời hạn</span>
+              ) : !deadline || deadline.status === 'NOT_CONFIGURED' ? (
+                <span>{getDeadlineStatusText(deadline)}</span>
               ) : (
                 <>
-                  <span>
-                    Hạn: {formatDeadlineDate(deadline.endDate)}
-                  </span>
-
-                  <span className="h-4 w-px bg-amber-300" />
-
-                  <span
-                    className={
-                      deadline.status === 'CLOSED' ||
-                      deadline.status === 'INACTIVE'
-                        ? 'text-red-600'
-                        : 'text-amber-800'
-                    }
-                  >
-                    {getDeadlineStatus()}
-                  </span>
+                  {deadline.endDate && (
+                    <>
+                      <span>Hạn: {formatDate(deadline.endDate, 'short')}</span>
+                      <span
+                        className={`h-4 w-px ${
+                          isDeadlineBlocked ? 'bg-red-200' : 'bg-amber-300'
+                        }`}
+                      />
+                    </>
+                  )}
+                  <span>{getDeadlineStatusText(deadline)}</span>
                 </>
               )}
             </div>
           </div>
+
+          {/* Dòng 2: Tabs trạng thái */}
+          <div className="border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+            <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-100/90 p-1">
+              {tabs.map((tab) => {
+                const active = tabStatus === tab.key
+
+                return (
+                  <button
+                    key={tab.key || 'all'}
+                    type="button"
+                    onClick={() => setTabStatus(tab.key)}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all cursor-pointer ${
+                      active
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-white hover:text-blue-700'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        active
+                          ? 'bg-white text-blue-700'
+                          : tab.key === 'pending' && tab.count > 0
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-200/80 text-slate-700'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Thông báo lỗi danh sách đơn */}
-        {error && (
-          <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
-            {error}
+        {/* Cảnh báo khi ngoài thời hạn xử lý đơn */}
+        {isDeadlineBlocked && (
+          <div className="border-b border-amber-200 bg-amber-50/70 px-5 py-2.5 text-xs font-medium text-amber-800">
+            {getDeadlineStatusText(deadline)} — Hiện chỉ xem danh sách, không thể
+            duyệt hoặc từ chối đơn đăng ký.
           </div>
         )}
 
         {/* Bảng dữ liệu */}
-        <div
-          ref={scrollContainerRef}
-          className="w-full overflow-x-auto"
-        >
-          <table className="w-full min-w-[1150px] border-collapse text-left">
-            <thead className="sticky top-0 z-10 bg-slate-50">
-              <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-500">
-                <th className="w-16 px-5 py-4 text-center">STT</th>
-
-                <th className="w-[220px] px-5 py-4">
+        <div ref={scrollContainerRef} className="w-full overflow-x-auto">
+          <Table className="min-w-[1150px] border-collapse text-left">
+            <TableHeader className="sticky top-0 z-10 bg-slate-50">
+              <TableRow className="border-b border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-500 hover:bg-slate-50">
+                <TableHead className="h-auto w-16 px-5 py-4 text-center font-bold uppercase text-slate-500">
+                  STT
+                </TableHead>
+                <TableHead className="h-auto w-[220px] px-5 py-4 font-bold uppercase text-slate-500">
                   Sinh viên
-                </th>
-
-                <th className="w-[190px] px-5 py-4">
+                </TableHead>
+                <TableHead className="h-auto w-[190px] px-5 py-4 font-bold uppercase text-slate-500">
                   Bộ môn
-                </th>
-
-                <th className="px-5 py-4">
+                </TableHead>
+                <TableHead className="h-auto px-5 py-4 font-bold uppercase text-slate-500">
                   Đề tài đăng ký
-                </th>
-
-                <th className="w-[180px] px-5 py-4">
+                </TableHead>
+                <TableHead className="h-auto w-[180px] px-5 py-4 font-bold uppercase text-slate-500">
                   Ngày gửi đơn
-                </th>
-
-                <th className="w-[180px] px-5 py-4">
+                </TableHead>
+                <TableHead className="h-auto w-[180px] px-5 py-4 font-bold uppercase text-slate-500">
                   Thời gian xử lý
-                </th>
-
-                <th className="w-[200px] px-5 py-4 text-center">
+                </TableHead>
+                <TableHead className="h-auto w-[230px] px-5 py-4 text-center font-bold uppercase text-slate-500">
                   Thao tác
-                </th>
-              </tr>
-            </thead>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
 
-            <tbody className="divide-y divide-slate-100">
+            <TableBody
+              className={`divide-y divide-slate-100 ${
+                isPlaceholderData ? 'opacity-60 transition-opacity' : ''
+              }`}
+            >
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="h-7 w-7 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-
-                      <span className="text-sm text-slate-500">
-                        Đang tải danh sách yêu cầu...
-                      </span>
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }, (_, index) => (
+                  <TableRow key={index}>
+                    <TableCell colSpan={7} className="px-5 py-4">
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : error ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="px-5 py-14 text-center text-sm text-red-600"
+                  >
+                    {error}
+                  </TableCell>
+                </TableRow>
               ) : pageData.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-16 text-center">
+                <TableRow>
+                  <TableCell colSpan={7} className="px-5 py-16 text-center">
                     <div className="text-sm font-medium text-slate-500">
                       Không tìm thấy đơn đăng ký nào.
                     </div>
-
                     <p className="mt-1 text-xs text-slate-400">
-                      Thử thay đổi trạng thái hoặc từ khóa tìm kiếm.
+                      Thử thay đổi học kỳ, trạng thái hoặc từ khóa tìm kiếm.
                     </p>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 pageData.map((request, index) => (
-                  <tr
+                  <TableRow
                     key={request.id}
                     className="transition-colors hover:bg-blue-50/40"
                   >
-                    <td className="px-5 py-5 text-center text-sm text-slate-400">
+                    <TableCell className="px-5 py-4 text-center text-sm text-slate-400">
                       {startIndex + index}
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-5">
+                    <TableCell className="px-5 py-4">
                       <p className="text-sm font-bold text-slate-900">
                         {request.name}
                       </p>
-
-                      <p className="mt-1 font-mono text-xs text-slate-500">
+                      <p className="mt-0.5 font-mono text-xs text-slate-500">
                         {request.mssv}
                       </p>
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-5 text-sm text-slate-600">
+                    <TableCell className="px-5 py-4 text-sm text-slate-600">
                       {request.major || '—'}
-                    </td>
+                    </TableCell>
 
-                    <td className="max-w-[400px] px-5 py-5">
+                    <TableCell className="max-w-[400px] px-5 py-4">
                       <p
                         className="line-clamp-2 text-sm leading-6 text-slate-800"
                         title={
@@ -525,60 +521,77 @@ export default function SupervisorRequestsPage() {
                           </span>
                         )}
                       </p>
-                    </td>
+                    </TableCell>
 
-                    {/* Ngày gửi đơn */}
-                    <td className="whitespace-nowrap px-5 py-5 text-sm text-slate-600">
-                      {formatDateTime(request.submittedDate)}
-                    </td>
+                    <TableCell className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+                      {request.submittedDate
+                        ? formatDate(request.submittedDate, 'full')
+                        : '—'}
+                    </TableCell>
 
-                    {/* Thời gian xử lý */}
-                    <td className="whitespace-nowrap px-5 py-5 text-sm text-slate-600">
+                    <TableCell className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
                       {request.processedAt ? (
-                        formatDateTime(request.processedAt)
+                        formatDate(request.processedAt, 'full')
                       ) : (
-                        <span className="text-amber-600">
-                          Chưa xử lý
-                        </span>
+                        <span className="text-amber-600">Chưa xử lý</span>
                       )}
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-5">
+                    <TableCell className="px-5 py-4">
                       <div className="flex items-center justify-center gap-2">
                         {request.status === 'pending' ? (
                           <>
-                            <button
+                            <Button
                               type="button"
+                              variant="success"
+                              size="sm"
+                              disabled={!canProcess || isActionPending}
+                              title={blockedReason}
                               onClick={() => setApproveTarget(request)}
-                              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 active:scale-95"
                             >
                               Duyệt
-                            </button>
-
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={!canProcess || isActionPending}
+                              title={blockedReason}
                               onClick={() => setRejectTarget(request)}
-                              className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 active:scale-95"
                             >
                               Từ chối
-                            </button>
+                            </Button>
                           </>
                         ) : (
                           <span
+                            title={request.statusDescription}
                             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(
                               request.status,
                             )}`}
                           >
-                            {getStatusLabel(request.status)}
+                            {getStatusLabel(request)}
                           </span>
                         )}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                          aria-label={`Xem chi tiết đơn của ${request.name}`}
+                          title="Xem chi tiết"
+                          onClick={() => setDetailTargetId(request.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         {/* Footer phân trang */}
@@ -596,29 +609,31 @@ export default function SupervisorRequestsPage() {
           </p>
 
           <div className="flex items-center justify-end gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               disabled={currentPage <= 1 || loading}
-              onClick={() => setCurrentPage(currentPage - 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => handlePageChange(currentPage - 1)}
               aria-label="Trang trước"
             >
               <ChevronLeft size={18} />
-            </button>
+            </Button>
 
             <span className="flex h-9 min-w-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white">
               {currentPage}
             </span>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               disabled={currentPage >= totalPages || loading}
-              onClick={() => setCurrentPage(currentPage + 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => handlePageChange(currentPage + 1)}
               aria-label="Trang sau"
             >
               <ChevronRight size={18} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -626,6 +641,7 @@ export default function SupervisorRequestsPage() {
       {/* Modal duyệt */}
       <ApproveSupervisorModal
         item={approveTarget}
+        isPending={isApproving}
         onClose={() => setApproveTarget(null)}
         onConfirm={handleConfirmApprove}
       />
@@ -633,8 +649,50 @@ export default function SupervisorRequestsPage() {
       {/* Modal từ chối */}
       <RejectSupervisorModal
         item={rejectTarget}
+        isPending={isRejecting}
         onClose={() => setRejectTarget(null)}
         onConfirm={handleConfirmReject}
+      />
+
+      {/* Modal chi tiết đơn đăng ký */}
+      <SupervisorDetailModal
+        open={Boolean(detailTargetId)}
+        data={detailData}
+        isPending={detailLoading}
+        error={detailError}
+        canProcess={canProcess}
+        isActionPending={isActionPending}
+        onClose={() => setDetailTargetId(undefined)}
+        onApprove={(detail) => {
+          setDetailTargetId(undefined)
+          setApproveTarget({
+            id: detail.registrationPublicId,
+            mssv: detail.studentCode,
+            name: detail.studentName,
+            major: detail.majorName ?? '',
+            topic: detail.topicName ?? '',
+            submittedDate: detail.submittedAt ?? '',
+            processedAt: detail.processedAt ?? undefined,
+            status: 'pending',
+            apiStatus: detail.status,
+            statusDescription: detail.statusDescription,
+          })
+        }}
+        onReject={(detail) => {
+          setDetailTargetId(undefined)
+          setRejectTarget({
+            id: detail.registrationPublicId,
+            mssv: detail.studentCode,
+            name: detail.studentName,
+            major: detail.majorName ?? '',
+            topic: detail.topicName ?? '',
+            submittedDate: detail.submittedAt ?? '',
+            processedAt: detail.processedAt ?? undefined,
+            status: 'pending',
+            apiStatus: detail.status,
+            statusDescription: detail.statusDescription,
+          })
+        }}
       />
     </div>
   )

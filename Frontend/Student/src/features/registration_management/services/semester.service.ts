@@ -1,4 +1,4 @@
-import { apiClient } from '@/shared/api'
+import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
 import type { Semester } from '../types/semester.types'
 
@@ -14,7 +14,7 @@ export const semesterService = {
   // Lấy học kỳ hiện tại
   async getCurrent(): Promise<Semester | null> {
     const res = await apiClient.get<ApiResponse<Semester | null>>(
-      '/semester/current',
+      API_ENDPOINTS.semester.current,
     )
 
     return res.data.data ?? null
@@ -24,7 +24,7 @@ export const semesterService = {
   async getAll(): Promise<Semester[]> {
     const res = await apiClient.get<
       ApiResponse<PageResponse<Semester>>
-    >('/semester', {
+    >(API_ENDPOINTS.semester.base, {
       params: {
         page: 0,
         size: 100,
@@ -33,6 +33,6 @@ export const semesterService = {
       },
     })
 
-    return res.data.data.content
+    return res.data.data?.content ?? []
   },
 }

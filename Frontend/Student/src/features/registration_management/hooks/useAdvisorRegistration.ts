@@ -1,5 +1,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from '@/shared/components/feedback/toast.store'
+import { isApiError } from '@/shared/types'
 import { registrationService } from '../services/registration.service'
 import type {
   SubmitAdvisorRegistrationRequest,
@@ -21,6 +23,9 @@ export const registrationKeys = {
   advisors: (semesterPublicId: string) =>
     [...registrationKeys.all, 'advisors', semesterPublicId] as const,
 }
+
+// Các mã lỗi nghiệp vụ cho thấy dữ liệu trên màn hình đã cũ (GV hết chỉ tiêu, khóa phân công, trạng thái đơn thay đổi...)
+const STALE_DATA_ERROR_CODES = new Set([4000, 4004, 1004, 3022, 2001])
 
 // Lấy đơn đăng ký hiện tại
 export function useCurrentRegistration() {
@@ -73,9 +78,18 @@ export function useSubmitRegistration() {
       registrationService.submit(body),
 
     onSuccess: () => {
-      queryClient.invalidateQueries({
+      toast.success('Đăng ký giảng viên hướng dẫn thành công')
+      return queryClient.invalidateQueries({
         queryKey: registrationKeys.all,
       })
+    },
+
+    onError: (error) => {
+      if (isApiError(error) && STALE_DATA_ERROR_CODES.has(error.code)) {
+        void queryClient.invalidateQueries({
+          queryKey: registrationKeys.all,
+        })
+      }
     },
   })
 }
@@ -89,9 +103,19 @@ export function useUpdateRegistration() {
       registrationService.update(body),
 
     onSuccess: () => {
-      queryClient.invalidateQueries({
+      toast.success('Cập nhật đơn đăng ký giảng viên hướng dẫn thành công')
+      return queryClient.invalidateQueries({
         queryKey: registrationKeys.all,
       })
     },
+
+    onError: (error) => {
+      if (isApiError(error) && STALE_DATA_ERROR_CODES.has(error.code)) {
+        void queryClient.invalidateQueries({
+          queryKey: registrationKeys.all,
+        })
+      }
+    },
   })
 }
+

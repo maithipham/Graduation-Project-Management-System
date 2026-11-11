@@ -1,14 +1,11 @@
 // ==================== STATUS ====================
 
 // Status hiển thị trên giao diện
-export type SupervisorApprovalStatus =
-  | 'pending'
-  | 'approved'
-  | 'rejected'
+export type SupervisorApprovalStatus = 'pending' | 'approved' | 'rejected'
 
 export type SupervisorTabStatus = SupervisorApprovalStatus | ''
 
-// Status BE trả về
+// Status BE trả về (RegistrationStatus)
 export type ApiRegistrationStatus =
   | 'PENDING'
   | 'TEACHER_APPROVED'
@@ -16,14 +13,22 @@ export type ApiRegistrationStatus =
   | 'ASSIGNED_BY_HOD'
   | 'REJECTED'
 
+// Status mốc thời hạn DANG_KY_GVHD từ BE
+export type RegistrationDeadlineStatus =
+  | 'NOT_CONFIGURED'
+  | 'INACTIVE'
+  | 'NOT_STARTED'
+  | 'CLOSED'
+  | 'OPEN'
+
 // ==================== API RESPONSE ====================
 
-// Một yêu cầu đăng ký GVHD từ BE
+// Một đơn đăng ký GVHD từ BE (AdvisorRegistrationResponse)
 export interface AdvisorRegistrationResponse {
   registrationPublicId: string
   studentPublicId: string
   semesterPublicId: string
-  semesterAdvisorPublicId: string | null
+  teacherPublicId: string | null
 
   studentCode: string
   studentName: string
@@ -41,7 +46,7 @@ export interface AdvisorRegistrationResponse {
   processedAt: string | null
 }
 
-// Danh sách yêu cầu đăng ký GVHD từ BE
+// Danh sách đơn đăng ký GVHD từ BE (TeacherAdvisorRegistrationListResponse)
 export interface TeacherAdvisorRegistrationListResponse {
   registrations: AdvisorRegistrationResponse[]
   pendingCount: number
@@ -50,9 +55,26 @@ export interface TeacherAdvisorRegistrationListResponse {
   totalCount: number
 }
 
+// Thông tin thời hạn đăng ký GVHD từ BE
+export interface RegistrationDeadline {
+  semesterPublicId: string
+  name: string | null
+  startDate: string | null
+  endDate: string | null
+  isActive: boolean | null
+  status: RegistrationDeadlineStatus
+}
+
+// ==================== API REQUEST PARAMS ====================
+
+export interface GetSupervisorRequestsParams {
+  semesterPublicId: string
+  status?: SupervisorTabStatus
+  keyword?: string
+}
+
 // ==================== UI MODEL ====================
 
-// Kiểu dữ liệu hiện tại mà giao diện đang sử dụng
 export interface SupervisorRequestItem {
   id: string
   mssv: string
@@ -61,10 +83,13 @@ export interface SupervisorRequestItem {
   topic: string
   submittedDate: string
   status: SupervisorApprovalStatus
+  apiStatus?: ApiRegistrationStatus
+  statusDescription?: string
   processedAt?: string
-  email: string
-  phone: string
-  note: string
+  // Các trường tùy chọn còn dùng bởi lecturer_portal_storage (mock cũ ở màn hình khác)
+  email?: string
+  phone?: string
+  note?: string
 }
 
 export interface SupervisorRequestCounts {

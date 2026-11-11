@@ -1,26 +1,16 @@
+import { apiClient, API_ENDPOINTS } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
 
-import apiClient from '@/shared/api/client'
-import { API_ENDPOINTS } from '@/shared/api/endpoints'
+import type { RegistrationDeadline } from '../types/supervisorRegistration.types'
 
-export interface RegistrationDeadline {
-  semesterPublicId: string
-  name: string | null
-  startDate: string | null
-  endDate: string | null
-  isActive: boolean | null
-  status:
-    | 'NOT_CONFIGURED'
-    | 'INACTIVE'
-    | 'NOT_STARTED'
-    | 'CLOSED'
-    | 'OPEN'
-}
+export type { RegistrationDeadline }
 
 export const supervisorDeadlineService = {
+  // 5. GET /api/teacher/advisor-registrations/deadline — Lấy hạn đăng ký GVHD theo học kỳ
   getRegistrationDeadline: async (
     semesterPublicId: string,
   ): Promise<RegistrationDeadline> => {
-    const response = await apiClient.get<RegistrationDeadline>(
+    const response = await apiClient.get<ApiResponse<RegistrationDeadline>>(
       API_ENDPOINTS.lecturer.deadline,
       {
         params: {
@@ -29,6 +19,6 @@ export const supervisorDeadlineService = {
       },
     )
 
-    return response.data
+    return response.data.data
   },
 }

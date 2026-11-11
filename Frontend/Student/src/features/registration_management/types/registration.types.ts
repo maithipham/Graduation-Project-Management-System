@@ -6,12 +6,20 @@ export type AdvisorRegistrationStatus =
   | 'REJECTED'
   | 'ASSIGNED_BY_HOD'
 
+export type AdvisorRegistrationDeadlineStatus =
+  | 'NOT_CONFIGURED'
+  | 'INACTIVE'
+  | 'NOT_STARTED'
+  | 'CLOSED'
+  | 'OPEN'
+
 export interface AvailableAdvisor {
   teacherPublicId: string
-  teacherCode: string
-  teacherName: string
+  teacherCode: string | null
+  teacherName: string | null
   academicTitle: string | null
   organization: string | null
+  majorName: string | null
   maxStudents: number
   occupiedStudents: number
   remainingSlots: number
@@ -37,13 +45,13 @@ export interface AdvisorRegistrationResponse {
 
 export interface SubmitAdvisorRegistrationRequest {
   teacherPublicId: string
-  topicName?: string
+  topicName?: string | null
 }
 
 export interface UpdateAdvisorRegistrationRequest {
   semesterPublicId: string
   teacherPublicId: string
-  topicName?: string
+  topicName?: string | null
 }
 
 export interface RegistrationOverviewResponse {
@@ -53,6 +61,7 @@ export interface RegistrationOverviewResponse {
   deadlineName: string | null
   deadlineStartDate: string | null
   deadlineEndDate: string | null
-  deadlineActive: boolean
-  deadlineStatus: string | null
+  deadlineActive: boolean | null
+  deadlineStatus: AdvisorRegistrationDeadlineStatus | null
 }
+

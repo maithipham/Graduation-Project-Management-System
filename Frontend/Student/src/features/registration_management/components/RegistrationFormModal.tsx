@@ -23,8 +23,9 @@ interface RegistrationFormModalProps {
   onSubmit: (lecturer: AvailableAdvisor, topic: string) => void
 }
 
-const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
-  open,
+const RegistrationFormModalContent: React.FC<
+  Omit<RegistrationFormModalProps, 'open'>
+> = ({
   isEditing,
   lecturers,
   initialLecturerId,
@@ -47,17 +48,6 @@ const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
 
   const pickerRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
-
-  // Đồng bộ dữ liệu khi mở modal hoặc khi dữ liệu ban đầu thay đổi.
-  useEffect(() => {
-    if (open) {
-      setSelectedId(initialLecturerId)
-      setTopicInput(initialTopic)
-      setPickerOpen(false)
-      setPickerSearch('')
-      setErrorMsg(null)
-    }
-  }, [open, initialLecturerId, initialTopic])
 
   // Đóng dropdown khi click bên ngoài.
   useEffect(() => {
@@ -118,12 +108,14 @@ const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
       const code = lecturer.teacherCode?.toLowerCase() ?? ''
       const title = lecturer.academicTitle?.toLowerCase() ?? ''
       const organization = lecturer.organization?.toLowerCase() ?? ''
+      const major = lecturer.majorName?.toLowerCase() ?? ''
 
       return (
         name.includes(keyword) ||
         code.includes(keyword) ||
         title.includes(keyword) ||
-        organization.includes(keyword)
+        organization.includes(keyword) ||
+        major.includes(keyword)
       )
     })
   }, [lecturers, pickerSearch])
@@ -203,10 +195,6 @@ const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
     onSubmit(selectedLecturer, normalizedTopic)
   }
 
-  if (!open) {
-    return null
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-5">
       <div className="w-full max-w-5xl overflow-visible rounded-2xl bg-white shadow-2xl">
@@ -239,7 +227,7 @@ const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleFormSubmit}>
+        <form noValidate onSubmit={handleFormSubmit}>
           <div className="space-y-5 px-5 py-5 sm:px-6">
 
             {/* Chọn giảng viên */}
@@ -372,23 +360,29 @@ const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
                               <div className="flex min-w-0 items-center gap-1.5">
                                 <span
                                   className="truncate text-sm font-semibold text-slate-800"
-                                  title={lecturer.teacherName}
+                                  title={lecturer.teacherName ?? undefined}
                                 >
-                                  {lecturer.teacherName}
+                                  {lecturer.teacherName || 'Chưa cập nhật tên'}
                                 </span>
 
                                 <span className="shrink-0 text-xs text-slate-400">
-                                  ({lecturer.teacherCode})
+                                  ({lecturer.teacherCode || '—'})
                                 </span>
                               </div>
 
-                              {/* Đơn vị công tác */}
+                              {/* Bộ môn / Đơn vị công tác */}
                               <div className="min-w-0">
                                 <span
                                   className="block truncate text-xs text-slate-500"
-                                  title={lecturer.organization || ''}
+                                  title={
+                                    lecturer.majorName ||
+                                    lecturer.organization ||
+                                    undefined
+                                  }
                                 >
-                                  {lecturer.organization || 'Chưa cập nhật'}
+                                  {lecturer.majorName ||
+                                    lecturer.organization ||
+                                    'Chưa cập nhật'}
                                 </span>
                               </div>
 
@@ -515,6 +509,22 @@ const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
         </form>
       </div>
     </div>
+  )
+}
+
+const RegistrationFormModal: React.FC<RegistrationFormModalProps> = ({
+  open,
+  ...props
+}) => {
+  if (!open) {
+    return null
+  }
+
+  return (
+    <RegistrationFormModalContent
+      key={`${props.isEditing ? 'edit' : 'create'}-${props.initialLecturerId ?? 'none'}-${props.initialTopic}`}
+      {...props}
+    />
   )
 }
 

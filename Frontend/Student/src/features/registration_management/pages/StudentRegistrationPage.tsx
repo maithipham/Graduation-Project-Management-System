@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useNotifications } from '@/features/notification'
+import { Skeleton } from '@/shared/components/ui'
+import { isApiError } from '@/shared/types'
 import RegistrationFormModal from '../components/RegistrationFormModal'
 import { RegistrationHistoryTable } from '../components/RegistrationHistoryTable'
 import { RegistrationOverviewCard } from '../components/RegistrationOverviewCard'
 import {
+  registrationKeys,
   useCurrentSemester,
   useSemesters,
+  useCurrentRegistration,
   useRegistrationOverview,
   useRegistrationHistory,
   useAvailableAdvisors,
@@ -12,28 +18,21 @@ import {
   useUpdateRegistration,
 } from '../hooks'
 import type {
+  AdvisorRegistrationDeadlineStatus,
   AdvisorRegistrationResponse,
   AvailableAdvisor,
 } from '../types/registration.types'
 
 function getErrorMessage(error: unknown): string {
+  if (isApiError(error)) {
+    return error.message
+  }
+
   if (error instanceof Error) {
     return error.message
   }
 
   return 'Có lỗi xảy ra. Vui lòng thử lại.'
-}
-
-function syncTopicToStorage(nextTopic: string | null) {
-  try {
-    if (nextTopic === null) {
-      localStorage.removeItem('student_topic')
-    } else {
-      localStorage.setItem('student_topic', nextTopic)
-    }
-  } catch {
-    // Bỏ qua lỗi localStorage
-  }
 }
 
 function formatDeadlineDate(date: string | null): string {
@@ -55,15 +54,19 @@ function formatDeadlineDate(date: string | null): string {
 function computeCountdownLabel(
   startDate: string | null,
   endDate: string | null,
-  isActive: boolean,
-  deadlineStatus: string | null,
+  isActive: boolean | null,
+  deadlineStatus: AdvisorRegistrationDeadlineStatus | null,
 ): string {
-  if (!isActive) {
-    return 'Đã khóa'
+  if (deadlineStatus === 'NOT_CONFIGURED' || (!startDate && !endDate)) {
+    return 'Chưa thiết lập'
   }
 
-  if (!startDate || !endDate) {
-    return 'Chưa thiết lập'
+  if (deadlineStatus === 'INACTIVE' || !startDate || !endDate) {
+    return 'Chưa kích hoạt'
+  }
+
+  if (isActive !== true) {
+    return 'Đã khóa'
   }
 
   const now = Date.now()
@@ -78,8 +81,8 @@ function computeCountdownLabel(
     return 'Đã hết hạn'
   }
 
-  if (now < start) {
-    const diffMs = start - now
+  if (deadlineStatus === 'NOT_STARTED' || now < start) {
+    const diffMs = Math.max(0, start - now)
     const totalHours = Math.ceil(diffMs / (1000 * 60 * 60))
     const days = Math.floor(totalHours / 24)
     const hours = totalHours % 24
@@ -91,7 +94,7 @@ function computeCountdownLabel(
     return `Mở sau ${Math.max(1, hours)} giờ`
   }
 
-  const diffMs = end - now
+  const diffMs = Math.max(0, end - now)
   const totalHours = Math.floor(diffMs / (1000 * 60 * 60))
   const days = Math.floor(totalHours / 24)
   const hours = totalHours % 24
@@ -122,6 +125,26 @@ function getDeadlineText(
 }
 
 export default function StudentRegistrationPage() {
+  const queryClient = useQueryClient()
+
+  // Đồng bộ realtime khi nhận thông báo mới qua SSE (/connection)
+  const { data: notifications } = useNotifications()
+  const latestNotificationId = notifications?.[0]?.id
+  const prevNotificationIdRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    if (latestNotificationId === undefined) return
+    if (
+      prevNotificationIdRef.current !== undefined &&
+      prevNotificationIdRef.current !== latestNotificationId
+    ) {
+      void queryClient.invalidateQueries({
+        queryKey: registrationKeys.all,
+      })
+    }
+    prevNotificationIdRef.current = latestNotificationId
+  }, [latestNotificationId, queryClient])
+
   // 1. Lấy học kỳ hiện tại
   const {
     data: semester,
@@ -138,34 +161,70 @@ export default function StudentRegistrationPage() {
     error: semestersError,
   } = useSemesters()
 
-  // 3. Học kỳ đang được chọn
-  const [selectedSemesterPublicId, setSelectedSemesterPublicId] =
-    useState('')
-
-  // Mặc định chọn học kỳ hiện tại
-  useEffect(() => {
-    if (!semester?.publicId) return
-
-    setSelectedSemesterPublicId(semester.publicId)
-  }, [semester?.publicId])
-
-  // Nếu không có học kỳ hiện tại thì chọn học kỳ đầu tiên
-  useEffect(() => {
+  // Gộp học kỳ hiện tại vào danh sách nếu chưa có
+  const semesterOptions = useMemo(() => {
     if (
-      !selectedSemesterPublicId &&
-      semesters.length > 0 &&
-      !semester?.publicId
+      semester &&
+      !semesters.some((item) => item.publicId === semester.publicId)
     ) {
-      setSelectedSemesterPublicId(semesters[0].publicId)
+      return [semester, ...semesters]
     }
-  }, [semesters, selectedSemesterPublicId, semester?.publicId])
+    return semesters
+  }, [semester, semesters])
+
+  // 3. Năm học và học kỳ do người dùng chọn (mặc định ưu tiên học kỳ hiện tại, sau đó học kỳ đầu tiên)
+  const [userSelectedYear, setUserSelectedYear] = useState<string | null>(null)
+  const [userSelectedSemesterId, setUserSelectedSemesterId] = useState<
+    string | null
+  >(null)
+
+  const academicYears = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          semesterOptions
+            .map((item) => item.academicYear)
+            .filter(Boolean),
+        ),
+      ),
+    [semesterOptions],
+  )
+
+  const selectedSemester = useMemo(() => {
+    if (userSelectedSemesterId) {
+      const matched = semesterOptions.find(
+        (item) => item.publicId === userSelectedSemesterId,
+      )
+      if (matched) return matched
+    }
+
+    return semester ?? semesterOptions[0] ?? null
+  }, [userSelectedSemesterId, semesterOptions, semester])
+
+  const selectedAcademicYear =
+    userSelectedYear && academicYears.includes(userSelectedYear)
+      ? userSelectedYear
+      : (selectedSemester?.academicYear ?? academicYears[0] ?? '')
+
+  const termsOfYear = useMemo(() => {
+    if (!selectedAcademicYear) {
+      return semesterOptions
+    }
+
+    const filtered = semesterOptions.filter(
+      (item) => item.academicYear === selectedAcademicYear,
+    )
+    return filtered.length > 0 ? filtered : semesterOptions
+  }, [semesterOptions, selectedAcademicYear])
+
+  const selectedSemesterPublicId = selectedSemester?.publicId ?? ''
 
   const semesterPublicId = selectedSemesterPublicId || undefined
 
   // Chỉ học kỳ hiện tại mới được phép đăng ký hoặc chỉnh sửa
   const isCurrentSemester =
-    !!semester?.publicId &&
-    semesterPublicId === semester.publicId
+    Boolean(semester?.publicId) &&
+    semesterPublicId === semester?.publicId
 
   // 4. Lấy thông tin tổng quan theo học kỳ được chọn
   const {
@@ -175,7 +234,7 @@ export default function StudentRegistrationPage() {
     error: overviewError,
   } = useRegistrationOverview(semesterPublicId)
 
-  // 5. Lấy lịch sử đăng ký
+  // 5. Lấy lịch sử đăng ký theo học kỳ được chọn
   const {
     data: requests = [],
     isLoading: isLoadingHistory,
@@ -183,7 +242,10 @@ export default function StudentRegistrationPage() {
     error: historyError,
   } = useRegistrationHistory(semesterPublicId)
 
-  // 6. Lấy danh sách giảng viên còn chỉ tiêu
+  // 6. Lấy đơn đăng ký mới nhất trong học kỳ hiện tại
+  const { data: currentRegistration } = useCurrentRegistration()
+
+  // 7. Lấy danh sách giảng viên còn chỉ tiêu (chỉ gọi khi đang xem học kỳ hiện tại)
   const {
     data: lecturers = [],
     isLoading: isLoadingLecturers,
@@ -191,11 +253,11 @@ export default function StudentRegistrationPage() {
     isCurrentSemester ? semesterPublicId : undefined,
   )
 
-  // 7. Mutation đăng ký và cập nhật
+  // 8. Mutation đăng ký và cập nhật
   const submitMutation = useSubmitRegistration()
   const updateMutation = useUpdateRegistration()
 
-  // 8. State giao diện
+  // 9. State giao diện
   const [modalOpen, setModalOpen] = useState(false)
   const [isEditingPending, setIsEditingPending] = useState(false)
 
@@ -207,31 +269,71 @@ export default function StudentRegistrationPage() {
   const isSubmitting =
     submitMutation.isPending || updateMutation.isPending
 
-  // 9. Xác định trạng thái đơn theo học kỳ đang chọn
-  const pendingRegistration = requests.find(
-    (request) => request.status === 'PENDING',
-  )
+  // 10. Trạng thái hạn đăng ký
+  const deadlineStatus = registrationOverview?.deadlineStatus ?? null
+  const isDeadlineOpen = deadlineStatus === 'OPEN'
+  const canEditOrSubmit = isCurrentSemester && isDeadlineOpen
 
-  const waitingApprovalRegistration = requests.find(
-    (request) => request.status === 'TEACHER_APPROVED',
-  )
+  let editDisabledReason: string | null = null
+  if (!isCurrentSemester) {
+    editDisabledReason = 'Học kỳ cũ'
+  } else if (!isDeadlineOpen) {
+    switch (deadlineStatus) {
+      case 'CLOSED':
+        editDisabledReason = 'Đã hết hạn'
+        break
+      case 'NOT_STARTED':
+        editDisabledReason = 'Chưa mở đăng ký'
+        break
+      case 'INACTIVE':
+        editDisabledReason = 'Chưa kích hoạt'
+        break
+      default:
+        editDisabledReason = 'Chưa thiết lập hạn'
+        break
+    }
+  }
 
-  const assignedRegistration = requests.find(
-    (request) =>
-      request.status === 'HOD_APPROVED' ||
-      request.status === 'ASSIGNED_BY_HOD',
-  )
+  // 11. Xác định trạng thái đơn theo học kỳ đang chọn
+  const pendingRegistration =
+    (isCurrentSemester && currentRegistration?.status === 'PENDING'
+      ? currentRegistration
+      : undefined) ??
+    requests.find((request) => request.status === 'PENDING')
+
+  const waitingApprovalRegistration =
+    (isCurrentSemester &&
+    currentRegistration?.status === 'TEACHER_APPROVED'
+      ? currentRegistration
+      : undefined) ??
+    requests.find((request) => request.status === 'TEACHER_APPROVED')
+
+  const assignedRegistration =
+    (isCurrentSemester &&
+    (currentRegistration?.status === 'HOD_APPROVED' ||
+      currentRegistration?.status === 'ASSIGNED_BY_HOD')
+      ? currentRegistration
+      : undefined) ??
+    requests.find(
+      (request) =>
+        request.status === 'HOD_APPROVED' ||
+        request.status === 'ASSIGNED_BY_HOD',
+    )
+
+  const latestInSemester =
+    (isCurrentSemester ? currentRegistration : null) ??
+    requests[0] ??
+    null
 
   const hasAssignedMentor =
-    !!registrationOverview?.mentorName ||
-    !!assignedRegistration
+    Boolean(registrationOverview?.mentorName) ||
+    Boolean(assignedRegistration)
 
-  const isPending = !!pendingRegistration
-  const isWaitingApproval = !!waitingApprovalRegistration
+  const isPending = Boolean(pendingRegistration)
+  const isWaitingApproval = Boolean(waitingApprovalRegistration)
 
   const isLatestRejected =
-    requests.length > 0 &&
-    requests[0].status === 'REJECTED' &&
+    latestInSemester?.status === 'REJECTED' &&
     !isPending &&
     !isWaitingApproval &&
     !hasAssignedMentor
@@ -240,13 +342,13 @@ export default function StudentRegistrationPage() {
     pendingRegistration ??
     waitingApprovalRegistration ??
     assignedRegistration ??
-    (isLatestRejected ? requests[0] : null)
+    (isLatestRejected ? latestInSemester : null)
 
-  // 10. Thông tin GVHD và đề tài chính thức
+  // 12. Thông tin GVHD và đề tài chính thức
   const mentor = registrationOverview?.mentorName ?? ''
   const topic = registrationOverview?.topicName ?? ''
 
-  // 11. Thông tin deadline
+  // 13. Thông tin deadline
   const deadlineText = getDeadlineText(
     registrationOverview?.deadlineStartDate ?? null,
     registrationOverview?.deadlineEndDate ?? null,
@@ -254,24 +356,48 @@ export default function StudentRegistrationPage() {
 
   const countdownLabel = registrationOverview
     ? computeCountdownLabel(
-      registrationOverview.deadlineStartDate,
-      registrationOverview.deadlineEndDate,
-      registrationOverview.deadlineActive,
-      registrationOverview.deadlineStatus,
-    )
+        registrationOverview.deadlineStartDate,
+        registrationOverview.deadlineEndDate,
+        registrationOverview.deadlineActive,
+        registrationOverview.deadlineStatus,
+      )
     : 'Đang tải...'
 
-  // 12. Xử lý khi đổi học kỳ
-  const handleSemesterChange = (nextSemesterPublicId: string) => {
-    setSelectedSemesterPublicId(nextSemesterPublicId)
+  // 14. Xử lý khi đổi năm học / học kỳ
+  const handleAcademicYearChange = (nextAcademicYear: string) => {
+    if (nextAcademicYear === selectedAcademicYear) return
+
+    const termsInYear = semesterOptions.filter(
+      (item) => item.academicYear === nextAcademicYear,
+    )
+    const nextSemester =
+      termsInYear.find((item) => item.publicId === semester?.publicId) ??
+      termsInYear[0]
+
+    setUserSelectedYear(nextAcademicYear)
+    setUserSelectedSemesterId(nextSemester?.publicId ?? null)
     setSubmitError(null)
     setModalOpen(false)
     setIsEditingPending(false)
     setEditingRegistration(null)
   }
 
+  const handleSemesterChange = (nextSemesterPublicId: string) => {
+    const matched = semesterOptions.find(
+      (item) => item.publicId === nextSemesterPublicId,
+    )
+    if (matched?.academicYear) {
+      setUserSelectedYear(matched.academicYear)
+    }
 
-  // 13. Mở form tạo đơn mới hoặc chỉnh sửa đơn hiện tại
+    setUserSelectedSemesterId(nextSemesterPublicId)
+    setSubmitError(null)
+    setModalOpen(false)
+    setIsEditingPending(false)
+    setEditingRegistration(null)
+  }
+
+  // 15. Mở form tạo đơn mới hoặc chỉnh sửa đơn hiện tại
   const handlePrimaryAction = () => {
     if (!isCurrentSemester) {
       setSubmitError(
@@ -290,6 +416,13 @@ export default function StudentRegistrationPage() {
 
     if (!semesterPublicId) {
       setSubmitError('Không tìm thấy học kỳ được chọn.')
+      return
+    }
+
+    if (!isDeadlineOpen) {
+      setSubmitError(
+        'Hiện không nằm trong thời gian mở đăng ký giảng viên hướng dẫn.',
+      )
       return
     }
 
@@ -321,14 +454,20 @@ export default function StudentRegistrationPage() {
     setModalOpen(true)
   }
 
-
-  // 14. Mở form chỉnh sửa đơn PENDING
+  // 16. Mở form chỉnh sửa đơn PENDING
   const handleEditRegistration = (
     request: AdvisorRegistrationResponse,
   ) => {
     if (!isCurrentSemester) {
       setSubmitError(
         'Bạn không thể chỉnh sửa đơn đăng ký của học kỳ cũ.',
+      )
+      return
+    }
+
+    if (!isDeadlineOpen) {
+      setSubmitError(
+        'Hiện không nằm trong thời gian mở đăng ký giảng viên hướng dẫn.',
       )
       return
     }
@@ -343,7 +482,7 @@ export default function StudentRegistrationPage() {
     setModalOpen(true)
   }
 
-  // 15. Đóng modal
+  // 17. Đóng modal
   const handleCloseModal = () => {
     if (isSubmitting) return
 
@@ -353,7 +492,7 @@ export default function StudentRegistrationPage() {
     setSubmitError(null)
   }
 
-  // 16. Gửi đơn đăng ký hoặc cập nhật đơn
+  // 18. Gửi đơn đăng ký hoặc cập nhật đơn
   const handleFormSubmit = async (
     lecturer: AvailableAdvisor,
     topicVal: string,
@@ -370,7 +509,13 @@ export default function StudentRegistrationPage() {
       return
     }
 
-    // Lấy teacherPublicId thay vì semesterAdvisorPublicId
+    if (!isDeadlineOpen) {
+      setSubmitError(
+        'Hiện không nằm trong thời gian mở đăng ký giảng viên hướng dẫn.',
+      )
+      return
+    }
+
     if (!lecturer.teacherPublicId) {
       setSubmitError('Không tìm thấy thông tin giảng viên hướng dẫn.')
       return
@@ -378,7 +523,7 @@ export default function StudentRegistrationPage() {
 
     setSubmitError(null)
 
-    // Tên đề tài không bắt buộc
+    // Tên đề tài không bắt buộc: chuỗi rỗng gửi null để xóa hoặc bỏ trống trên BE
     const normalizedTopic = topicVal.trim()
 
     try {
@@ -386,16 +531,14 @@ export default function StudentRegistrationPage() {
         await updateMutation.mutateAsync({
           semesterPublicId,
           teacherPublicId: lecturer.teacherPublicId,
-          topicName: normalizedTopic || undefined,
+          topicName: normalizedTopic ? normalizedTopic : null,
         })
       } else {
         await submitMutation.mutateAsync({
           teacherPublicId: lecturer.teacherPublicId,
-          topicName: normalizedTopic || undefined,
+          topicName: normalizedTopic ? normalizedTopic : null,
         })
       }
-
-      syncTopicToStorage(normalizedTopic || null)
 
       setModalOpen(false)
       setIsEditingPending(false)
@@ -406,18 +549,17 @@ export default function StudentRegistrationPage() {
     }
   }
 
-  // 17. Trạng thái tải dữ liệu ban đầu
+  // 19. Trạng thái tải dữ liệu ban đầu
   if (isLoadingSemester || isLoadingSemesters) {
     return (
-      <div className="w-full flex items-center justify-center py-16">
-        <p className="text-sm text-slate-500">
-          Đang tải thông tin đăng ký...
-        </p>
+      <div className="w-full space-y-5">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     )
   }
 
-  // 18. Xử lý lỗi lấy dữ liệu học kỳ
+  // 20. Xử lý lỗi lấy dữ liệu học kỳ
   if (isSemesterError || isSemestersError) {
     return (
       <div className="w-full rounded-xl border border-rose-200 bg-rose-50 p-5">
@@ -432,8 +574,8 @@ export default function StudentRegistrationPage() {
     )
   }
 
-  // 19. Không có học kỳ nào
-  if (!semester && semesters.length === 0) {
+  // 21. Không có học kỳ nào
+  if (!semester && semesterOptions.length === 0) {
     return (
       <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-5">
         <p className="text-sm font-semibold text-amber-700">
@@ -447,7 +589,7 @@ export default function StudentRegistrationPage() {
     )
   }
 
-  // 20. Lỗi khi tải overview
+  // 22. Lỗi khi tải overview
   if (isOverviewError) {
     return (
       <div className="w-full rounded-xl border border-rose-200 bg-rose-50 p-5">
@@ -464,31 +606,30 @@ export default function StudentRegistrationPage() {
 
   return (
     <div className="w-full max-w-full space-y-5">
-      {/* Thông tin đăng ký và chọn học kỳ */}
-      <RegistrationOverviewCard
-        currentRegistration={cardRegistration ?? null}
-        mentor={mentor}
-        topic={topic}
-        deadlineText={deadlineText}
-        countdownLabel={countdownLabel}
-        hasAssignedMentor={hasAssignedMentor}
-        isLatestRejected={isLatestRejected}
-        semesters={semesters}
-        selectedSemesterPublicId={selectedSemesterPublicId}
-        onSemesterChange={handleSemesterChange}
-        onPrimaryAction={handlePrimaryAction}
-      />
-
-      {/* Thông báo lỗi khi tải danh sách học kỳ */}
-      {/* Thông báo khi đang xem học kỳ cũ
-      {!isCurrentSemester && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-          <p className="text-sm text-blue-700">
-            Bạn đang xem dữ liệu của học kỳ trước. Chức năng tạo và chỉnh sửa
-            đơn đăng ký chỉ khả dụng trong học kỳ hiện tại.
-          </p>
-        </div>
-      )} */}
+      {/* Thông tin đăng ký và chọn năm học / học kỳ */}
+      {isLoadingOverview ? (
+        <Skeleton className="h-24 w-full rounded-xl" />
+      ) : (
+        <RegistrationOverviewCard
+          currentRegistration={cardRegistration ?? null}
+          mentor={mentor}
+          topic={topic}
+          deadlineText={deadlineText}
+          countdownLabel={countdownLabel}
+          deadlineStatus={deadlineStatus}
+          hasAssignedMentor={hasAssignedMentor}
+          isLatestRejected={isLatestRejected}
+          isCurrentSemester={isCurrentSemester}
+          isDeadlineOpen={isDeadlineOpen}
+          academicYears={academicYears}
+          selectedAcademicYear={selectedAcademicYear}
+          termsOfYear={termsOfYear}
+          selectedSemesterPublicId={selectedSemesterPublicId}
+          onAcademicYearChange={handleAcademicYearChange}
+          onSemesterChange={handleSemesterChange}
+          onPrimaryAction={handlePrimaryAction}
+        />
+      )}
 
       {/* Thông báo lỗi khi tải lịch sử */}
       {isHistoryError && (
@@ -501,14 +642,12 @@ export default function StudentRegistrationPage() {
 
       {/* Bảng lịch sử đăng ký */}
       {isLoadingHistory ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">
-            Đang tải lịch sử đăng ký...
-          </p>
-        </div>
+        <Skeleton className="h-64 w-full rounded-xl" />
       ) : (
         <RegistrationHistoryTable
           requests={requests}
+          canEdit={canEditOrSubmit}
+          editDisabledReason={editDisabledReason}
           onEdit={handleEditRegistration}
         />
       )}

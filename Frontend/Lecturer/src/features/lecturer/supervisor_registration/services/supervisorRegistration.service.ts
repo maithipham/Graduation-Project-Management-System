@@ -1,132 +1,123 @@
-import apiClient from '@/shared/api/client'
-import { API_ENDPOINTS } from '@/shared/api/endpoints'
+import { apiClient, API_ENDPOINTS } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
 
 import type {
-  SupervisorRequestItem,
-  SupervisorRequestCounts,
-  SupervisorTabStatus,
   AdvisorRegistrationResponse,
-  TeacherAdvisorRegistrationListResponse,
   ApiRegistrationStatus,
+  GetSupervisorRequestsParams,
+  SupervisorRequestCounts,
+  SupervisorRequestItem,
+  SupervisorTabStatus,
+  TeacherAdvisorRegistrationListResponse,
 } from '../types/supervisorRegistration.types'
 
-// Tham số lấy danh sách yêu cầu
-export interface GetSupervisorRequestsParams {
-  semesterPublicId: string
-  status?: SupervisorTabStatus
-  keyword?: string
-}
+export type { GetSupervisorRequestsParams }
 
-// Chuyển trạng thái BE sang trạng thái giao diện
 const mapStatus = (
   status: ApiRegistrationStatus,
 ): SupervisorRequestItem['status'] => {
   switch (status) {
     case 'PENDING':
       return 'pending'
-
     case 'REJECTED':
       return 'rejected'
-
     case 'TEACHER_APPROVED':
     case 'HOD_APPROVED':
     case 'ASSIGNED_BY_HOD':
       return 'approved'
-
     default:
       return 'pending'
   }
 }
 
-// Chuyển dữ liệu BE thành dữ liệu giao diện
-const mapRequest = (
-  item: AdvisorRegistrationResponse,
-): SupervisorRequestItem => {
-  const status = mapStatus(item.status)
-
-  return {
-    id: item.registrationPublicId,
-    mssv: item.studentCode,
-    name: item.studentName,
-    major: item.majorName ?? '',
-    topic: item.topicName ?? '',
-
-    // Thời gian sinh viên gửi đơn
-    submittedDate: item.submittedAt ?? '',
-
-    // Thời gian giảng viên duyệt hoặc từ chối
-    processedAt: item.processedAt ?? undefined,
-
-    status,
-    email: '',
-    phone: '',
-    note: '',
+const mapTabToApiStatus = (
+  status?: SupervisorTabStatus,
+): ApiRegistrationStatus | undefined => {
+  switch (status) {
+    case 'pending':
+      return 'PENDING'
+    case 'approved':
+      return 'TEACHER_APPROVED'
+    case 'rejected':
+      return 'REJECTED'
+    default:
+      return undefined
   }
 }
 
+const mapRequest = (
+  item: AdvisorRegistrationResponse,
+): SupervisorRequestItem => ({
+  id: item.registrationPublicId,
+  mssv: item.studentCode,
+  name: item.studentName,
+  major: item.majorName ?? '',
+  topic: item.topicName ?? '',
+  submittedDate: item.submittedAt ?? '',
+  processedAt: item.processedAt ?? undefined,
+  status: mapStatus(item.status),
+  apiStatus: item.status,
+  statusDescription: item.statusDescription,
+})
+
+// Giống một @Service: chỉ gọi API và bóc wrapper ApiResponse, không xử lý giao diện
 export const supervisorRegistrationService = {
-  // Lấy danh sách yêu cầu đăng ký GVHD
+  // 1. GET /api/teacher/advisor-registrations — Danh sách đơn đăng ký và bộ đếm theo học kỳ
   getRequests: async (
     params: GetSupervisorRequestsParams,
   ): Promise<{
     items: SupervisorRequestItem[]
     counts: SupervisorRequestCounts
   }> => {
-    const response = await apiClient.get<TeacherAdvisorRegistrationListResponse>(
-      API_ENDPOINTS.lecturer.base,
-      {
-        params: {
-          semesterPublicId: params.semesterPublicId,
-          status: params.status
-            ? params.status.toUpperCase() === 'APPROVED'
-              ? 'TEACHER_APPROVED'
-              : params.status.toUpperCase()
-            : undefined,
-          keyword: params.keyword?.trim() || undefined,
-        },
+    const response = await apiClient.get<
+      ApiResponse<TeacherAdvisorRegistrationListResponse>
+    >(API_ENDPOINTS.lecturer.base, {
+      params: {
+        semesterPublicId: params.semesterPublicId,
+        status: mapTabToApiStatus(params.status),
+        keyword: params.keyword?.trim() || undefined,
       },
-    )
+    })
 
-    const data = response.data
+    const data = response.data.data
 
     return {
-      items: data.registrations.map(mapRequest),
-
+      items: (data?.registrations ?? []).map(mapRequest),
       counts: {
-        pending: data.pendingCount,
-        approved: data.approvedCount,
-        rejected: data.rejectedCount,
-        all: data.totalCount,
+        pending: data?.pendingCount ?? 0,
+        approved: data?.approvedCount ?? 0,
+        rejected: data?.rejectedCount ?? 0,
+        all: data?.totalCount ?? 0,
       },
     }
   },
 
-  // Lấy chi tiết yêu cầu
+  // 2. GET /api/teacher/advisor-registrations/{publicId} — Chi tiết một đơn đăng ký
   getRequestDetail: async (
     id: string,
   ): Promise<AdvisorRegistrationResponse> => {
-    const response = await apiClient.get<AdvisorRegistrationResponse>(
-      API_ENDPOINTS.lecturer.detail(id),
-    )
+    const response = await apiClient.get<
+      ApiResponse<AdvisorRegistrationResponse>
+    >(API_ENDPOINTS.lecturer.detail(id))
 
-    return response.data
+    return response.data.data
   },
 
-  // Duyệt yêu cầu
+  // 3. PATCH /api/teacher/advisor-registrations/{publicId}/approve — Duyệt đơn
   approveRequest: async (id: string): Promise<AdvisorRegistrationResponse> => {
-    const response = await apiClient.patch<AdvisorRegistrationResponse>(
-      API_ENDPOINTS.lecturer.approve(id),
-    )
+    const response = await apiClient.patch<
+      ApiResponse<AdvisorRegistrationResponse>
+    >(API_ENDPOINTS.lecturer.approve(id))
 
-    return response.data
+    return response.data.data
   },
 
-  // Từ chối yêu cầu - không cần lý do
+  // 4. PATCH /api/teacher/advisor-registrations/{publicId}/reject — Từ chối đơn
   rejectRequest: async (id: string): Promise<AdvisorRegistrationResponse> => {
-    const response = await apiClient.patch<AdvisorRegistrationResponse>(
-      API_ENDPOINTS.lecturer.reject(id),
-    )
+    const response = await apiClient.patch<
+      ApiResponse<AdvisorRegistrationResponse>
+    >(API_ENDPOINTS.lecturer.reject(id))
 
-    return response.data
+    return response.data.data
   },
 }
