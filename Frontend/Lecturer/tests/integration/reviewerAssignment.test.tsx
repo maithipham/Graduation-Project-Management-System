@@ -1,113 +1,100 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ReviewerAssignmentPage from '@/features/department/lecturer_management/pages/ReviewerAssignmentPage'
 import { teacherService } from '@/features/department/lecturer_management/services/teacher.service'
+import { commentingLecturerService } from '@/features/department/lecturer_management/services/commentingLecturer.service'
+import { transformCommentingLecturer, transformStudentAssignment } from '@/features/department/lecturer_management/utils/commenting.mapper'
 import { studentService } from '@/features/department/student_management/services/student.service'
-import { toSpringPage } from '@/shared/utils'
-import type { TeacherListItem } from '@/features/department/lecturer_management/types'
-import type { StudentListItem } from '@/features/department/student_management/types'
+import type { SemesterOption } from '@/features/department/student_management/types'
 
-const MOCK_TEACHERS: TeacherListItem[] = [
-  {
-    publicId: 't-1',
-    id: 1,
-    name: 'Vũ Thị Lan',
-    academicTitle: 'TS.',
-    email: 'lan.vt@tlu.edu.vn',
-    organization: 'Trường Đại học Thủy lợi',
-    isInternal: true,
-    majorName: 'Kỹ thuật phần mềm',
-    amount: 5,
-    isAssigned: false,
-    assignmentStatus: 'Chưa phân công',
-    status: true,
-  },
+const CURRENT_SEMESTER: SemesterOption = {
+  publicId: 'sem-curr',
+  name: 'Học kỳ 1 năm học 2026-2027',
+  academicYear: '2026-2027',
+  term: 'Học kỳ 1',
+  startDate: '01-09-2026',
+  endDate: '15-01-2027',
+}
+
+// Giảng viên nhận xét (đi qua mapper giống như service thật)
+const MOCK_LECTURERS = [
+  transformCommentingLecturer(
+    {
+      id: 10,
+      publicId: 't-10',
+      fullName: 'Vũ Thị Lan',
+      title: 'TS.',
+      department: 'Kỹ thuật phần mềm',
+      organization: 'Trường Đại học Thủy lợi',
+      currentCommentingCount: 1,
+    },
+    'Kỹ thuật phần mềm',
+  ),
 ]
 
-const MOCK_STUDENTS: StudentListItem[] = [
-  {
-    publicId: 's-1',
+// Sinh viên: An chưa có GVNX, Bình đã có GVNX
+const MOCK_STUDENTS = [
+  transformStudentAssignment({
+    studentId: 1,
+    studentPublicId: 's-1',
     studentCode: '2151060001',
-    name: 'Nguyễn Văn An',
+    studentName: 'Nguyễn Văn An',
     className: '62PM1',
-    batch: 'K62',
     majorName: 'Kỹ thuật phần mềm',
-    topicName: 'Hệ thống Microservices',
-    lecturerName: 'TS. Nguyễn Quốc Bảo',
-    coLecturerName: null,
-    status: 'STAGE_1_ADVISOR_ASSIGNED',
-    statusLabel: 'Đã phân công GVHD',
-    accountStatus: true,
-  },
-  {
-    publicId: 's-2',
+    topicId: 101,
+    topicTitle: 'Hệ thống Microservices',
+    supervisorId: 20,
+    supervisorName: 'TS. Nguyễn Quốc Bảo',
+    commentingLecturerId: null,
+  }),
+  transformStudentAssignment({
+    studentId: 2,
+    studentPublicId: 's-2',
     studentCode: '2151060002',
-    name: 'Trần Thị Bình',
+    studentName: 'Trần Thị Bình',
     className: '62PM1',
-    batch: 'K62',
     majorName: 'Kỹ thuật phần mềm',
-    topicName: 'Kiến trúc Clean Architecture',
-    lecturerName: 'ThS. Bùi Hoàng Long',
-    coLecturerName: null,
-    status: 'STAGE_1_ADVISOR_ASSIGNED',
-    statusLabel: 'Đã phân công GVHD',
-    accountStatus: true,
-  },
+    topicId: 102,
+    topicTitle: 'Kiến trúc Clean Architecture',
+    supervisorId: 21,
+    supervisorName: 'ThS. Bùi Hoàng Long',
+    commentingLecturerId: 10,
+    commentingLecturerPublicId: 't-10',
+    commentingLecturerName: 'TS. Vũ Thị Lan',
+  }),
 ]
 
 function renderPage() {
-  vi.spyOn(studentService, 'getCurrentSemester').mockResolvedValue({
-    publicId: 'sem-curr',
-    name: 'Học kỳ 1 năm học 2026-2027',
-    academicYear: '2026-2027',
-    term: 'Học kỳ 1',
-    startDate: '01-09-2026',
-    endDate: '15-01-2027',
+  vi.spyOn(studentService, 'getCurrentSemester').mockResolvedValue(CURRENT_SEMESTER)
+  vi.spyOn(studentService, 'getSemesters').mockResolvedValue([CURRENT_SEMESTER])
+  vi.spyOn(teacherService, 'getManagedMajor').mockResolvedValue({
+    publicId: 'm1',
+    code: '7480103',
+    name: 'Kỹ thuật phần mềm',
   })
-  vi.spyOn(studentService, 'getSemesters').mockResolvedValue([
-    {
-      publicId: 'sem-curr',
-      name: 'Học kỳ 1 năm học 2026-2027',
-      academicYear: '2026-2027',
-      term: 'Học kỳ 1',
-      startDate: '01-09-2026',
-      endDate: '15-01-2027',
-    },
-  ])
-  vi.spyOn(studentService, 'getMajors').mockResolvedValue([
-    { publicId: 'm1', code: '7480103', name: 'Kỹ thuật phần mềm' },
-  ])
-  vi.spyOn(studentService, 'getBatches').mockResolvedValue(['K62', 'K63'])
-  vi.spyOn(teacherService, 'getTeachers').mockImplementation(async (params) =>
-    toSpringPage({
-      content: MOCK_TEACHERS,
-      number: params.page,
-      size: params.size,
-      totalElements: MOCK_TEACHERS.length,
-      totalPages: 1,
-    }),
-  )
-  vi.spyOn(studentService, 'getStudents').mockImplementation(async (params) =>
-    toSpringPage({
-      content: MOCK_STUDENTS,
-      number: params.page,
-      size: params.size,
-      totalElements: MOCK_STUDENTS.length,
-      totalPages: 1,
-    }),
-  )
+  const getLecturers = vi
+    .spyOn(commentingLecturerService, 'getCommentingLecturers')
+    .mockResolvedValue(MOCK_LECTURERS)
+  const getStudents = vi
+    .spyOn(commentingLecturerService, 'getStudents')
+    .mockResolvedValue(MOCK_STUDENTS)
+  const assignManual = vi
+    .spyOn(commentingLecturerService, 'assignManual')
+    .mockResolvedValue(undefined)
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
 
-  return render(
+  render(
     <QueryClientProvider client={queryClient}>
       <ReviewerAssignmentPage />
     </QueryClientProvider>,
   )
+
+  return { getLecturers, getStudents, assignManual }
 }
 
 describe('ReviewerAssignmentPage', () => {
@@ -115,36 +102,42 @@ describe('ReviewerAssignmentPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('hiển thị thanh công cụ, thống kê và danh sách sinh viên lấy từ backend', async () => {
-    renderPage()
+  it('tự chọn học kỳ hiện tại, hiển thị sinh viên, thống kê và giảng viên nhận xét từ backend', async () => {
+    const { getLecturers, getStudents } = renderPage()
 
-    expect(screen.getByText('Tải file mẫu')).toBeInTheDocument()
-    expect(screen.getByText('Import File')).toBeInTheDocument()
-    expect(screen.getByText('Thêm thủ công')).toBeInTheDocument()
+    expect(await screen.findByText('Nguyễn Văn An')).toBeInTheDocument()
+    expect(screen.getByText('Trần Thị Bình')).toBeInTheDocument()
+    expect(screen.getByText('Tất cả (2)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Phân công nhanh \(Chia đều\)/ })).toBeInTheDocument()
+    expect(screen.getAllByText('TS. Vũ Thị Lan').length).toBeGreaterThan(0)
 
-    await waitFor(() => {
-      expect(screen.getByText('Nguyễn Văn An')).toBeInTheDocument()
-      expect(screen.getByText('Trần Thị Bình')).toBeInTheDocument()
-    })
+    // Gọi API với học kỳ hiện tại
+    expect(getStudents).toHaveBeenCalledWith('sem-curr', 'ALL')
+    expect(getLecturers).toHaveBeenCalledWith('sem-curr', 'Kỹ thuật phần mềm')
   })
 
-  it('chọn người nhận xét từ combobox cập nhật người nhận xét của sinh viên', async () => {
+  it('tích chọn sinh viên rồi bấm Gán sẽ gửi phân công thủ công cho giảng viên đang chọn', async () => {
     const u = userEvent.setup()
-    renderPage()
+    const { assignManual } = renderPage()
+
+    const row = (await screen.findByText('Nguyễn Văn An')).closest('tr')
+    expect(row).not.toBeNull()
+
+    const assignBtn = screen.getByRole('button', { name: /Gán \(0 SV\)/ })
+    expect(assignBtn).toBeDisabled()
+
+    await u.click(within(row as HTMLElement).getByRole('checkbox'))
+
+    const enabledBtn = await screen.findByRole('button', { name: /Gán \(1 SV\)/ })
+    await waitFor(() => expect(enabledBtn).toBeEnabled())
+    await u.click(enabledBtn)
 
     await waitFor(() => {
-      expect(screen.getByText('Nguyễn Văn An')).toBeInTheDocument()
+      expect(assignManual).toHaveBeenCalledWith({
+        commentingLecturerId: 10,
+        commentingLecturerPublicId: 't-10',
+        studentOrTopicIds: [101],
+      })
     })
-
-    // Tìm các nút combobox
-    const buttons = screen.getAllByRole('button', { name: /Chưa phân công|TS\.|PGS\.|ThS\./i })
-    expect(buttons.length).toBeGreaterThan(0)
-
-    // Bấm vào 1 nút combobox đang "Chưa phân công"
-    const unassignedBtn = screen.getAllByRole('button', { name: 'Chưa phân công' })[0]
-    await u.click(unassignedBtn)
-
-    // Hiển thị danh sách giảng viên để chọn
-    expect(await screen.findByPlaceholderText('Tìm GV nhận xét...')).toBeInTheDocument()
   })
 })

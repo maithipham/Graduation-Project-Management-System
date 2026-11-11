@@ -7,8 +7,6 @@ import type {
   AssignmentFilterParams,
   CommentingLecturer,
   StudentAssignment,
-  LecturerCategory,
-  LecturerSort,
 } from '../types/commenting.types'
 import {
   filterStudentAssignments,

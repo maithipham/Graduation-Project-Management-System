@@ -45,7 +45,6 @@ export function CommentingAssignmentWorkspaceView({
     filters,
     setFilters,
     selectedIds,
-    selectedStudents,
     selectedLecturerId,
     setSelectedLecturerId,
     selectedLecturer,
