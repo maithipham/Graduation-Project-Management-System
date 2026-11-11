@@ -1,18 +1,52 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Download, FileText, Minus, Plus, Printer } from 'lucide-react'
+import {
+  ArrowLeft,
+  Download,
+  ExternalLink,
+  FileText,
+  FileX,
+  Minus,
+  Plus,
+  Printer,
+} from 'lucide-react'
 import { useMyInfo } from '@/features/auth'
+import { toast } from '@/shared/components/feedback/toast.store'
+import { Skeleton } from '@/shared/components/ui'
+import { cn, formatDate } from '@/shared/utils'
+import { useMyOutline } from '../hooks/useOutlineManagement'
 import { useMyTopicOverview } from '../hooks/useTopicTitle'
+import { extractOutlineFileName, isSafeFileUrl } from '../services/outline.service'
+import { getOutlineDeadlineDisplay } from '../utils/outlineDeadline'
 
 export default function StudentOutlinePreviewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { data: user } = useMyInfo()
-  const { data: topicOverview } = useMyTopicOverview()
+  const {
+    data: outlineData,
+    isPending: isOutlineLoading,
+    isError: isOutlineError,
+  } = useMyOutline()
+  const {
+    data: topicOverview,
+    isPending: isTopicLoading,
+    isError: isTopicError,
+  } = useMyTopicOverview()
 
-  const fileName = searchParams.get('file') || 'De_cuong_DATN_v2.pdf'
+  const deadlineSource = outlineData ?? topicOverview
+  const isMetaLoading = isOutlineLoading && isTopicLoading
+  const isMetaError = isOutlineError && isTopicError
+  const deadlineDisplay = getOutlineDeadlineDisplay(deadlineSource)
+
+  const fileUrl = searchParams.get('url') || outlineData?.outlineFile || ''
+  const hasValidFileUrl = isSafeFileUrl(fileUrl)
+  const fileName =
+    searchParams.get('file') ||
+    (fileUrl ? extractOutlineFileName(fileUrl) : outlineData?.title || 'Đề cương đồ án tốt nghiệp')
+  const isPdfUrl = hasValidFileUrl && /\.pdf(?:$|\?)/i.test(fileUrl)
+
   const [scale, setScale] = useState<number>(1.0)
-  const [toastMsg, setToastMsg] = useState<string>('')
 
   useEffect(() => {
     document.title = `${fileName} - Xem trước`
@@ -27,29 +61,30 @@ export default function StudentOutlinePreviewPage() {
   }
 
   const handleDownload = () => {
-    setToastMsg(`Đang tải xuống tệp: ${fileName}`)
-    window.setTimeout(() => setToastMsg(''), 2500)
+    if (!hasValidFileUrl) {
+      toast.warning('Chưa có tệp đề cương để tải xuống.')
+      return
+    }
+    window.open(fileUrl, '_blank', 'noopener,noreferrer')
   }
 
   const studentName =
+    outlineData?.studentName ||
     user?.name?.trim() ||
     topicOverview?.histories?.[0]?.studentName ||
     'Sinh viên'
-  const studentCode = topicOverview?.histories?.[0]?.studentCode || ''
+  const studentCode =
+    outlineData?.studentCode || topicOverview?.histories?.[0]?.studentCode || ''
   const topicName =
+    outlineData?.topicName ||
     topicOverview?.officialName ||
     topicOverview?.provisionalName ||
     'Chưa cập nhật tên đề tài'
-  const mentorName = topicOverview?.lecturerName || 'Chưa phân công'
+  const mentorName = deadlineSource?.lecturerName || 'Chưa phân công'
+  const reviewerName = outlineData?.reviewerName || 'Chưa phân công'
 
   return (
     <div className="bg-slate-700 text-slate-800 min-h-screen flex flex-col">
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg">
-          {toastMsg}
-        </div>
-      )}
-
       {/* Document Viewer Header */}
       <header className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between border-b border-slate-800 shrink-0 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-3 min-w-0">
@@ -68,9 +103,11 @@ export default function StudentOutlinePreviewPage() {
               {fileName}
             </span>
           </div>
-          <span className="hidden sm:inline-block rounded bg-emerald-500/20 text-emerald-300 text-[11px] px-2 py-0.5 font-medium border border-emerald-500/30 shrink-0">
-            Đã xác thực
-          </span>
+          {outlineData?.statusDescription && (
+            <span className="hidden sm:inline-block rounded bg-emerald-500/20 text-emerald-300 text-[11px] px-2 py-0.5 font-medium border border-emerald-500/30 shrink-0">
+              {outlineData.statusDescription}
+            </span>
+          )}
         </div>
 
         {/* Viewer Tools */}
@@ -109,8 +146,9 @@ export default function StudentOutlinePreviewPage() {
 
           <button
             type="button"
+            disabled={!hasValidFileUrl}
             onClick={handleDownload}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white font-semibold transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-semibold transition-colors shadow-xs cursor-pointer"
           >
             <Download size={14} />
             <span>Tải về</span>
@@ -118,7 +156,7 @@ export default function StudentOutlinePreviewPage() {
         </div>
       </header>
 
-      {/* PDF Preview Canvas */}
+      {/* Preview Canvas */}
       <main className="flex-1 overflow-auto p-4 sm:p-8 flex justify-center">
         <div
           style={{
@@ -128,12 +166,12 @@ export default function StudentOutlinePreviewPage() {
             padding: '25mm 20mm',
             boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
           }}
-          className="bg-white text-slate-900 transition-transform origin-top duration-150 mx-auto"
+          className="bg-white text-slate-900 transition-transform origin-top duration-150 mx-auto flex flex-col"
         >
           {/* Document Header */}
           <div className="text-center space-y-1 pb-6 border-b-2 border-slate-900">
             <p className="text-xs uppercase tracking-wider font-semibold text-slate-600">
-              BỘ NÔNG NGHIỆP VÀ PHÁT TRIỂN NÔNG THÔN
+              BỘ NÔNG NGHIỆP VÀ MÔI TRƯỜNG
             </p>
             <p className="text-sm font-bold uppercase tracking-wider">TRƯỜNG ĐẠI HỌC THỦY LỢI</p>
             <p className="text-xs font-semibold text-slate-700">KHOA CÔNG NGHỆ THÔNG TIN</p>
@@ -141,7 +179,6 @@ export default function StudentOutlinePreviewPage() {
             <h1 className="text-xl font-extrabold uppercase tracking-wide pt-4 text-[#1565C0]">
               ĐỀ CƯƠNG ĐỒ ÁN TỐT NGHIỆP
             </h1>
-            <p className="text-xs text-slate-500 italic">Niên khóa 2022 - 2026</p>
           </div>
 
           {/* Document Metadata */}
@@ -149,7 +186,7 @@ export default function StudentOutlinePreviewPage() {
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Tên đề tài:</span>
               <span className="col-span-2 font-semibold text-slate-900">
-                {topicName}
+                {isMetaLoading ? <Skeleton className="h-4 w-64" /> : topicName}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -160,128 +197,101 @@ export default function StudentOutlinePreviewPage() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Giảng viên hướng dẫn:</span>
-              <span className="col-span-2 font-semibold text-[#1565C0]">
-                {mentorName}
+              <span className="col-span-2 font-semibold text-[#1565C0]">{mentorName}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <span className="font-bold text-slate-700">Giáo viên nhận xét:</span>
+              <span className="col-span-2 font-semibold text-slate-900">{reviewerName}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <span className="font-bold text-slate-700">Hạn nộp đề tài / đề cương:</span>
+              <span className="col-span-2">
+                {isMetaLoading ? (
+                  <Skeleton className="h-4 w-56" />
+                ) : isMetaError ? (
+                  <span className="text-rose-600 font-medium">Không tải được thời hạn nộp.</span>
+                ) : (
+                  <span className={cn('font-semibold', deadlineDisplay.toneClassName)}>
+                    {deadlineDisplay.text}
+                  </span>
+                )}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <span className="font-bold text-slate-700">Chuyên ngành:</span>
-              <span className="col-span-2">Kỹ thuật Phần mềm (Software Engineering)</span>
+              <span className="font-bold text-slate-700">Trạng thái đề cương:</span>
+              <span className="col-span-2 font-medium text-slate-800">
+                {isOutlineLoading ? (
+                  <Skeleton className="h-4 w-36" />
+                ) : (
+                  outlineData?.statusDescription || 'Chưa nộp đề cương'
+                )}
+              </span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <span className="font-bold text-slate-700">Thời gian thực hiện:</span>
-              <span className="col-span-2">Từ 01/10/2026 đến 15/01/2027</span>
-            </div>
+            {outlineData?.submittedAt && (
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-bold text-slate-700">Thời gian nộp gần nhất:</span>
+                <span className="col-span-2 text-slate-700">
+                  {formatDate(outlineData.submittedAt, 'full')}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Outline Content Sections */}
-          <div className="mt-8 space-y-6 text-xs leading-relaxed text-slate-800">
-            <div>
-              <h2 className="text-sm font-bold uppercase text-slate-900 border-b border-slate-200 pb-1 mb-2">
-                1. Đặt vấn đề và tính cấp thiết
-              </h2>
-              <p className="text-justify text-slate-700">
-                Hiện nay quy trình quản lý đồ án tốt nghiệp tại các khoa kỹ thuật đối mặt với nhiều
-                khó khăn trong việc theo dõi tiến độ, lưu vết duyệt đề tài và phản hồi giữa sinh
-                viên với giảng viên hướng dẫn. Hệ thống GPMS được nghiên cứu xây dựng nhằm giải
-                quyết bài toán tự động hóa quy trình phân công, nộp đề cương, phản biện và chấm điểm
-                bảo vệ trực tuyến, nâng cao tính minh bạch và chất lượng quản lý đào tạo.
-              </p>
+          {/* Feedback Section */}
+          {(outlineData?.reviewFeedback || outlineData?.advisorFeedback) && (
+            <div className="mt-6 space-y-3 text-xs border-t border-slate-200 pt-5">
+              {outlineData.reviewFeedback && (
+                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                  <div className="font-bold text-slate-800 mb-1">
+                    Nhận xét của GV thẩm định ({reviewerName}):
+                  </div>
+                  <p className="text-slate-700 leading-relaxed">{outlineData.reviewFeedback}</p>
+                </div>
+              )}
+              {outlineData.advisorFeedback && (
+                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                  <div className="font-bold text-slate-800 mb-1">
+                    Nhận xét của GVHD ({mentorName}):
+                  </div>
+                  <p className="text-slate-700 leading-relaxed">{outlineData.advisorFeedback}</p>
+                </div>
+              )}
             </div>
+          )}
 
-            <div>
-              <h2 className="text-sm font-bold uppercase text-slate-900 border-b border-slate-200 pb-1 mb-2">
-                2. Mục tiêu nghiên cứu và phạm vi
-              </h2>
-              <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                <li>
-                  Nghiên cứu quy trình nghiệp vụ xét duyệt đề tài, báo cáo tuần và hội đồng bảo vệ
-                  tại Trường Đại học Thủy Lợi.
-                </li>
-                <li>
-                  Xây dựng giải pháp kiến trúc phần mềm hướng dịch vụ (RESTful API) và giao diện
-                  trực quan thân thiện trên nền tảng Web hiện đại.
-                </li>
-                <li>
-                  Tích hợp luồng xét duyệt đa cấp: Sinh viên → Giảng viên hướng dẫn → Bộ môn / Khoa
-                  phê duyệt.
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 className="text-sm font-bold uppercase text-slate-900 border-b border-slate-200 pb-1 mb-2">
-                3. Phương pháp nghiên cứu và công nghệ áp dụng
-              </h2>
-              <p className="text-justify text-slate-700 mb-2">
-                Hệ thống áp dụng mô hình Scrum/Agile với chu kỳ phát triển 2 tuần/sprint. Công nghệ
-                sử dụng bao gồm:
-              </p>
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded border border-slate-200 font-mono text-[11px]">
-                <div>• Frontend: Single Page Application / Tailwind CSS</div>
-                <div>• Backend: Spring Boot / RESTful API</div>
-                <div>• CSDL: PostgreSQL / Redis Cache</div>
-                <div>• Xác thực: OAuth2, JWT Bearer Token</div>
+          {/* Embedded PDF or File Download Link */}
+          <div className="mt-6 pt-5 border-t border-slate-200 flex-1 flex flex-col">
+            {isOutlineLoading ? (
+              <Skeleton className="h-96 w-full rounded-lg" />
+            ) : isPdfUrl ? (
+              <iframe
+                src={fileUrl}
+                title={fileName}
+                className="w-full flex-1 min-h-[520px] border border-slate-200 rounded-lg"
+              />
+            ) : hasValidFileUrl ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center space-y-3">
+                <FileText size={32} className="text-[#1565C0] mx-auto" />
+                <p className="text-sm font-semibold text-slate-800">{fileName}</p>
+                <p className="text-xs text-slate-500">
+                  Trình duyệt không hỗ trợ xem trực tiếp định dạng tệp này. Vui lòng mở hoặc tải tệp về máy.
+                </p>
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1565C0] text-white text-xs font-semibold hover:bg-[#0D47A1] transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  <span>Mở tệp đề cương</span>
+                </a>
               </div>
-            </div>
-
-            <div>
-              <h2 className="text-sm font-bold uppercase text-slate-900 border-b border-slate-200 pb-1 mb-2">
-                4. Kế hoạch và tiến độ thực hiện
-              </h2>
-              <div className="overflow-x-auto border border-slate-200 rounded">
-                <table className="w-full text-left text-[11px]">
-                  <thead className="bg-slate-100 font-bold border-b border-slate-200 text-slate-700">
-                    <tr>
-                      <th className="p-2">Tuần</th>
-                      <th className="p-2">Nội dung công việc</th>
-                      <th className="p-2">Sản phẩm đầu ra</th>
-                      <th className="p-2">Dự kiến</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="p-2 font-semibold">Tuần 1 - 2</td>
-                      <td className="p-2">Khảo sát yêu cầu, hoàn thiện đề cương chi tiết</td>
-                      <td className="p-2">Tài liệu đề cương, SRS</td>
-                      <td className="p-2 text-emerald-700 font-semibold">Hoàn thành</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 font-semibold">Tuần 3 - 6</td>
-                      <td className="p-2">Thiết kế kiến trúc hệ thống và cơ sở dữ liệu</td>
-                      <td className="p-2">Sơ đồ ERD, Architecture Doc</td>
-                      <td className="p-2 text-blue-700">Đang thực hiện</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 font-semibold">Tuần 7 - 12</td>
-                      <td className="p-2">Xây dựng module Đăng ký GVHD, Đề cương, Báo cáo</td>
-                      <td className="p-2">Mã nguồn module hoàn chỉnh</td>
-                      <td className="p-2 text-slate-500">Chưa bắt đầu</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 font-semibold">Tuần 13 - 15</td>
-                      <td className="p-2">Kiểm thử tích hợp, hoàn thiện báo cáo tốt nghiệp</td>
-                      <td className="p-2">Báo cáo cuối cùng, Slide bảo vệ</td>
-                      <td className="p-2 text-slate-500">Chưa bắt đầu</td>
-                    </tr>
-                  </tbody>
-                </table>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500 text-xs space-y-2">
+                <FileX size={32} className="text-slate-300 mx-auto" />
+                <p>Chưa có tệp đề cương nào được nộp từ hệ thống.</p>
               </div>
-            </div>
-
-            {/* Signatures */}
-            <div className="pt-8 flex justify-between text-center">
-              <div>
-                <p className="font-bold text-slate-800">GIẢNG VIÊN HƯỚNG DẪN</p>
-                <p className="text-[11px] text-slate-400 italic mb-12">(Ký và ghi rõ họ tên)</p>
-                <p className="font-semibold text-slate-900">{mentorName}</p>
-              </div>
-              <div>
-                <p className="font-bold text-slate-800">SINH VIÊN THỰC HIỆN</p>
-                <p className="text-[11px] text-slate-400 italic mb-12">(Ký và ghi rõ họ tên)</p>
-                <p className="font-semibold text-slate-900">{studentName}</p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </main>

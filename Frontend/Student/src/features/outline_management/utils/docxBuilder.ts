@@ -404,7 +404,11 @@ export function buildOutlineBlocks(
   return blocks
 }
 
-export function downloadOutlineDocx(blocks: DocxBlock[], fileName: string): void {
+const DOCX_MIME_TYPE =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+/** Tạo Blob tài liệu Word (.docx) từ danh sách block nội dung đề cương. */
+export function buildOutlineDocxBlob(blocks: DocxBlock[]): Blob {
   const bytes = zipStore([
     { name: '[Content_Types].xml', data: encodeUtf8(CONTENT_TYPES) },
     { name: '_rels/.rels', data: encodeUtf8(ROOT_RELS) },
@@ -414,9 +418,18 @@ export function downloadOutlineDocx(blocks: DocxBlock[], fileName: string): void
   ])
   const copy = new Uint8Array(bytes.byteLength)
   copy.set(bytes)
-  const blob = new Blob([copy], {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  })
+  return new Blob([copy], { type: DOCX_MIME_TYPE })
+}
+
+/** Tạo File .docx hoàn chỉnh để upload trực tiếp qua POST /outline/submit. */
+export function buildOutlineDocxFile(blocks: DocxBlock[], fileName: string): File {
+  const safeName = fileName?.trim() || 'De_cuong.docx'
+  const blob = buildOutlineDocxBlob(blocks)
+  return new File([blob], safeName, { type: DOCX_MIME_TYPE })
+}
+
+export function downloadOutlineDocx(blocks: DocxBlock[], fileName: string): void {
+  const blob = buildOutlineDocxBlob(blocks)
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

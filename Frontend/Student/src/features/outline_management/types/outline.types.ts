@@ -1,4 +1,69 @@
-import type { SemesterCode } from '@/shared/contexts'
+import type { OutlineDeadlineStatus } from './topicTitle.types'
+
+export type OutlineStatus = 'PENDING' | 'APPROVED' | 'REQUEST_CHANGES' | 'REJECTED'
+
+export interface ThesisOutlineHistoryResponse {
+  publicId: string
+  outlineHistoryFile: string
+  submissionNote: string | null
+  status: OutlineStatus
+  statusDescription: string
+  submittedAt: string
+  reviewerPublicId: string | null
+  reviewerName: string | null
+  reviewFeedback: string | null
+  reviewedAt: string | null
+}
+
+export interface ThesisOutlineResponse {
+  publicId: string | null
+  topicPublicId: string | null
+  topicName: string | null
+  currentStage: string | null
+  topicStatus: string | null
+  disqualificationReason: string | null
+  studentPublicId: string | null
+  studentCode: string | null
+  studentName: string | null
+  lecturerPublicId: string | null
+  lecturerName: string | null
+  coLecturerPublicId: string | null
+  coLecturerName: string | null
+  reviewerPublicId: string | null
+  reviewerName: string | null
+  title: string | null
+  outlineFile: string | null
+  status: OutlineStatus | null
+  statusDescription: string | null
+  reviewFeedback: string | null
+  advisorFeedback: string | null
+  submittedAt: string | null
+  reviewedAt: string | null
+  canReview: boolean
+  canWriteAdvisorFeedback: boolean
+  deadlineName: string | null
+  deadlineStartDate: string | null
+  deadlineEndDate: string | null
+  deadlineActive: boolean | null
+  deadlineStatus: OutlineDeadlineStatus
+  histories: ThesisOutlineHistoryResponse[]
+}
+
+export interface SubmitOutlineRequest {
+  file: File
+  submissionNote?: string
+  title?: string
+}
+
+export const OUTLINE_ERROR_CODES = {
+  OUTLINE_FILE_EMPTY: 4000,
+  OUTLINE_REVIEWER_NOT_ASSIGNED: 3068,
+  OUTLINE_STAGE_INVALID: 3069,
+  OUTLINE_ALREADY_FINALIZED: 3070,
+  OUTLINE_DEADLINE_NOT_FOUND: 3073,
+  OUTLINE_SUBMISSION_DEADLINE_CLOSED: 3074,
+  TOPIC_NOT_IN_PROGRESS: 3057,
+} as const
 
 export interface OutlineScheduleRow {
   step: number
@@ -68,23 +133,6 @@ export interface OutlineSectionConfig {
   hint: string
   required: boolean
   rows: number
-}
-
-export type OutlineSubmissionStatus = 'Đã duyệt' | 'Đã từ chối' | 'Chờ duyệt'
-
-export interface OutlineSubmissionItem {
-  id: number
-  year: string
-  semester: SemesterCode
-  source: 'file' | 'editor'
-  editorData?: OutlineEditorData | null
-  time: string
-  fileName: string
-  status: OutlineSubmissionStatus
-  approvedTime?: string
-  note: string
-  reviewerName?: string
-  advisorNote?: string
 }
 
 export interface SignSideBlock {

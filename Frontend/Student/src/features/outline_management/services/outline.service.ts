@@ -1,11 +1,15 @@
-import { STUDENT_TOPIC_STORAGE_KEYS } from '@/shared/constants/studentProfile.mock'
+import { API_ENDPOINTS, apiClient } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
 import type {
   OutlineEditorData,
   OutlineScheduleRow,
   OutlineSectionConfig,
-  OutlineSubmissionItem,
   StudentOutlineMeta,
+  SubmitOutlineRequest,
+  ThesisOutlineResponse,
 } from '../types/outline.types'
+
+export const OUTLINE_DRAFT_STORAGE_KEY = 'student_outline_draft_v1'
 
 export const OUTLINE_CONTENT_SECTIONS: OutlineSectionConfig[] = [
   {
@@ -68,82 +72,6 @@ export const DEFAULT_SCHEDULE_ROWS: OutlineScheduleRow[] = [
   },
 ]
 
-export const SAMPLE_EDITOR_OUTLINE: OutlineEditorData = {
-  topic: 'Xây dựng hệ thống Quản lý Đồ án Tốt nghiệp trực tuyến (GPMS)',
-  studentName: 'Phạm Mai',
-  className: '21DH-CNTT1',
-  mssv: '2151060001',
-  phone: '0912 345 678',
-  email: 'mai.pham@student.tlu.edu.vn',
-  supervisor1: 'TS. Nguyễn Thu Thủy',
-  supervisor2: '',
-  summary:
-    'Đồ án tập trung xây dựng hệ thống trực tuyến hỗ trợ sinh viên, giảng viên và bộ môn trong quy trình quản lý đồ án tốt nghiệp từ khâu đăng ký giảng viên hướng dẫn, đề xuất và duyệt tên đề tài, nộp đề cương trực tuyến đến theo dõi tiến độ và đánh giá kết quả. Hệ thống giải quyết các bất cập trong quản lý thủ công, tối ưu hóa thời gian xử lý và nâng cao tính minh bạch.',
-  objectives:
-    '- Nghiên cứu quy trình quản lý đồ án tốt nghiệp hiện hành tại Khoa Công nghệ thông tin - Trường Đại học Thủy Lợi.\n- Phân tích và thiết kế hệ thống phần mềm đáp ứng đầy đủ các nghiệp vụ của sinh viên, giảng viên hướng dẫn và trưởng bộ môn.\n- Xây dựng ứng dụng web với giao diện hiện đại, thân thiện, tương thích đa thiết bị và đảm bảo an toàn thông tin.',
-  expectedResults:
-    '- Tài liệu phân tích yêu cầu (SRS) và tài liệu thiết kế hệ thống (SDD).\n- Hệ thống phần mềm web hoàn chỉnh có các chức năng: nộp đề cương trực tuyến, phê duyệt đề tài, phản hồi nhận xét và theo dõi tiến độ.\n- Bản tổng kết đánh giá hiệu năng và báo cáo đồ án tốt nghiệp đúng quy chuẩn.',
-  schedule: DEFAULT_SCHEDULE_ROWS,
-  references:
-    '[1] Pressman, R. S. Software Engineering: A Practitioner\'s Approach, 8th Edition, McGraw-Hill, 2014.\n[2] React Official Documentation, https://react.dev/\n[3] Khoa CNTT - ĐHTL, Quy định về quản lý đồ án tốt nghiệp đại học, 2026.',
-}
-
-export const INITIAL_OUTLINE_SUBMISSIONS: OutlineSubmissionItem[] = [
-  {
-    id: 1,
-    year: '2026-2027',
-    semester: 'HK1',
-    source: 'editor',
-    editorData: SAMPLE_EDITOR_OUTLINE,
-    time: '28/10/2026 10:15',
-    fileName: 'De_cuong_2151060001_Pham_Mai.docx',
-    status: 'Đã duyệt',
-    approvedTime: '29/10/2026 14:20',
-    reviewerName: 'TS. Trần Minh Khôi',
-    note: 'Đề cương đạt yêu cầu, kế hoạch phân chia rõ ràng và bám sát tiến độ học kỳ.',
-    advisorNote: 'Đồng ý với đề cương và kế hoạch triển khai của sinh viên.',
-  },
-  {
-    id: 2,
-    year: '2026-2027',
-    semester: 'HK1',
-    source: 'file',
-    time: '12/10/2026 09:15',
-    fileName: 'De_cuong_DATN_v2.pdf',
-    status: 'Đã từ chối',
-    approvedTime: '13/10/2026 09:15',
-    reviewerName: 'TS. Trần Minh Khôi',
-    note: 'Bổ sung mục tiêu đo lường cụ thể và làm rõ phạm vi dữ liệu thử nghiệm.',
-    advisorNote: 'Yêu cầu sinh viên sửa lại theo góp ý của GV nhận xét.',
-  },
-  {
-    id: 3,
-    year: '2026-2027',
-    semester: 'HK1',
-    source: 'file',
-    time: '09/10/2026 20:40',
-    fileName: 'De_cuong_DATN_v1.pdf',
-    status: 'Đã từ chối',
-    approvedTime: '10/10/2026 09:15',
-    reviewerName: 'TS. Trần Minh Khôi',
-    note: 'Thiếu phần tài liệu tham khảo và bảng tiến độ thực hiện chưa rõ ràng.',
-    advisorNote: 'Cần thảo luận lại với GVHD trước khi nộp lại.',
-  },
-  {
-    id: 4,
-    year: '2025-2026',
-    semester: 'HK2',
-    source: 'file',
-    time: '15/03/2026 14:20',
-    fileName: 'De_cuong_DATN_HK2_2526.pdf',
-    status: 'Đã duyệt',
-    approvedTime: '16/03/2026 10:00',
-    reviewerName: 'TS. Lê Văn Cường',
-    note: 'Đề cương đạt yêu cầu.',
-    advisorNote: 'Đồng ý thông qua.',
-  },
-]
-
 export function createEmptyOutlineEditorData(
   topic: string = '',
   meta?: Partial<StudentOutlineMeta>,
@@ -172,7 +100,7 @@ export function loadSavedOutlineDraft(
 ): OutlineEditorData {
   const base = createEmptyOutlineEditorData(defaultTopic, meta)
   try {
-    const raw = localStorage.getItem(STUDENT_TOPIC_STORAGE_KEYS.outlineDraft)
+    const raw = localStorage.getItem(OUTLINE_DRAFT_STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<OutlineEditorData> | null
       if (parsed && typeof parsed === 'object') {
@@ -223,16 +151,53 @@ export function buildDefaultDocxFileName(mssv: string, name: string): string {
   return `De_cuong_${mssv || 'MSSV'}_${safeName || 'HoTen'}.docx`
 }
 
-export function formatOutlineNow(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
-    d.getHours(),
-  )}:${pad(d.getMinutes())}`
+/** Kiểm tra URL tệp an toàn trước khi gắn vào href / iframe. */
+export function isSafeFileUrl(url?: string | null): boolean {
+  if (!url) return false
+  const trimmed = url.trim()
+  return /^https?:\/\//i.test(trimmed) || trimmed.startsWith('/')
+}
+
+/** Tách tên tệp hiển thị từ URL Cloudinary hoặc đường dẫn tệp do BE trả về. */
+export function extractOutlineFileName(fileUrl?: string | null): string {
+  if (!fileUrl) return 'Tệp đề cương'
+  const withoutQuery = fileUrl.trim().split('?')[0].split('#')[0]
+  const segments = withoutQuery.split('/').filter(Boolean)
+  const rawName = segments[segments.length - 1]
+  if (!rawName) return fileUrl
+  try {
+    return decodeURIComponent(rawName)
+  } catch {
+    return rawName
+  }
 }
 
 export const outlineService = {
-  getInitialSubmissions: (): OutlineSubmissionItem[] => INITIAL_OUTLINE_SUBMISSIONS,
+  /** Lấy thông tin đề cương hiện tại, lịch sử nộp và hạn nộp (GET /outline/my-outline). */
+  async getMyOutline(semesterId?: string): Promise<ThesisOutlineResponse> {
+    const res = await apiClient.get<ApiResponse<ThesisOutlineResponse>>(
+      API_ENDPOINTS.outline.myOutline,
+      { params: semesterId ? { semesterId } : undefined },
+    )
+    return res.data.data
+  },
+
+  /** Nộp mới hoặc nộp lại file đề cương (POST /outline/submit). */
+  async submitOutline(payload: SubmitOutlineRequest): Promise<void> {
+    const formData = new FormData()
+    formData.append('file', payload.file)
+    if (payload.submissionNote?.trim()) {
+      formData.append('submissionNote', payload.submissionNote.trim())
+    }
+    if (payload.title?.trim()) {
+      formData.append('title', payload.title.trim())
+    }
+
+    await apiClient.post<ApiResponse<void>>(API_ENDPOINTS.outline.submit, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
   loadDraft: (topic: string = '', meta?: Partial<StudentOutlineMeta>): OutlineEditorData =>
     loadSavedOutlineDraft(topic, meta),
   createEmptyDraft: (topic: string = '', meta?: Partial<StudentOutlineMeta>): OutlineEditorData =>

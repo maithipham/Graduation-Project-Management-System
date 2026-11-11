@@ -10,8 +10,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { STUDENT_TOPIC_STORAGE_KEYS } from '@/shared/constants/studentProfile.mock'
 import {
+  OUTLINE_DRAFT_STORAGE_KEY,
   OUTLINE_SECTIONS,
   buildDefaultDocxFileName,
   createEmptyOutlineEditorData,
@@ -23,16 +23,26 @@ import type {
   OutlineSectionKey,
   StudentOutlineMeta,
 } from '../types/outline.types'
-import { buildOutlineBlocks, downloadOutlineDocx } from '../utils/docxBuilder'
+import {
+  buildOutlineBlocks,
+  buildOutlineDocxFile,
+  downloadOutlineDocx,
+} from '../utils/docxBuilder'
 import { OutlinePaperPreview } from './OutlinePaperPreview'
 
 interface OnlineOutlineEditorModalProps {
   open: boolean
+  isSubmitting?: boolean
   defaultTopicVi: string
   termLabel: string
   studentMeta: StudentOutlineMeta
   onClose: () => void
-  onSubmit: (payload: { fileName: string; data: OutlineEditorData }) => void
+  onSubmit: (payload: {
+    file: File
+    title?: string
+    fileName: string
+    data: OutlineEditorData
+  }) => void
   onToast: (message: string, type?: 'success' | 'warning' | 'error') => void
 }
 
@@ -47,6 +57,7 @@ const withPlanRows = (data: OutlineEditorData): OutlineEditorData =>
 
 export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> = ({
   open,
+  isSubmitting = false,
   defaultTopicVi,
   termLabel,
   studentMeta,
@@ -56,7 +67,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 }) => {
   const [tab, setTab] = useState<'form' | 'preview'>('form')
   const [data, setData] = useState<OutlineEditorData>(() =>
-    withPlanRows(loadSavedOutlineDraft(defaultTopicVi)),
+    withPlanRows(loadSavedOutlineDraft(defaultTopicVi, studentMeta)),
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [footerMsg, setFooterMsg] = useState<string>('')
@@ -65,7 +76,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
   if (prevOpen !== open) {
     setPrevOpen(open)
     if (open) {
-      setData(withPlanRows(loadSavedOutlineDraft(defaultTopicVi)))
+      setData(withPlanRows(loadSavedOutlineDraft(defaultTopicVi, studentMeta)))
       setErrors({})
       setFooterMsg('')
       setTab('form')
@@ -78,7 +89,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 
   const saveDraft = (silent = false) => {
     try {
-      localStorage.setItem(STUDENT_TOPIC_STORAGE_KEYS.outlineDraft, JSON.stringify(data))
+      localStorage.setItem(OUTLINE_DRAFT_STORAGE_KEY, JSON.stringify(data))
       if (!silent) onToast('Đã lưu nháp đề cương.', 'success')
     } catch {
       if (!silent) onToast('Không lưu được bản nháp.', 'error')
@@ -131,11 +142,11 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 
   const handleReset = () => {
     if (window.confirm('Xóa toàn bộ nội dung đã nhập và bản nháp đã lưu?')) {
-      setData(withPlanRows(createEmptyOutlineEditorData(defaultTopicVi)))
+      setData(withPlanRows(createEmptyOutlineEditorData(defaultTopicVi, studentMeta)))
       setErrors({})
       setFooterMsg('')
       try {
-        localStorage.removeItem(STUDENT_TOPIC_STORAGE_KEYS.outlineDraft)
+        localStorage.removeItem(OUTLINE_DRAFT_STORAGE_KEY)
       } catch {
         // ignore
       }
@@ -149,6 +160,8 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
   }
 
   const handleSubmit = () => {
+    if (isSubmitting) return
+
     const nextErrors: Record<string, string> = {}
     if (!(data.topicVi ?? '').trim()) {
       nextErrors.topicVi = 'Vui lòng nhập tên đề tài.'
@@ -172,11 +185,17 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
     setErrors({})
     setFooterMsg('')
     saveDraft(true)
+    const clonedData = JSON.parse(JSON.stringify(data)) as OutlineEditorData
+    const docxFile = buildOutlineDocxFile(
+      buildOutlineBlocks(clonedData, studentMeta),
+      defaultFileName,
+    )
     onSubmit({
+      file: docxFile,
+      title: (clonedData.topicVi ?? '').trim() || defaultTopicVi,
       fileName: defaultFileName,
-      data: JSON.parse(JSON.stringify(data)) as OutlineEditorData,
+      data: clonedData,
     })
-    onClose()
   }
 
   const fieldCls = (key: string) =>
@@ -186,7 +205,7 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
     <div
       className="fixed inset-0 z-50 bg-slate-900/55 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget && !isSubmitting) onClose()
       }}
     >
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
@@ -233,8 +252,9 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed p-1 rounded-md cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -442,33 +462,37 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
           <div className="flex flex-wrap items-center gap-2 ml-auto">
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleReset}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:text-rose-600 cursor-pointer"
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               Xóa nội dung
             </button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => saveDraft(false)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
             >
               <Save size={14} />
               <span>Lưu nháp</span>
             </button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleExportWord}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-[#1565C0] bg-blue-50 border border-blue-200 hover:bg-blue-100 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-[#1565C0] bg-blue-50 border border-blue-200 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
             >
               <FileDown size={14} />
               <span>Xuất file Word</span>
             </button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleSubmit}
-              className="px-5 py-2 rounded-lg text-xs font-bold uppercase bg-[#1565C0] text-white hover:bg-[#0D47A1] shadow-xs cursor-pointer transition-colors"
+              className="px-5 py-2 rounded-lg text-xs font-bold uppercase bg-[#1565C0] text-white hover:bg-[#0D47A1] disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-xs cursor-pointer transition-colors"
             >
-              Nộp đề cương
+              {isSubmitting ? 'Đang nộp...' : 'Nộp đề cương'}
             </button>
           </div>
         </div>

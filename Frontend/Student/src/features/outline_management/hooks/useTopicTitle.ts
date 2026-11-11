@@ -8,7 +8,7 @@ export const TOPIC_TITLE_KEYS = {
   overview: (semesterId?: string) => ['topic-title', 'overview', semesterId] as const,
 }
 
-// Hook lấy thông tin đề tài & toàn bộ lịch sử nộp/đổi tên
+/** Lấy thông tin đề tài, lịch sử nộp/đổi tên và thời hạn chốt tên / nộp đề cương. */
 export const useMyTopicOverview = (semesterId?: string) => {
   return useQuery({
     queryKey: TOPIC_TITLE_KEYS.overview(semesterId),
@@ -17,29 +17,31 @@ export const useMyTopicOverview = (semesterId?: string) => {
   })
 }
 
-// Hook chốt tên đề tài chính thức lần đầu
-export const useConfirmInitialTitle = () => {
+function useTopicTitleMutation(
+  mutationFn: (payload: TopicTitleSubmitRequest) => Promise<void>,
+  successMessage: string,
+) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: TopicTitleSubmitRequest) =>
-      topicTitleService.confirmInitialTitle(payload),
+    mutationFn,
     onSuccess: () => {
-      toast.success('Gửi tên đề tài chính thức thành công!')
-      queryClient.invalidateQueries({ queryKey: TOPIC_TITLE_KEYS.all })
+      toast.success(successMessage)
+      void queryClient.invalidateQueries({ queryKey: TOPIC_TITLE_KEYS.all })
+      void queryClient.invalidateQueries({ queryKey: ['student-outline'] })
     },
   })
 }
 
-// Hook xin đổi tên đề tài
-export const useRequestChangeTitle = () => {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (payload: TopicTitleSubmitRequest) =>
-      topicTitleService.requestChangeTitle(payload),
-    onSuccess: () => {
-      toast.success('Gửi yêu cầu đổi tên đề tài thành công!')
-      queryClient.invalidateQueries({ queryKey: TOPIC_TITLE_KEYS.all })
-    },
-  })
-}
+/** Chốt tên đề tài chính thức lần đầu (Giai đoạn 2). */
+export const useConfirmInitialTitle = () =>
+  useTopicTitleMutation(
+    topicTitleService.confirmInitialTitle,
+    'Gửi tên đề tài chính thức thành công!',
+  )
 
+/** Gửi yêu cầu xin đổi tên đề tài (sau khi đã có tên chính thức). */
+export const useRequestChangeTitle = () =>
+  useTopicTitleMutation(
+    topicTitleService.requestChangeTitle,
+    'Gửi yêu cầu đổi tên đề tài thành công!',
+  )

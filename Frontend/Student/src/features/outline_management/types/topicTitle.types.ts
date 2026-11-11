@@ -1,5 +1,13 @@
 export type TopicTitleChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
+export type OutlineDeadlineStatus =
+  | 'NOT_CONFIGURED'
+  | 'INACTIVE'
+  | 'NOT_STARTED'
+  | 'OPEN'
+  | 'CLOSED'
+  | 'EXTENDED'
+
 export interface TopicTitleHistoryResponse {
   publicId: string
   topicPublicId: string
@@ -18,17 +26,22 @@ export interface TopicTitleHistoryResponse {
 }
 
 export interface StudentTopicOverviewResponse {
-  topicPublicId: string
+  topicPublicId: string | null
   officialName: string | null
   provisionalName: string | null
-  currentStage: string
-  currentStageDescription: string
-  status: 'IN_PROGRESS' | 'DISQUALIFIED' | 'CANCELLED' | 'COMPLETED' | string
+  currentStage: string | null
+  currentStageDescription: string | null
+  status: 'IN_PROGRESS' | 'DISQUALIFIED' | 'CANCELLED' | 'COMPLETED' | string | null
   disqualificationReason: string | null
-  lecturerPublicId: string
-  lecturerName: string
+  lecturerPublicId: string | null
+  lecturerName: string | null
   coLecturerPublicId: string | null
   coLecturerName: string | null
+  deadlineName: string | null
+  deadlineStartDate: string | null
+  deadlineEndDate: string | null
+  deadlineActive: boolean | null
+  deadlineStatus: OutlineDeadlineStatus
   histories: TopicTitleHistoryResponse[]
 }
 
@@ -38,7 +51,7 @@ export interface TopicTitleSubmitRequest {
 
 export const TOPIC_TITLE_ERROR_CODES = {
   TOPIC_NAME_EMPTY: 4000,
-  ADVISOR_TOPIC_NAME_TOO_LONG: 4000,
+  ADVISOR_TOPIC_NAME_TOO_LONG: 3048,
   TOPIC_NEW_NAME_UNCHANGED: 3058,
   TOPIC_TITLE_PENDING_EXISTS: 3051,
   TOPIC_STAGE_INVALID_FOR_TITLE: 3056,
@@ -48,4 +61,3 @@ export const TOPIC_TITLE_ERROR_CODES = {
   FORBIDDEN: 2001,
   UNAUTHORIZED: 2000,
 } as const
-

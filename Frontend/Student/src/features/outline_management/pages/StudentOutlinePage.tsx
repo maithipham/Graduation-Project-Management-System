@@ -4,342 +4,292 @@ import {
   Award,
   Clock,
   Eye,
-  FilePen,
   FilePenLine,
   FileUp,
   FileX,
   Send,
 } from 'lucide-react'
 import { useMyInfo } from '@/features/auth'
-import { getTermInfo, getTermLabel, useStudentSemester } from '@/shared/contexts'
-import {
-  OnlineOutlineEditorModal,
-  OutlineSubmittedPreviewModal,
-} from '../components/OnlineOutlineEditorModal'
+import { toast } from '@/shared/components/feedback/toast.store'
+import { Skeleton } from '@/shared/components/ui'
+import { cn, formatDate } from '@/shared/utils'
+import { OnlineOutlineEditorModal } from '../components/OnlineOutlineEditorModal'
 import { SubmitOutlineFileModal } from '../components/SubmitOutlineFileModal'
-import { INITIAL_OUTLINE_SUBMISSIONS, formatOutlineNow } from '../services/outline.service'
+import { useMyOutline, useSubmitOutline } from '../hooks/useOutlineManagement'
 import {
   useConfirmInitialTitle,
   useMyTopicOverview,
   useRequestChangeTitle,
 } from '../hooks/useTopicTitle'
-import type { OutlineEditorData, OutlineSubmissionItem } from '../types/outline.types'
+import { extractOutlineFileName, isSafeFileUrl } from '../services/outline.service'
+import type { OutlineStatus, SubmitOutlineRequest } from '../types/outline.types'
+import {
+  getOutlineDeadlineDisplay,
+  getOutlineSubmitState,
+} from '../utils/outlineDeadline'
 
-interface ToastItem {
-  id: number
-  message: string
-  type: 'success' | 'warning' | 'error'
+const OUTLINE_STATUS_STYLE: Record<
+  OutlineStatus,
+  { label: string; badgeClassName: string }
+> = {
+  APPROVED: {
+    label: 'Đã duyệt',
+    badgeClassName: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  REQUEST_CHANGES: {
+    label: 'Yêu cầu chỉnh sửa',
+    badgeClassName: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  REJECTED: {
+    label: 'Không đạt',
+    badgeClassName: 'bg-rose-50 text-rose-700 border-rose-200',
+  },
+  PENDING: {
+    label: 'Đang chờ duyệt',
+    badgeClassName: 'bg-blue-50 text-[#1565C0] border-blue-200',
+  },
 }
 
 export default function StudentOutlinePage() {
   const { data: user } = useMyInfo()
-  const { term } = useStudentSemester()
   const topicInputRef = useRef<HTMLTextAreaElement>(null)
-  const toastSeqRef = useRef<number>(0)
-  const submissionSeqRef = useRef<number>(100)
 
-  // 1. Lấy dữ liệu thật từ Backend (Overview đề tài và toàn bộ lịch sử)
+  // 1. Lấy dữ liệu thật từ Backend (Overview đề tài & Đề cương hiện tại)
   const {
     data: topicOverview,
     isPending: isTopicLoading,
     isError: isTopicError,
   } = useMyTopicOverview()
+  const {
+    data: outlineData,
+    isPending: isOutlineLoading,
+    isError: isOutlineError,
+  } = useMyOutline()
 
-  // 2. Mutations để chốt tên và xin đổi tên đề tài
+  // 2. Mutations chốt tên, xin đổi tên và nộp/nộp lại đề cương
   const confirmMutation = useConfirmInitialTitle()
   const changeMutation = useRequestChangeTitle()
+  const submitOutlineMutation = useSubmitOutline()
   const isMutating = confirmMutation.isPending || changeMutation.isPending
 
   // 3. Quản lý trạng thái nhập tên đề tài (derive trực tiếp từ server state, chỉ ghi đè khi user tự sửa)
+  const pendingHistory = topicOverview?.histories?.find((h) => h.status === 'PENDING')
+  const hasPendingRequest = Boolean(pendingHistory)
+  const latestRejectedHistory =
+    !hasPendingRequest && topicOverview?.histories?.[0]?.status === 'REJECTED'
+      ? topicOverview.histories[0]
+      : null
+
   const [editedTopic, setEditedTopic] = useState<string | null>(null)
+  const [topicValidationError, setTopicValidationError] = useState<string | null>(null)
   const defaultTopic =
-    topicOverview?.officialName || topicOverview?.provisionalName || ''
+    pendingHistory?.newName ||
+    topicOverview?.officialName ||
+    topicOverview?.provisionalName ||
+    ''
   const topic = editedTopic !== null ? editedTopic : defaultTopic
 
-  const [history, setHistory] = useState<OutlineSubmissionItem[]>(
-    INITIAL_OUTLINE_SUBMISSIONS,
-  )
   const [fileModalOpen, setFileModalOpen] = useState<boolean>(false)
   const [editorModalOpen, setEditorModalOpen] = useState<boolean>(false)
-  const [previewItem, setPreviewItem] = useState<{
-    fileName: string
-    data: OutlineEditorData
-  } | null>(null)
-  const [toasts, setToasts] = useState<ToastItem[]>([])
 
-  const pushToast = (
+  const handleEditorToast = (
     message: string,
     type: 'success' | 'warning' | 'error' = 'success',
   ) => {
-    toastSeqRef.current += 1
-    const id = toastSeqRef.current
-    setToasts((prev) => [...prev, { id, message, type }])
-    window.setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, 2800)
+    toast[type](message)
   }
 
-  // 4. Các điều kiện nghiệp vụ dựa theo API response
+  // 4. Các điều kiện nghiệp vụ dựa theo API response (GET /topic/my-title-history)
+  const hasTopic = Boolean(topicOverview?.topicPublicId)
   const isDisqualified = topicOverview?.status === 'DISQUALIFIED'
-  const pendingHistory = topicOverview?.histories?.find((h) => h.status === 'PENDING')
-  const hasPendingRequest = Boolean(pendingHistory)
+  const isTopicLockedStatus =
+    Boolean(topicOverview?.status) && topicOverview?.status !== 'IN_PROGRESS'
   const isInitial =
+    hasTopic &&
     topicOverview?.currentStage === 'STAGE_1_ADVISOR_ASSIGNED' &&
     !topicOverview?.officialName
+  const isChange = hasTopic && topicOverview?.officialName != null && !hasPendingRequest
+
+  const deadlineDisplay = getOutlineDeadlineDisplay(topicOverview)
+  // Cả chốt tên lần đầu lẫn đổi/cập nhật tên đều dùng chung mốc hạn nộp đề cương (chỉ mở khi deadlineStatus === 'OPEN')
+  const isBlockedByDeadline = !deadlineDisplay.isOpenForStudent
+  const canEditTopic =
+    !isTopicLoading &&
+    !isTopicError &&
+    hasTopic &&
+    !isTopicLockedStatus &&
+    !hasPendingRequest &&
+    (isInitial || isChange)
+  const isTopicSubmitDisabled =
+    !canEditTopic || isMutating || isBlockedByDeadline
 
   const handleSaveTopic = () => {
-    if (isDisqualified) {
-      pushToast(
-        `Đồ án đã bị đình chỉ: ${topicOverview?.disqualificationReason || 'Không xác định'}`,
-        'error',
-      )
-      return
-    }
-
-    if (hasPendingRequest) {
-      pushToast(
-        'Đang có yêu cầu chờ giảng viên hướng dẫn xác nhận, vui lòng không gửi trùng lặp!',
-        'warning',
-      )
+    if (!canEditTopic || isBlockedByDeadline) {
       return
     }
 
     const val = topic.trim()
     if (!val) {
-      pushToast('Vui lòng nhập tên đề tài!', 'error')
+      setTopicValidationError('Vui lòng nhập tên đề tài!')
       topicInputRef.current?.focus()
       return
     }
 
     if (val.length > 500) {
-      pushToast('Tên đề tài không được vượt quá 500 ký tự!', 'error')
+      setTopicValidationError('Tên đề tài không được vượt quá 500 ký tự!')
       topicInputRef.current?.focus()
       return
     }
 
     if (isInitial) {
+      setTopicValidationError(null)
       confirmMutation.mutate(
         { newName: val },
         {
           onSuccess: () => {
             setEditedTopic(null)
-            pushToast('Gửi tên đề tài chính thức thành công, chờ GVHD phê duyệt!', 'success')
-          },
-          onError: (err) => {
-            pushToast(err instanceof Error ? err.message : 'Gửi tên đề tài thất bại', 'error')
+            setTopicValidationError(null)
           },
         },
       )
-    } else {
-      if (
-        topicOverview?.officialName &&
-        val.toLowerCase() === topicOverview.officialName.trim().toLowerCase()
-      ) {
-        pushToast('Vui lòng nhập tên đề tài mới khác với tên chính thức hiện tại!', 'warning')
-        topicInputRef.current?.focus()
-        return
-      }
+      return
+    }
 
-      changeMutation.mutate(
-        { newName: val },
-        {
-          onSuccess: () => {
-            setEditedTopic(null)
-            pushToast('Gửi yêu cầu đổi tên đề tài thành công, chờ GVHD phê duyệt!', 'success')
-          },
-          onError: (err) => {
-            pushToast(err instanceof Error ? err.message : 'Gửi yêu cầu đổi tên thất bại', 'error')
-          },
+    if (
+      topicOverview?.officialName &&
+      val.toLowerCase() === topicOverview.officialName.trim().toLowerCase()
+    ) {
+      setTopicValidationError('Tên đề tài mới phải khác với tên hiện tại!')
+      topicInputRef.current?.focus()
+      return
+    }
+
+    setTopicValidationError(null)
+    changeMutation.mutate(
+      { newName: val },
+      {
+        onSuccess: () => {
+          setEditedTopic(null)
+          setTopicValidationError(null)
         },
-      )
-    }
-  }
-
-  const filteredSubmissions = history.filter(
-    (h) => h.year === term.year && h.semester === term.semester,
-  )
-
-  const termInfo = getTermInfo(term)
-  const outlineDeadline = `${termInfo.outlineDeadline || '28/10/2026 23:59:55'} (GMT+07)`
-
-  const handleFileSubmit = (file: File) => {
-    submissionSeqRef.current += 1
-    const newItem: OutlineSubmissionItem = {
-      id: submissionSeqRef.current,
-      year: term.year,
-      semester: term.semester,
-      source: 'file',
-      time: formatOutlineNow(),
-      fileName: file.name,
-      status: 'Chờ duyệt',
-      reviewerName: topicOverview?.lecturerName || 'Chưa phân công',
-      note: 'Đề cương vừa nộp, đang chờ xét duyệt.',
-      advisorNote: 'Chờ GVHD nhận xét.',
-    }
-    setHistory((prev) => [newItem, ...prev])
-    setFileModalOpen(false)
-    pushToast(`Đã nộp thành công tệp: ${file.name}`, 'success')
-  }
-
-  const handleOnlineEditorSubmit = ({
-    fileName,
-    data,
-  }: {
-    fileName: string
-    data: OutlineEditorData
-  }) => {
-    submissionSeqRef.current += 1
-    const newItem: OutlineSubmissionItem = {
-      id: submissionSeqRef.current,
-      year: term.year,
-      semester: term.semester,
-      source: 'editor',
-      editorData: data,
-      time: formatOutlineNow(),
-      fileName,
-      status: 'Chờ duyệt',
-      reviewerName: topicOverview?.lecturerName || 'Chưa phân công',
-      note: 'Đề cương vừa nộp, đang chờ xét duyệt.',
-      advisorNote: 'Chờ GVHD nhận xét.',
-    }
-    setHistory((prev) => [newItem, ...prev])
-    pushToast(`Đã nộp thành công đề cương: ${fileName}`, 'success')
-  }
-
-  const handleToggleSubmissionStatus = (id: number) => {
-    setHistory((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item
-        const nextStatus = item.status === 'Đã duyệt' ? 'Đã từ chối' : 'Đã duyệt'
-        return {
-          ...item,
-          status: nextStatus,
-          approvedTime:
-            nextStatus === 'Đã duyệt' ? '13/10/2026 14:20' : '10/10/2026 09:15',
-          note:
-            nextStatus === 'Đã duyệt'
-              ? 'Đề cương đạt yêu cầu, được thông qua.'
-              : 'Bổ sung mục tiêu đo lường cụ thể và làm rõ phạm vi dữ liệu.',
-          advisorNote:
-            nextStatus === 'Đã duyệt'
-              ? 'Đồng ý thông qua.'
-              : 'Yêu cầu sinh viên sửa lại theo góp ý của GV nhận xét.',
-        }
-      }),
+      },
     )
   }
 
-  const handleViewOutlineItem = (item: OutlineSubmissionItem) => {
-    if (item.source === 'editor' && item.editorData) {
-      setPreviewItem({ fileName: item.fileName, data: item.editorData })
-    } else {
-      window.open(
-        `/student/outline/preview?file=${encodeURIComponent(item.fileName)}`,
-        '_blank',
-        'noopener,noreferrer',
-      )
-    }
+  const deadlineSource = outlineData ?? topicOverview
+  const isDeadlineLoading = isOutlineLoading && isTopicLoading
+  const isDeadlineError = isOutlineError && isTopicError
+  const outlineSubmitState = getOutlineSubmitState(outlineData)
+  const outlineDeadlineDisplay = outlineData
+    ? outlineSubmitState.deadlineDisplay
+    : getOutlineDeadlineDisplay(deadlineSource)
+  const canSubmitOutline =
+    !isOutlineLoading && !isOutlineError && outlineSubmitState.canSubmit
+
+  const handleFileSubmit = (payload: SubmitOutlineRequest) => {
+    submitOutlineMutation.mutate(payload, {
+      onSuccess: () => {
+        setFileModalOpen(false)
+      },
+    })
   }
 
-  const renderStatusBadge = (
-    status: OutlineSubmissionItem['status'],
-    approvedTime?: string,
+  const handleOnlineEditorSubmit = (payload: { file: File; title?: string }) => {
+    submitOutlineMutation.mutate(
+      {
+        file: payload.file,
+        title: payload.title,
+      },
+      {
+        onSuccess: () => {
+          setEditorModalOpen(false)
+        },
+      },
+    )
+  }
+
+  const renderOutlineStatusBadge = (
+    status: OutlineStatus,
+    statusDescription?: string | null,
+    reviewedAt?: string | null,
   ) => {
-    if (status === 'Đã duyệt') {
-      return (
-        <div className="flex flex-col items-start gap-1">
-          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
-            Đã duyệt
-          </span>
-          <span className="text-[11px] text-slate-500 font-medium">
-            {approvedTime || '13/10/2026 14:20'}
-          </span>
-        </div>
-      )
-    }
-
-    if (status === 'Đã từ chối') {
-      return (
-        <div className="flex flex-col items-start gap-1">
-          <span className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 border border-rose-200">
-            Đã từ chối
-          </span>
-          <span className="text-[11px] text-slate-500 font-medium">
-            {approvedTime || '10/10/2026 09:15'}
-          </span>
-        </div>
-      )
-    }
-
+    const config = OUTLINE_STATUS_STYLE[status] ?? OUTLINE_STATUS_STYLE.PENDING
     return (
       <div className="flex flex-col items-start gap-1">
-        <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200">
-          Chờ duyệt
+        <span
+          className={cn(
+            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border',
+            config.badgeClassName,
+          )}
+        >
+          {statusDescription || config.label}
         </span>
+        {reviewedAt && (
+          <span className="text-[11px] text-slate-500 font-medium">
+            {formatDate(reviewedAt, 'full')}
+          </span>
+        )}
       </div>
     )
   }
 
   const studentMeta = {
-    name: user?.name?.trim() || topicOverview?.histories?.[0]?.studentName || '',
-    mssv: topicOverview?.histories?.[0]?.studentCode || '',
+    name:
+      outlineData?.studentName ||
+      user?.name?.trim() ||
+      topicOverview?.histories?.[0]?.studentName ||
+      '',
+    mssv:
+      outlineData?.studentCode || topicOverview?.histories?.[0]?.studentCode || '',
     className: '',
     department: '',
-    mentor: topicOverview?.lecturerName || '',
+    mentor: deadlineSource?.lecturerName || '',
   }
+
+  const outlineHistories = outlineData?.histories ?? []
+  const hasExactOutlineFileMatch = Boolean(
+    outlineData?.outlineFile &&
+      outlineHistories.some((h) => h.outlineHistoryFile === outlineData.outlineFile),
+  )
 
   return (
     <div className="w-full max-w-full space-y-4">
-      {/* Toast Notifications */}
-      {toasts.length > 0 && (
-        <div className="fixed top-5 right-5 z-100 flex flex-col gap-2 pointer-events-none">
-          {toasts.map((t) => {
-            const bgCls =
-              t.type === 'error'
-                ? 'bg-rose-600'
-                : t.type === 'warning'
-                  ? 'bg-amber-600'
-                  : 'bg-emerald-600'
-            return (
-              <div
-                key={t.id}
-                className={`${bgCls} text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-lg transition-all duration-300 pointer-events-auto`}
-              >
-                {t.message}
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {/* 1. Khối thông tin đề cương (Cùng 1 khối, thẳng hàng trên 1 line: Tên đề tài, Nội dung, Thời hạn nộp, Nút thao tác) */}
       <div className="rounded-xl border border-slate-200 bg-white px-4 sm:px-5 py-3.5 sm:py-4 shadow-xs">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1.2fr)_auto] items-stretch divide-y lg:divide-y-0 lg:divide-x divide-slate-100 gap-4 lg:gap-0">
           {/* Cột 1: Tên đề tài tốt nghiệp & Gửi yêu cầu */}
-          <div id="topic-container" className="lg:pr-4 xl:pr-5">
+          <form
+            id="topic-container"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleSaveTopic()
+            }}
+            className="lg:pr-4 xl:pr-5"
+          >
             <div className="min-h-[28px] flex items-center justify-between gap-2 mb-2">
               <label
                 htmlFor="outlineTopicInput"
-                className="text-xs font-bold text-slate-700 flex items-center gap-1.5"
+                className="text-xs font-bold text-slate-700 flex items-center gap-1.5 flex-wrap"
               >
                 <Award size={14} className="text-[#1565C0] shrink-0" />
-                <span>Tên đề tài tốt nghiệp</span>
-                {isInitial && (
-                  <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#1565C0] border border-blue-200">
-                    Chốt lần đầu
+                <span>
+                  {isInitial
+                    ? 'Chốt tên đề tài chính thức'
+                    : isChange
+                      ? 'Yêu cầu đổi tên đề tài'
+                      : 'Tên đề tài tốt nghiệp'}
+                </span>
+                {hasPendingRequest && (
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800 border border-amber-200">
+                    Đang chờ GVHD duyệt tên đề tài
                   </span>
                 )}
               </label>
               <button
-                type="button"
-                onClick={handleSaveTopic}
-                disabled={
-                  isDisqualified ||
-                  hasPendingRequest ||
-                  isMutating ||
-                  isTopicLoading ||
-                  !topic.trim()
-                }
+                type="submit"
+                disabled={isTopicSubmitDisabled}
                 className="h-7 px-2.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[11px] font-bold tracking-wide uppercase transition cursor-pointer shadow-2xs inline-flex items-center justify-center gap-1 shrink-0 whitespace-nowrap"
               >
                 <Send size={12} className="shrink-0" />
@@ -354,17 +304,28 @@ export default function StudentOutlinePage() {
             </div>
 
             {isTopicLoading ? (
-              <div className="h-14 rounded-lg bg-slate-100 animate-pulse border border-slate-200" />
+              <Skeleton className="h-14 w-full rounded-lg" />
+            ) : isTopicError ? (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-700">
+                Không tải được thông tin đề tài từ máy chủ. Vui lòng thử lại sau.
+              </div>
             ) : isDisqualified ? (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
+              <div
+                role="alert"
+                className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1"
+              >
                 <p className="font-bold flex items-center gap-1.5">
                   <AlertTriangle size={14} className="text-rose-600 shrink-0" />
                   <span>Đề tài đã bị đình chỉ (DISQUALIFIED)</span>
                 </p>
                 <p className="text-[11px] text-rose-700">
-                  {topicOverview?.disqualificationReason ||
-                    'Bạn đã bị dừng thực hiện đồ án trong học kỳ này.'}
+                  Bạn đã bị dừng thực hiện đồ án trong học kỳ này. Lý do:{' '}
+                  {topicOverview?.disqualificationReason || 'Không xác định'}
                 </p>
+              </div>
+            ) : !hasTopic ? (
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                Bạn chưa nằm trong danh sách sinh viên thực hiện đồ án của học kỳ này.
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -373,8 +334,19 @@ export default function StudentOutlinePage() {
                   ref={topicInputRef}
                   rows={2}
                   value={topic}
-                  disabled={hasPendingRequest || isMutating}
-                  onChange={(e) => setEditedTopic(e.target.value)}
+                  aria-invalid={Boolean(topicValidationError)}
+                  disabled={
+                    hasPendingRequest ||
+                    isMutating ||
+                    isTopicLockedStatus ||
+                    isBlockedByDeadline
+                  }
+                  onChange={(e) => {
+                    setEditedTopic(e.target.value)
+                    if (topicValidationError) {
+                      setTopicValidationError(null)
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault()
@@ -384,25 +356,46 @@ export default function StudentOutlinePage() {
                   placeholder={
                     isInitial
                       ? 'Nhập tên đề tài chính thức lần đầu...'
-                      : 'Nhập tên đề tài muốn đổi...'
+                      : 'Nhập tên đề tài mới...'
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-medium text-xs sm:text-[13px] text-slate-900 leading-snug focus:outline-hidden focus:border-[#1565C0] focus:ring-2 focus:ring-[#1565C0]/20 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed transition resize-y min-h-[54px]"
+                  className={cn(
+                    'w-full px-3 py-2 rounded-lg border bg-white font-medium text-xs sm:text-[13px] text-slate-900 leading-snug focus:outline-hidden focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed transition resize-y min-h-[54px]',
+                    topicValidationError
+                      ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                      : 'border-slate-300 focus:border-[#1565C0] focus:ring-[#1565C0]/20',
+                  )}
                 />
 
-                {hasPendingRequest && (
-                  <div className="rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900 space-y-0.5">
-                    <div className="flex items-center gap-1.5 font-semibold text-amber-800">
-                      <Clock size={12} className="text-amber-600 shrink-0" />
-                      <span>Đang chờ GVHD duyệt tên đề tài:</span>
-                    </div>
-                    <div className="text-[12px] text-amber-950 font-medium pl-4">
-                      "{pendingHistory?.newName}"
-                    </div>
-                    {pendingHistory?.oldName && (
-                      <div className="text-[11px] text-amber-700 pl-4">
-                        (Tên hiện tại: {pendingHistory.oldName})
-                      </div>
-                    )}
+                {topicValidationError && (
+                  <p role="alert" className="text-xs font-semibold text-[#DC2626]">
+                    {topicValidationError}
+                  </p>
+                )}
+
+                {isBlockedByDeadline && deadlineDisplay.lockedReason && (
+                  <p className="text-xs font-medium text-rose-700">
+                    {deadlineDisplay.lockedReason}
+                  </p>
+                )}
+
+                {isTopicLockedStatus && !isDisqualified && (
+                  <p className="text-xs font-medium text-slate-600">
+                    Đề tài hiện ở trạng thái {topicOverview?.status}, không thể chỉnh sửa tên đề tài.
+                  </p>
+                )}
+
+                {hasPendingRequest && pendingHistory?.oldName && (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-[11.5px] text-amber-800 wrap-break-word">
+                    <span className="font-medium">Tên hiện tại: </span>
+                    <span className="font-semibold text-amber-950">
+                      {pendingHistory.oldName}
+                    </span>
+                  </div>
+                )}
+
+                {latestRejectedHistory && (
+                  <div className="rounded-md bg-rose-50 border border-rose-200 px-2.5 py-1.5 text-[11.5px] text-rose-800">
+                    Yêu cầu tên đề tài "{latestRejectedHistory.newName}" đã bị GVHD từ chối. Vui lòng chỉnh sửa và gửi lại.
                   </div>
                 )}
 
@@ -427,43 +420,71 @@ export default function StudentOutlinePage() {
                       </span>
                     </div>
                   )}
-
-                {isTopicError && (
-                  <div className="text-[11px] text-rose-600 pt-0.5">
-                    Không tải được thông tin đề tài từ máy chủ. Vui lòng thử lại.
-                  </div>
-                )}
               </div>
             )}
-          </div>
+          </form>
 
-          {/* Cột 2: Thời hạn nộp & Giáo viên nhận xét */}
+          {/* Cột 2: Thời hạn nộp & Giảng viên phụ trách */}
           <div className="pt-4 lg:pt-0 lg:px-4 xl:px-5">
             <div className="min-h-[28px] flex items-center mb-2">
               <h2 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Clock size={14} className="text-[#1565C0] shrink-0" />
-                <span>Thời hạn nộp</span>
+                <span>{deadlineSource?.deadlineName || 'Thời hạn nộp'}</span>
               </h2>
             </div>
-            <p id="outlineDeadlineText" className="text-xs sm:text-[13.5px] font-bold text-amber-800 leading-snug">
-              {outlineDeadline}
-            </p>
+
+            {isDeadlineLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-52" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+            ) : isDeadlineError ? (
+              <p id="outlineDeadlineText" className="text-xs font-medium text-rose-600">
+                Không tải được thời hạn nộp.
+              </p>
+            ) : (
+              <>
+                <p
+                  id="outlineDeadlineText"
+                  className={cn(
+                    'text-xs sm:text-[13.5px] font-bold leading-snug',
+                    outlineDeadlineDisplay.toneClassName,
+                  )}
+                >
+                  {outlineDeadlineDisplay.text}
+                </p>
+                {outlineDeadlineDisplay.lockedReason && (
+                  <p className="text-[11.5px] font-medium text-rose-700 mt-1 leading-snug">
+                    {outlineDeadlineDisplay.lockedReason}
+                  </p>
+                )}
+              </>
+            )}
+
             <div className="mt-2.5 text-xs text-slate-600 space-y-1">
               <div>
                 Giảng viên hướng dẫn:{' '}
                 <strong className="text-slate-900 font-semibold">
-                  {topicOverview?.lecturerName ||
-                    (isTopicLoading ? 'Đang tải...' : 'Chưa phân công')}
+                  {deadlineSource?.lecturerName ||
+                    (isDeadlineLoading ? 'Đang tải...' : 'Chưa phân công')}
                 </strong>
               </div>
-              {topicOverview?.coLecturerName && (
+              {deadlineSource?.coLecturerName && (
                 <div>
                   Đồng GVHD:{' '}
                   <strong className="text-slate-800 font-medium">
-                    {topicOverview.coLecturerName}
+                    {deadlineSource.coLecturerName}
                   </strong>
                 </div>
               )}
+              <div>
+                Giáo viên nhận xét:{' '}
+                <strong className="text-slate-900 font-semibold">
+                  {isOutlineLoading
+                    ? 'Đang tải...'
+                    : outlineData?.reviewerName || 'Chưa phân công'}
+                </strong>
+              </div>
               {topicOverview?.currentStageDescription && (
                 <div className="text-[11px] text-slate-500">
                   Giai đoạn:{' '}
@@ -472,6 +493,22 @@ export default function StudentOutlinePage() {
                   </span>
                 </div>
               )}
+              {!isOutlineLoading &&
+                !isOutlineError &&
+                !outlineSubmitState.canSubmit &&
+                outlineSubmitState.reason &&
+                outlineSubmitState.reason !== outlineDeadlineDisplay.lockedReason && (
+                  <p
+                    className={cn(
+                      'text-[11.5px] font-medium rounded-md px-2.5 py-1.5 mt-1.5 border leading-snug',
+                      outlineData?.status === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border-amber-200',
+                    )}
+                  >
+                    {outlineSubmitState.reason}
+                  </p>
+                )}
             </div>
           </div>
 
@@ -480,7 +517,7 @@ export default function StudentOutlinePage() {
             <button
               type="button"
               id="openSubmitModalBtn"
-              disabled={isDisqualified}
+              disabled={!canSubmitOutline || submitOutlineMutation.isPending}
               onClick={() => setFileModalOpen(true)}
               className="w-full inline-flex items-center justify-center gap-1.5 px-4 h-9 rounded-lg border border-[#1565C0] text-[#1565C0] bg-blue-50/40 hover:bg-blue-50 disabled:border-slate-200 disabled:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed font-semibold text-xs tracking-wide uppercase transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
             >
@@ -490,7 +527,7 @@ export default function StudentOutlinePage() {
             <button
               type="button"
               id="openEditorBtn"
-              disabled={isDisqualified}
+              disabled={!canSubmitOutline || submitOutlineMutation.isPending}
               onClick={() => setEditorModalOpen(true)}
               className="w-full inline-flex items-center justify-center gap-1.5 px-4 h-9 rounded-lg bg-[#1565C0] text-white hover:bg-[#0D47A1] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-semibold text-xs tracking-wide uppercase transition-colors cursor-pointer shadow-xs whitespace-nowrap"
             >
@@ -503,12 +540,49 @@ export default function StudentOutlinePage() {
 
       {/* 3. Lịch sử nộp đề cương */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
-          <Clock size={16} className="text-[#1565C0]" />
-          <h2 className="text-xs sm:text-[13px] font-bold text-slate-900" id="historyHeaderTitle">
-            Lịch sử nộp đề cương
-          </h2>
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-[#1565C0]" />
+            <h2 className="text-xs sm:text-[13px] font-bold text-slate-900" id="historyHeaderTitle">
+              Lịch sử nộp đề cương
+            </h2>
+          </div>
+          {!isOutlineLoading && !isOutlineError && outlineData?.status && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-500 font-medium">Trạng thái hiện tại:</span>
+              {renderOutlineStatusBadge(outlineData.status, outlineData.statusDescription)}
+            </div>
+          )}
         </div>
+
+        {!isOutlineLoading &&
+          !isOutlineError &&
+          (outlineData?.reviewFeedback || outlineData?.advisorFeedback) && (
+            <div className="px-5 py-3 bg-slate-50/60 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              {outlineData.reviewFeedback && (
+                <div className="rounded-lg bg-white border border-slate-200/80 p-3 space-y-1">
+                  <div className="font-semibold text-slate-700">
+                    Nhận xét của GV thẩm định
+                    {outlineData.reviewerName ? ` (${outlineData.reviewerName})` : ''}:
+                  </div>
+                  <p className="text-slate-600 leading-relaxed wrap-break-word">
+                    {outlineData.reviewFeedback}
+                  </p>
+                </div>
+              )}
+              {outlineData.advisorFeedback && (
+                <div className="rounded-lg bg-white border border-slate-200/80 p-3 space-y-1">
+                  <div className="font-semibold text-slate-700">
+                    Nhận xét của GVHD
+                    {outlineData.lecturerName ? ` (${outlineData.lecturerName})` : ''}:
+                  </div>
+                  <p className="text-slate-600 leading-relaxed wrap-break-word">
+                    {outlineData.advisorFeedback}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-[13px] text-slate-600 border-collapse">
@@ -522,7 +596,23 @@ export default function StudentOutlinePage() {
               </tr>
             </thead>
             <tbody id="submissions-table-body" className="divide-y divide-slate-100 bg-white">
-              {filteredSubmissions.length === 0 ? (
+              {isOutlineLoading ? (
+                Array.from({ length: 2 }).map((_, idx) => (
+                  <tr key={idx}>
+                    <td className="py-3.5 px-5"><Skeleton className="h-4 w-28" /></td>
+                    <td className="py-3.5 px-5"><Skeleton className="h-4 w-48" /></td>
+                    <td className="py-3.5 px-5"><Skeleton className="h-5 w-24 rounded-full" /></td>
+                    <td className="py-3.5 px-5"><Skeleton className="h-4 w-44" /></td>
+                    <td className="py-3.5 px-5"><Skeleton className="h-4 w-40" /></td>
+                  </tr>
+                ))
+              ) : isOutlineError ? (
+                <tr>
+                  <td colSpan={5} className="py-8 px-5 text-center text-rose-600 text-xs font-medium">
+                    Không tải được lịch sử nộp đề cương từ máy chủ. Vui lòng thử lại sau.
+                  </td>
+                </tr>
+              ) : outlineHistories.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-10 px-5 text-center text-slate-400 text-xs">
                     <FileX size={32} className="text-slate-300 mx-auto mb-2" />
@@ -530,55 +620,74 @@ export default function StudentOutlinePage() {
                   </td>
                 </tr>
               ) : (
-                filteredSubmissions.map((row) => {
-                  const isEditor = row.source === 'editor'
+                outlineHistories.map((row, idx) => {
+                  const canOpenFile = isSafeFileUrl(row.outlineHistoryFile)
+                  const displayFileName = extractOutlineFileName(row.outlineHistoryFile)
+                  const reviewerDisplayName = row.reviewerName || outlineData?.reviewerName
+                  const isLatestRow = hasExactOutlineFileMatch
+                    ? row.outlineHistoryFile === outlineData?.outlineFile
+                    : idx === 0
+                  const rowAdvisorFeedback =
+                    isLatestRow && outlineData?.advisorFeedback
+                      ? outlineData.advisorFeedback
+                      : null
+
                   return (
-                    <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={row.publicId} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3.5 px-5 font-normal text-slate-900 whitespace-nowrap">
-                        {row.time}
+                        {formatDate(row.submittedAt, 'full') || '—'}
                       </td>
                       <td className="py-3.5 px-5 font-normal text-slate-900">
                         <div className="inline-flex items-center gap-2 flex-wrap">
-                          <span
-                            onClick={() => handleViewOutlineItem(row)}
-                            className="hover:text-[#1565C0] font-medium cursor-pointer"
-                          >
-                            {row.fileName}
-                          </span>
-                          {isEditor && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-blue-50 text-[#1565C0] border border-blue-200">
-                              <FilePen size={12} />
-                              <span>Soạn online</span>
-                            </span>
+                          {canOpenFile ? (
+                            <>
+                              <a
+                                href={row.outlineHistoryFile}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:text-[#1565C0] hover:underline font-medium break-all"
+                              >
+                                {displayFileName}
+                              </a>
+                              <a
+                                href={row.outlineHistoryFile}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded text-slate-400 hover:text-[#1565C0] hover:bg-blue-50 transition"
+                                title="Xem đề cương"
+                              >
+                                <Eye size={15} />
+                              </a>
+                            </>
+                          ) : (
+                            <span className="font-medium break-all">{displayFileName}</span>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleViewOutlineItem(row)}
-                            className="p-1 rounded text-slate-400 hover:text-[#1565C0] hover:bg-blue-50 transition cursor-pointer"
-                            title="Xem đề cương"
-                          >
-                            <Eye size={15} />
-                          </button>
                         </div>
+                        {row.submissionNote && (
+                          <div className="text-[11px] text-slate-500 mt-0.5 wrap-break-word">
+                            Ghi chú: {row.submissionNote}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-5 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSubmissionStatus(row.id)}
-                          title="Nhấp để chuyển trạng thái giữa Đã duyệt và Đã từ chối"
-                          className="cursor-pointer text-left"
-                        >
-                          {renderStatusBadge(row.status, row.approvedTime)}
-                        </button>
+                        {renderOutlineStatusBadge(
+                          row.status,
+                          row.statusDescription,
+                          row.reviewedAt,
+                        )}
                       </td>
                       <td className="py-3.5 px-5 font-normal text-slate-800 max-w-[280px]">
-                        {row.reviewerName && (
-                          <div className="font-semibold text-slate-900 mb-0.5">{row.reviewerName}</div>
+                        {reviewerDisplayName && (
+                          <div className="font-semibold text-slate-900 mb-0.5">
+                            {reviewerDisplayName}
+                          </div>
                         )}
-                        <div className="text-slate-600 text-xs leading-relaxed">{row.note || '—'}</div>
+                        <div className="text-slate-600 text-xs leading-relaxed wrap-break-word">
+                          {row.reviewFeedback || '—'}
+                        </div>
                       </td>
-                      <td className="py-3.5 px-5 font-normal text-slate-700 text-xs leading-relaxed max-w-[280px]">
-                        {row.advisorNote || '—'}
+                      <td className="py-3.5 px-5 font-normal text-slate-700 text-xs leading-relaxed max-w-[280px] wrap-break-word">
+                        {rowAdvisorFeedback || '—'}
                       </td>
                     </tr>
                   )
@@ -591,26 +700,32 @@ export default function StudentOutlinePage() {
 
       <SubmitOutlineFileModal
         open={fileModalOpen}
+        isSubmitting={submitOutlineMutation.isPending}
+        defaultTitle={
+          outlineData?.title ||
+          outlineData?.topicName ||
+          topicOverview?.officialName ||
+          topicOverview?.provisionalName ||
+          ''
+        }
         onClose={() => setFileModalOpen(false)}
         onSubmitFile={handleFileSubmit}
       />
 
       <OnlineOutlineEditorModal
         open={editorModalOpen}
-        defaultTopicVi={topicOverview?.officialName || topicOverview?.provisionalName || ''}
-        termLabel={getTermLabel(term)}
+        isSubmitting={submitOutlineMutation.isPending}
+        defaultTopicVi={
+          outlineData?.topicName ||
+          topicOverview?.officialName ||
+          topicOverview?.provisionalName ||
+          ''
+        }
+        termLabel={deadlineSource?.deadlineName || 'Học kỳ hiện tại'}
         studentMeta={studentMeta}
         onClose={() => setEditorModalOpen(false)}
         onSubmit={handleOnlineEditorSubmit}
-        onToast={pushToast}
-      />
-
-      <OutlineSubmittedPreviewModal
-        open={Boolean(previewItem)}
-        fileName={previewItem?.fileName ?? ''}
-        data={previewItem?.data ?? null}
-        studentMeta={studentMeta}
-        onClose={() => setPreviewItem(null)}
+        onToast={handleEditorToast}
       />
     </div>
   )

@@ -47,6 +47,10 @@ export const API_ENDPOINTS = {
     confirmInitial: '/topic/confirm-title',
     requestChange: '/topic/change-title',
   },
+  outline: {
+    myOutline: '/outline/my-outline',
+    submit: '/outline/submit',
+  },
   advisor: {
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
   },

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/shared/api'
-import { topicTitleService } from '@/features/outline_management'
+import {
+  getOutlineDeadlineDisplay,
+  topicTitleService,
+} from '@/features/outline_management'
 import type { StudentTopicOverviewResponse } from '@/features/outline_management'
 
 vi.mock('@/shared/api', () => ({
@@ -22,7 +25,7 @@ describe('Topic Title Service', () => {
     vi.clearAllMocks()
   })
 
-  it('getMyTopicOverview calls GET /topic/my-title-history and returns data', async () => {
+  it('getMyTopicOverview calls GET /topic/my-title-history and returns data including deadline', async () => {
     const mockOverview: StudentTopicOverviewResponse = {
       topicPublicId: '018db26a-932f-789a-bc01-e23456789abc',
       officialName: 'Xây dựng hệ thống Quản lý Đồ án TLU',
@@ -35,6 +38,11 @@ describe('Topic Title Service', () => {
       lecturerName: 'ThS. Trần Văn Bình',
       coLecturerPublicId: null,
       coLecturerName: null,
+      deadlineName: 'Hạn sinh viên chỉnh sửa & nộp lại đề cương',
+      deadlineStartDate: '2026-11-01T00:00:00',
+      deadlineEndDate: '2026-11-20T23:59:59',
+      deadlineActive: true,
+      deadlineStatus: 'OPEN',
       histories: [],
     }
 
@@ -91,3 +99,67 @@ describe('Topic Title Service', () => {
   })
 })
 
+describe('getOutlineDeadlineDisplay', () => {
+  it('returns unconfigured state when overview is missing or NOT_CONFIGURED / INACTIVE', () => {
+    expect(getOutlineDeadlineDisplay(null)).toMatchObject({
+      text: 'Chưa cấu hình thời hạn nộp',
+      isOpenForStudent: false,
+      lockedReason:
+        'Học kỳ hiện tại chưa được cấu hình thời hạn nộp đề cương và cập nhật tên đề tài.',
+    })
+
+    expect(
+      getOutlineDeadlineDisplay({
+        deadlineStartDate: null,
+        deadlineEndDate: null,
+        deadlineStatus: 'INACTIVE',
+      }),
+    ).toMatchObject({
+      text: 'Chưa cấu hình thời hạn nộp',
+      isOpenForStudent: false,
+      lockedReason:
+        'Học kỳ hiện tại chưa được cấu hình thời hạn nộp đề cương và cập nhật tên đề tài.',
+    })
+  })
+
+  it('returns OPEN display with formatted start and end dates and allows student actions', () => {
+    const res = getOutlineDeadlineDisplay({
+      deadlineStartDate: '2026-11-01T00:00:00',
+      deadlineEndDate: '2026-11-20T23:59:59',
+      deadlineStatus: 'OPEN',
+    })
+    expect(res.text).toContain('Từ ')
+    expect(res.text).toContain('(Đang mở)')
+    expect(res.isOpenForStudent).toBe(true)
+    expect(res.lockedReason).toBeNull()
+  })
+
+  it('locks student actions on NOT_STARTED, EXTENDED, and CLOSED with unified reasons', () => {
+    const notStarted = getOutlineDeadlineDisplay({
+      deadlineStartDate: '2026-11-15T08:00:00',
+      deadlineEndDate: '2026-11-20T23:59:59',
+      deadlineStatus: 'NOT_STARTED',
+    })
+    expect(notStarted.text).toContain('Chưa mở')
+    expect(notStarted.isOpenForStudent).toBe(false)
+    expect(notStarted.lockedReason).toContain('thời hạn nộp đề cương và cập nhật tên đề tài')
+
+    const extended = getOutlineDeadlineDisplay({
+      deadlineStartDate: '2026-11-01T00:00:00',
+      deadlineEndDate: '2026-11-22T23:59:59',
+      deadlineStatus: 'EXTENDED',
+    })
+    expect(extended.text).toContain('Đang trong thời gian gia hạn chấm của giảng viên')
+    expect(extended.isOpenForStudent).toBe(false)
+    expect(extended.lockedReason).toContain('gia hạn chấm cho giảng viên')
+
+    const closed = getOutlineDeadlineDisplay({
+      deadlineStartDate: '2026-11-01T00:00:00',
+      deadlineEndDate: '2026-11-10T23:59:59',
+      deadlineStatus: 'CLOSED',
+    })
+    expect(closed.text).toContain('Đã hết hạn')
+    expect(closed.isOpenForStudent).toBe(false)
+    expect(closed.lockedReason).toContain('Thời hạn nộp đề cương và cập nhật tên đề tài')
+  })
+})
