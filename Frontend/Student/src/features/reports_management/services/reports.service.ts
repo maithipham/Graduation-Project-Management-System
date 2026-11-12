@@ -1,58 +1,80 @@
-import type { StudentReportSubmissionItem } from '../types/reports.types'
+import { API_ENDPOINTS, apiClient } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
+import type { ThesisFinalReportResponse } from '../types/reports.types'
 
-export const INITIAL_REPORT_SUBMISSIONS: StudentReportSubmissionItem[] = [
-  {
-    id: 1,
-    year: '2026-2027',
-    semester: 'HK1',
-    time: '12/10/2026 09:15',
-    fileName: 'Bao_cao_DATN_v2.pdf',
-    status: 'Đã từ chối',
-    approvedTime: '13/10/2026 10:15',
-    plagiarismFile: 'Bao-cao-do-an-2251060321.pdf',
-    plagiarismRate: 42,
-    note: 'Tỷ lệ trùng lặp 42% vượt quá ngưỡng cho phép (<= 35%). Cần viết lại và trích dẫn đầy đủ.',
-  },
-  {
-    id: 2,
-    year: '2026-2027',
-    semester: 'HK1',
-    time: '05/10/2026 14:30',
-    fileName: 'Bao_cao_DATN_v1.docx',
-    status: 'Đã duyệt',
-    approvedTime: '06/10/2026 16:20',
-    plagiarismFile: 'Bao-cao-do-an-2251060321.pdf',
-    plagiarismRate: 18,
-    note: 'Báo cáo tiến độ đạt yêu cầu, tỷ lệ trùng lặp 18% hợp lệ (<= 35%).',
-  },
-  {
-    id: 3,
-    year: '2025-2026',
-    semester: 'HK2',
-    time: '20/04/2026 16:00',
-    fileName: 'Bao_cao_tien_do_HK2_2526.pdf',
-    status: 'Đã duyệt',
-    approvedTime: '22/04/2026 09:00',
-    plagiarismFile: 'Bao-cao-do-an-2151060001.pdf',
-    plagiarismRate: 12,
-    note: 'Báo cáo tiến độ giai đoạn 2 hoàn thành tốt.',
-  },
-]
+export const REPORT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // Nhỏ hơn 10 MB
+export const REPORT_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const
 
-export function formatReportNow(): string {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+/** Kiểm tra file báo cáo Final theo quy định Backend (.doc, .docx, .pdf và < 10 MB). */
+export function validateReportFile(file: File | null | undefined): string | null {
+  if (!file || file.size === 0 || !file.name.trim()) {
+    return 'File tải lên không được để trống.'
+  }
+  const dotIndex = file.name.lastIndexOf('.')
+  const extension = dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : ''
+  if (
+    !REPORT_ALLOWED_EXTENSIONS.includes(
+      extension as (typeof REPORT_ALLOWED_EXTENSIONS)[number],
+    )
+  ) {
+    return 'File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf.'
+  }
+  if (file.size >= REPORT_MAX_FILE_SIZE_BYTES) {
+    return 'File tải lên phải nhỏ hơn 10MB.'
+  }
+  return null
 }
 
-export function formatReportFileSize(bytes: number): string {
-  const kb = Math.round(bytes / 1024)
-  return kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
+/** Kiểm tra URL tệp an toàn trước khi gắn vào href. */
+export function isSafeReportFileUrl(url?: string | null): boolean {
+  if (!url) return false
+  const trimmed = url.trim()
+  return /^https?:\/\//i.test(trimmed) || trimmed.startsWith('/')
 }
 
-
+/** Tách tên tệp hiển thị từ URL Cloudinary hoặc đường dẫn tệp do BE trả về. */
+export function extractReportFileName(
+  fileUrl?: string | null,
+  fallback: string = 'Tệp báo cáo',
+): string {
+  if (!fileUrl) return fallback
+  const withoutQuery = fileUrl.trim().split('?')[0].split('#')[0]
+  const segments = withoutQuery.split('/').filter(Boolean)
+  const rawName = segments[segments.length - 1]
+  if (!rawName) return fileUrl
+  try {
+    return decodeURIComponent(rawName)
+  } catch {
+    return rawName
+  }
+}
 
 export const reportsService = {
-  getInitialSubmissions: (): StudentReportSubmissionItem[] => [...INITIAL_REPORT_SUBMISSIONS],
-  formatNow: formatReportNow,
+  /** Xem báo cáo Final, lịch sử nộp (kèm kết quả trùng lặp), phiếu tiến độ & hạn nộp theo học kỳ (`GET /report/my-report`). */
+  async getMyReport(semesterId?: string): Promise<ThesisFinalReportResponse> {
+    const res = await apiClient.get<ApiResponse<ThesisFinalReportResponse>>(
+      API_ENDPOINTS.report.myReport,
+      { params: semesterId ? { semesterId } : undefined },
+    )
+    return res.data.data
+  },
+
+  /** Sinh viên nộp mới hoặc nộp lại Báo cáo Final (`POST /report/submit`). */
+  async submitReport(file: File): Promise<void> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    await apiClient.post<ApiResponse<void>>(API_ENDPOINTS.report.submit, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      skipErrorToast: true,
+    })
+  },
+
+  /** Xem chi tiết một Báo cáo Final theo `publicId` (`GET /report/{publicId}`). */
+  async getReportDetail(publicId: string): Promise<ThesisFinalReportResponse> {
+    const res = await apiClient.get<ApiResponse<ThesisFinalReportResponse>>(
+      API_ENDPOINTS.report.detail(publicId),
+    )
+    return res.data.data
+  },
 }

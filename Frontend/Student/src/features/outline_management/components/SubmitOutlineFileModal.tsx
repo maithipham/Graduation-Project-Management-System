@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { FileCheck2, FileUp, UploadCloud, X } from 'lucide-react'
+import { validateOutlineFile } from '../services/outline.service'
 import type { SubmitOutlineRequest } from '../types/outline.types'
-
-const MAX_OUTLINE_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 interface SubmitOutlineFileModalProps {
   open: boolean
@@ -40,16 +39,10 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
     const f = e.target.files?.[0] ?? null
     if (!f) return
 
-    if (!/\.(pdf|doc|docx)$/i.test(f.name)) {
+    const validationError = validateOutlineFile(f)
+    if (validationError) {
       setSelectedFile(null)
-      setFileError('Chỉ hỗ trợ tệp định dạng .pdf, .doc, .docx.')
-      e.target.value = ''
-      return
-    }
-
-    if (f.size > MAX_OUTLINE_FILE_SIZE_BYTES) {
-      setSelectedFile(null)
-      setFileError('Dung lượng tệp không được vượt quá 50MB.')
+      setFileError(validationError)
       e.target.value = ''
       return
     }
@@ -89,7 +82,7 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
               <strong className="font-bold text-slate-700">.pdf, .doc, .docx</strong>
             </p>
             <p>
-              • Dung lượng tối đa: <strong className="font-bold text-slate-700">50MB</strong>
+              • Dung lượng tối đa: <strong className="font-bold text-slate-700">nhỏ hơn 10 MB</strong>
             </p>
             <p>
               • Vui lòng đặt tên tệp theo cú pháp:{' '}

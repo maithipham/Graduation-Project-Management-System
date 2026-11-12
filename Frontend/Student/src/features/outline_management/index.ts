@@ -1,4 +1,5 @@
 // Public API của sub-feature: outline_management
+// Không export pages: page được nạp bằng lazy() trong app/routes.
 export * from './types/outline.types'
 export * from './types/topicTitle.types'
 export * from './services/outline.service'
@@ -10,5 +11,3 @@ export * from './utils/outlineDeadline'
 export * from './components/OnlineOutlineEditorModal'
 export * from './components/OutlinePaperPreview'
 export * from './components/SubmitOutlineFileModal'
-export { default as StudentOutlinePage } from './pages/StudentOutlinePage'
-export { default as StudentOutlinePreviewPage } from './pages/StudentOutlinePreviewPage'

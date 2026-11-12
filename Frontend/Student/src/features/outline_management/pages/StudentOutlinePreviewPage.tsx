@@ -17,7 +17,10 @@ import { cn, formatDate } from '@/shared/utils'
 import { useMyOutline } from '../hooks/useOutlineManagement'
 import { useMyTopicOverview } from '../hooks/useTopicTitle'
 import { extractOutlineFileName, isSafeFileUrl } from '../services/outline.service'
-import { getOutlineDeadlineDisplay } from '../utils/outlineDeadline'
+import {
+  getOutlineDeadlineDisplay,
+  hasDistinctTopicDeadline,
+} from '../utils/outlineDeadline'
 
 export default function StudentOutlinePreviewPage() {
   const navigate = useNavigate()
@@ -37,7 +40,18 @@ export default function StudentOutlinePreviewPage() {
   const deadlineSource = outlineData ?? topicOverview
   const isMetaLoading = isOutlineLoading && isTopicLoading
   const isMetaError = isOutlineError && isTopicError
-  const deadlineDisplay = getOutlineDeadlineDisplay(deadlineSource)
+  const deadlineDisplay = getOutlineDeadlineDisplay(deadlineSource, {
+    fallbackName: 'Thời hạn nộp đề cương',
+  })
+  const showAdditionalTopicDeadline =
+    !isTopicLoading &&
+    !isTopicError &&
+    !isOutlineLoading &&
+    !isOutlineError &&
+    hasDistinctTopicDeadline(topicOverview, outlineData)
+  const topicDeadlineDisplay = getOutlineDeadlineDisplay(topicOverview, {
+    fallbackName: 'Thời hạn chốt tên đề tài',
+  })
 
   const fileUrl = searchParams.get('url') || outlineData?.outlineFile || ''
   const hasValidFileUrl = isSafeFileUrl(fileUrl)
@@ -217,6 +231,16 @@ export default function StudentOutlinePreviewPage() {
                 )}
               </span>
             </div>
+            {showAdditionalTopicDeadline && (
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-bold text-slate-700">
+                  {topicOverview?.deadlineName || 'Hạn chốt tên đề tài'}:
+                </span>
+                <span className={cn('col-span-2 font-semibold', topicDeadlineDisplay.toneClassName)}>
+                  {topicDeadlineDisplay.text}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Trạng thái đề cương:</span>
               <span className="col-span-2 font-medium text-slate-800">

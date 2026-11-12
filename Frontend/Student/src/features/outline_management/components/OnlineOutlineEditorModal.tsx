@@ -12,10 +12,12 @@ import {
 } from 'lucide-react'
 import {
   OUTLINE_DRAFT_STORAGE_KEY,
+  OUTLINE_MAX_TITLE_LENGTH,
   OUTLINE_SECTIONS,
   buildDefaultDocxFileName,
   createEmptyOutlineEditorData,
   loadSavedOutlineDraft,
+  validateOutlineFile,
 } from '../services/outline.service'
 import type {
   OutlineEditorData,
@@ -163,8 +165,11 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
     if (isSubmitting) return
 
     const nextErrors: Record<string, string> = {}
-    if (!(data.topicVi ?? '').trim()) {
+    const trimmedTopicVi = (data.topicVi ?? '').trim()
+    if (!trimmedTopicVi) {
       nextErrors.topicVi = 'Vui lòng nhập tên đề tài.'
+    } else if (trimmedTopicVi.length > OUTLINE_MAX_TITLE_LENGTH) {
+      nextErrors.topicVi = `Tiêu đề đề cương không được vượt quá ${OUTLINE_MAX_TITLE_LENGTH} ký tự.`
     }
     OUTLINE_SECTIONS.forEach((s) => {
       if (s.required && !data[s.key].trim()) {
@@ -182,17 +187,23 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
       return
     }
 
-    setErrors({})
-    setFooterMsg('')
-    saveDraft(true)
     const clonedData = JSON.parse(JSON.stringify(data)) as OutlineEditorData
     const docxFile = buildOutlineDocxFile(
       buildOutlineBlocks(clonedData, studentMeta),
       defaultFileName,
     )
+    const fileError = validateOutlineFile(docxFile)
+    if (fileError) {
+      setFooterMsg(fileError)
+      return
+    }
+
+    setErrors({})
+    setFooterMsg('')
+    saveDraft(true)
     onSubmit({
       file: docxFile,
-      title: (clonedData.topicVi ?? '').trim() || defaultTopicVi,
+      title: trimmedTopicVi || defaultTopicVi,
       fileName: defaultFileName,
       data: clonedData,
     })

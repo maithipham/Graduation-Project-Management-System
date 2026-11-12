@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/shared/api'
 import {
+  OUTLINE_ERROR_CODES,
+  OUTLINE_MAX_FILE_SIZE_BYTES,
   extractOutlineFileName,
   getOutlineSubmitState,
   isSafeFileUrl,
   outlineService,
+  validateOutlineFile,
 } from '@/features/outline_management'
 import type { ThesisOutlineResponse } from '@/features/outline_management'
 
@@ -171,10 +174,25 @@ describe('getOutlineSubmitState', () => {
   it('allows outline submission only when all prerequisite conditions hold', () => {
     expect(getOutlineSubmitState(createMockOutline({ status: null })).canSubmit).toBe(true)
     expect(
+      getOutlineSubmitState(
+        createMockOutline({
+          publicId: null,
+          status: null,
+          reviewerPublicId: null,
+          reviewerName: null,
+        }),
+      ).canSubmit,
+    ).toBe(true)
+    expect(
       getOutlineSubmitState(createMockOutline({ status: 'PENDING' })).canSubmit,
     ).toBe(true)
     expect(
       getOutlineSubmitState(createMockOutline({ status: 'REQUEST_CHANGES' })).canSubmit,
+    ).toBe(true)
+    expect(
+      getOutlineSubmitState(
+        createMockOutline({ currentStage: 'STAGE_3_OUTLINE_APPROVED', status: 'REQUEST_CHANGES' }),
+      ).canSubmit,
     ).toBe(true)
   })
 
@@ -190,6 +208,19 @@ describe('getOutlineSubmitState', () => {
     ).toMatchObject({
       canSubmit: false,
       reason: 'Đề tài đã bị đình chỉ, không thể nộp đề cương.',
+    })
+
+    expect(
+      getOutlineSubmitState(
+        createMockOutline({
+          topicStatus: 'DISQUALIFIED',
+          disqualificationReason: 'Không hoàn thành phê duyệt đề cương đúng hạn',
+        }),
+      ),
+    ).toMatchObject({
+      canSubmit: false,
+      reason:
+        'Đề tài đã bị đình chỉ (Không hoàn thành phê duyệt đề cương đúng hạn), không thể nộp đề cương.',
     })
 
     expect(
@@ -217,7 +248,7 @@ describe('getOutlineSubmitState', () => {
       ),
     ).toMatchObject({
       canSubmit: false,
-      reason: 'Cần hoàn thành chốt tên đề tài chính thức trước khi nộp đề cương.',
+      reason: null,
     })
 
     expect(
@@ -233,6 +264,46 @@ describe('getOutlineSubmitState', () => {
     expect(
       getOutlineSubmitState(createMockOutline({ deadlineStatus: 'CLOSED' })).canSubmit,
     ).toBe(false)
+  })
+})
+
+describe('validateOutlineFile & OUTLINE_ERROR_CODES', () => {
+  it('validates empty, invalid extension, >= 10 MB, and valid outline files', () => {
+    expect(validateOutlineFile(null)).toBe('Vui lòng chọn file đề cương cần tải lên.')
+
+    const emptyFile = new File([], 'empty.pdf', { type: 'application/pdf' })
+    expect(validateOutlineFile(emptyFile)).toBe('Vui lòng chọn file đề cương cần tải lên.')
+
+    const invalidExt = new File(['abc'], 'outline.txt', { type: 'text/plain' })
+    expect(validateOutlineFile(invalidExt)).toBe(
+      'File đề cương chỉ hỗ trợ định dạng .doc, .docx hoặc .pdf.',
+    )
+
+    const exactLimitFile = new File(['x'], 'big.pdf', { type: 'application/pdf' })
+    Object.defineProperty(exactLimitFile, 'size', { value: OUTLINE_MAX_FILE_SIZE_BYTES })
+    expect(validateOutlineFile(exactLimitFile)).toBe(
+      'Dung lượng file đề cương phải nhỏ hơn 10 MB.',
+    )
+
+    const validDocx = new File(['valid'], 'De_cuong.DOCX', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    expect(validateOutlineFile(validDocx)).toBeNull()
+  })
+
+  it('matches backend ErrorCode contract in API_Student_Outline.md', () => {
+    expect(OUTLINE_ERROR_CODES).toMatchObject({
+      OUTLINE_FILE_EMPTY: 4000,
+      OUTLINE_FILE_INVALID_FORMAT: 4000,
+      OUTLINE_FILE_TOO_LARGE: 4000,
+      OUTLINE_TITLE_TOO_LONG: 4000,
+      OUTLINE_REVIEWER_NOT_ASSIGNED: 3079,
+      OUTLINE_STAGE_INVALID: 3080,
+      OUTLINE_ALREADY_FINALIZED: 3081,
+      OUTLINE_DEADLINE_NOT_FOUND: 3084,
+      OUTLINE_SUBMISSION_DEADLINE_CLOSED: 3085,
+      TOPIC_NOT_IN_PROGRESS: 3057,
+    })
   })
 })
 
