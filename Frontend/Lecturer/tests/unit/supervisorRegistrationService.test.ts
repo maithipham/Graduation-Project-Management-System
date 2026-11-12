@@ -104,34 +104,58 @@ describe('supervisorRegistrationService', () => {
     ])
   })
 
-  it('getRequests: tab approved gửi TEACHER_APPROVED, tab all không gửi status', async () => {
+  it('getRequests: tab approved lọc TEACHER_APPROVED và HOD_APPROVED; tab rejected lọc REJECTED và HOD_REJECTED; tab all không lọc', async () => {
     reply = {
       code: 1000,
       data: {
-        registrations: [],
-        pendingCount: 0,
-        approvedCount: 0,
-        rejectedCount: 0,
-        totalCount: 0,
+        registrations: [
+          sampleRegistration,
+          { ...sampleRegistration, registrationPublicId: 'reg-ta', status: 'TEACHER_APPROVED' },
+          { ...sampleRegistration, registrationPublicId: 'reg-ha', status: 'HOD_APPROVED' },
+          { ...sampleRegistration, registrationPublicId: 'reg-as', status: 'ASSIGNED_BY_HOD' },
+          { ...sampleRegistration, registrationPublicId: 'reg-rj', status: 'REJECTED' },
+          { ...sampleRegistration, registrationPublicId: 'reg-hr', status: 'HOD_REJECTED' },
+        ],
+        pendingCount: 1,
+        approvedCount: 2,
+        rejectedCount: 2,
+        totalCount: 6,
       },
     }
 
-    await supervisorRegistrationService.getRequests({
+    const approvedResult = await supervisorRegistrationService.getRequests({
       semesterPublicId: 'sem-1',
       status: 'approved',
       keyword: '   ',
     })
     expect(sentUrl(requests[0])).toBe(
-      '/api/teacher/advisor-registrations?semesterPublicId=sem-1&status=TEACHER_APPROVED',
+      '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
     )
+    expect(approvedResult.items.map((item) => [item.id, item.apiStatus])).toEqual([
+      ['reg-ta', 'TEACHER_APPROVED'],
+      ['reg-ha', 'HOD_APPROVED'],
+    ])
 
-    await supervisorRegistrationService.getRequests({
+    const rejectedResult = await supervisorRegistrationService.getRequests({
       semesterPublicId: 'sem-1',
-      status: '',
+      status: 'rejected',
     })
     expect(sentUrl(requests[1])).toBe(
       '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
     )
+    expect(rejectedResult.items.map((item) => [item.id, item.apiStatus, item.status])).toEqual([
+      ['reg-rj', 'REJECTED', 'rejected'],
+      ['reg-hr', 'HOD_REJECTED', 'rejected'],
+    ])
+
+    const allResult = await supervisorRegistrationService.getRequests({
+      semesterPublicId: 'sem-1',
+      status: '',
+    })
+    expect(sentUrl(requests[2])).toBe(
+      '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
+    )
+    expect(allResult.items).toHaveLength(6)
   })
 
   it('getRequestDetail: gửi GET /api/teacher/advisor-registrations/{id} và bóc data', async () => {

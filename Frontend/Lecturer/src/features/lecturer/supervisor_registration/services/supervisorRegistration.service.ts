@@ -20,6 +20,7 @@ const mapStatus = (
     case 'PENDING':
       return 'pending'
     case 'REJECTED':
+    case 'HOD_REJECTED':
       return 'rejected'
     case 'TEACHER_APPROVED':
     case 'HOD_APPROVED':
@@ -30,16 +31,25 @@ const mapStatus = (
   }
 }
 
+const APPROVED_TAB_STATUSES: ReadonlySet<ApiRegistrationStatus> = new Set([
+  'TEACHER_APPROVED',
+  'HOD_APPROVED',
+])
+
+const REJECTED_TAB_STATUSES: ReadonlySet<ApiRegistrationStatus> = new Set([
+  'REJECTED',
+  'HOD_REJECTED',
+])
+
 const mapTabToApiStatus = (
   status?: SupervisorTabStatus,
 ): ApiRegistrationStatus | undefined => {
   switch (status) {
     case 'pending':
       return 'PENDING'
+    // BE chỉ nhận 1 enum RegistrationStatus mỗi request, nên tab 'approved'/'rejected' lấy toàn bộ rồi lọc nhóm trạng thái tương ứng
     case 'approved':
-      return 'TEACHER_APPROVED'
     case 'rejected':
-      return 'REJECTED'
     default:
       return undefined
   }
@@ -80,9 +90,20 @@ export const supervisorRegistrationService = {
     })
 
     const data = response.data.data
+    const rawRegistrations = data?.registrations ?? []
+    const filteredRegistrations =
+      params.status === 'approved'
+        ? rawRegistrations.filter((item) =>
+            APPROVED_TAB_STATUSES.has(item.status),
+          )
+        : params.status === 'rejected'
+          ? rawRegistrations.filter((item) =>
+              REJECTED_TAB_STATUSES.has(item.status),
+            )
+          : rawRegistrations
 
     return {
-      items: (data?.registrations ?? []).map(mapRequest),
+      items: filteredRegistrations.map(mapRequest),
       counts: {
         pending: data?.pendingCount ?? 0,
         approved: data?.approvedCount ?? 0,

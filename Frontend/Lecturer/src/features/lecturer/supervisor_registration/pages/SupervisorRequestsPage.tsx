@@ -81,6 +81,8 @@ function getStatusLabel(request: SupervisorRequestItem): string {
       return 'TBM phân công'
     case 'REJECTED':
       return 'Đã từ chối'
+    case 'HOD_REJECTED':
+      return 'TBM từ chối'
     default:
       switch (request.status) {
         case 'pending':

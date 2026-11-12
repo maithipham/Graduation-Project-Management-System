@@ -12,6 +12,7 @@ export type ApiRegistrationStatus =
   | 'HOD_APPROVED'
   | 'ASSIGNED_BY_HOD'
   | 'REJECTED'
+  | 'HOD_REJECTED'
 
 // Status mốc thời hạn DANG_KY_GVHD từ BE
 export type RegistrationDeadlineStatus =

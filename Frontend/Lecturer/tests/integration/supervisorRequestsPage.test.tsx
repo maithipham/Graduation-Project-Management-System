@@ -298,6 +298,62 @@ describe('SupervisorRequestsPage', () => {
   })
 
   it('chuyển tab và tìm kiếm gửi đúng tham số status và keyword lên BE', async () => {
+    handler = (config) => {
+      const url = sentUrl(config)
+      if (url.startsWith('/semester/current')) {
+        return { data: { code: 1000, data: SEMESTERS[0] } }
+      }
+      if (url.startsWith('/semester?')) {
+        return {
+          data: {
+            code: 1000,
+            data: { content: SEMESTERS, totalElements: 3, totalPages: 1, page: 0, size: 100 },
+          },
+        }
+      }
+      if (url.startsWith('/api/teacher/advisor-registrations/deadline')) {
+        return {
+          data: {
+            code: 1000,
+            data: {
+              semesterPublicId: 'sem-1',
+              name: 'Đăng ký GVHD',
+              startDate: '2026-01-01T00:00:00',
+              endDate: '2099-03-15T23:59:59',
+              isActive: true,
+              status: 'OPEN',
+            },
+          },
+        }
+      }
+      if (url.startsWith('/api/teacher/advisor-registrations?')) {
+        const isPendingOnly = url.includes('status=PENDING')
+        const registrations = isPendingOnly
+          ? SAMPLE_LIST
+          : [
+              ...SAMPLE_LIST,
+              { ...SAMPLE_LIST[0], registrationPublicId: 'reg-ta', studentName: 'Phạm GV Đã Duyệt', status: 'TEACHER_APPROVED' },
+              { ...SAMPLE_LIST[0], registrationPublicId: 'reg-ha', studentName: 'Đỗ TBM Đã Duyệt', status: 'HOD_APPROVED' },
+              { ...SAMPLE_LIST[0], registrationPublicId: 'reg-as', studentName: 'Hoàng TBM Phân Công', status: 'ASSIGNED_BY_HOD' },
+              { ...SAMPLE_LIST[0], registrationPublicId: 'reg-rj', studentName: 'Trần Bị Từ Chối', status: 'REJECTED' },
+              { ...SAMPLE_LIST[0], registrationPublicId: 'reg-hr', studentName: 'Lê TBM Từ Chối', status: 'HOD_REJECTED' },
+            ]
+        return {
+          data: {
+            code: 1000,
+            data: {
+              registrations,
+              pendingCount: 2,
+              approvedCount: 2,
+              rejectedCount: 2,
+              totalCount: 7,
+            },
+          },
+        }
+      }
+      return { data: { code: 1000, data: null } }
+    }
+
     const user = userEvent.setup()
     renderPage()
 
@@ -307,11 +363,19 @@ describe('SupervisorRequestsPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Đã duyệt/ }))
     await waitFor(() => {
-      expect(
-        requests.some((r) =>
-          sentUrl(r).includes('status=TEACHER_APPROVED'),
-        ),
-      ).toBe(true)
+      expect(screen.getByText('Phạm GV Đã Duyệt')).toBeInTheDocument()
+      expect(screen.getByText('Đỗ TBM Đã Duyệt')).toBeInTheDocument()
+      expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument()
+      expect(screen.queryByText('Hoàng TBM Phân Công')).not.toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /Đã từ chối/ }))
+    await waitFor(() => {
+      expect(screen.getByText('Trần Bị Từ Chối')).toBeInTheDocument()
+      expect(screen.getByText('Lê TBM Từ Chối')).toBeInTheDocument()
+      expect(screen.getByText('TBM từ chối')).toBeInTheDocument()
+      expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument()
+      expect(screen.queryByText('Phạm GV Đã Duyệt')).not.toBeInTheDocument()
     })
 
     await user.click(screen.getByRole('button', { name: /Tất cả/ }))
@@ -322,6 +386,7 @@ describe('SupervisorRequestsPage', () => {
       expect(listCalls[listCalls.length - 1]).toBe(
         '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
       )
+      expect(screen.getByText('Hoàng TBM Phân Công')).toBeInTheDocument()
     })
 
     const searchInput = screen.getByRole('textbox', { name: 'Tìm kiếm sinh viên' })
