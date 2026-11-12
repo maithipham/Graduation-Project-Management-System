@@ -10,12 +10,13 @@ import {
 } from 'lucide-react'
 import { Button } from '@/shared/components/ui'
 import { toast } from '@/shared/components/feedback'
-import { exportTableToCsv } from '@/shared/utils/excel'
+import { saveBlob } from '@/shared/utils/download'
 import { cn } from '@/shared/utils/cn'
 import { getAvatarInitials, getAvatarColor, getTeacherPlainName } from '../utils/teacherDisplay'
 import type { MajorOption, SemesterOption } from '@/features/department/student_management'
 import type { SupervisorLecturer, SupervisorStudent } from '../types'
 import { useManagedMajor } from '../hooks/useTeachers'
+import { supervisorService } from '../services/supervisor.service'
 import { QuotaConfigModal } from './QuotaConfigModal'
 import { AssignedStudentsModal } from './AssignedStudentsModal'
 import { SemesterScopeFilter } from './SemesterScopeFilter'
@@ -79,6 +80,7 @@ export function SupervisorOverviewView({
   const [viewLecturer, setViewLecturer] = useState<SupervisorLecturer | null>(null)
   const [removeLecturerTarget, setRemoveLecturerTarget] = useState<SupervisorLecturer | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const currentSemesterName = useMemo(() => {
     const currentTerm = termsOfYear.find(
@@ -151,51 +153,25 @@ export function SupervisorOverviewView({
     }
   }
 
-  const handleExport = () => {
-    if (!filteredLecturers || filteredLecturers.length === 0) {
-      toast.warning('Không có dữ liệu giảng viên hướng dẫn để xuất file')
-      return
+  const handleExport = async () => {
+    try {
+      setIsExporting(true)
+      const file = await supervisorService.exportSupervisors({
+        semesterId: selectedSemesterId !== 'all' ? selectedSemesterId : undefined,
+        keyword: search.trim() || undefined,
+        department: deptFilter !== 'all' ? deptFilter : undefined,
+        unitType: unitFilter !== 'all' ? unitFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      })
+      saveBlob(file)
+      toast.success('Xuất file danh sách GVHD thành công')
+    } catch (error: any) {
+      if (error?.message) {
+        toast.error(error.message)
+      }
+    } finally {
+      setIsExporting(false)
     }
-
-    const headers = [
-      'STT',
-      'Mã GV',
-      'Học vị',
-      'Họ và tên',
-      'Email',
-      'Đơn vị / Bộ môn',
-      'Hạn mức tối đa',
-      'Đã phân công',
-      'Còn lại',
-      'Trạng thái',
-    ]
-
-    const rows = filteredLecturers.map((l, index) => {
-      const remaining = Math.max(0, (l.quota ?? 0) - (l.assigned ?? 0))
-      const statusLabel =
-        (l.assigned ?? 0) >= (l.quota ?? 0)
-          ? 'Đã đủ hạn mức'
-          : (l.assigned ?? 0) > 0
-            ? 'Đang hướng dẫn'
-            : 'Chưa phân công'
-
-      return [
-        index + 1,
-        l.teacherCode || '',
-        l.title || '',
-        l.name || '',
-        l.email || '',
-        l.categoryLabel ? `${l.categoryLabel}${l.department ? ` - ${l.department}` : ''}` : l.department || '',
-        l.quota ?? 0,
-        l.assigned ?? 0,
-        remaining,
-        statusLabel,
-      ]
-    })
-
-    const safeSemesterName = currentSemesterName.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]/g, '_')
-    exportTableToCsv(headers, rows, `danh_sach_gvhd_${safeSemesterName || 'hoc_ky'}_${Date.now()}`)
-    toast.success(`Đã xuất thành công ${filteredLecturers.length} giảng viên hướng dẫn`)
   }
 
   return (
@@ -232,11 +208,12 @@ export function SupervisorOverviewView({
           <Button
             type="button"
             variant="outline"
+            disabled={isExporting}
             onClick={handleExport}
             className="h-9 px-3.5 text-xs font-semibold text-slate-700 shadow-2xs"
           >
             <Download className="w-4 h-4 text-slate-500 mr-1" />
-            Export File
+            {isExporting ? 'Đang xuất file...' : 'Export File (.xlsx)'}
           </Button>
 
           <Button

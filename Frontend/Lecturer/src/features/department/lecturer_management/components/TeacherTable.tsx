@@ -1,4 +1,4 @@
-import { SearchX, UserPlus } from 'lucide-react'
+import { Eye, Pencil, SearchX, Trash2, UserPlus } from 'lucide-react'
 import type { SpringPage } from '@/shared/types'
 import {
   Button,
@@ -31,6 +31,8 @@ interface TeacherTableProps {
   onPageChange: (page: number) => void
   onPageSizeChange?: (pageSize: number) => void
   onRowClick: (teacher: TeacherListItem) => void
+  onEdit?: (teacher: TeacherListItem) => void
+  onDelete?: (teacher: TeacherListItem) => void
   hasFilters: boolean
   onCreate: () => void
 }
@@ -49,6 +51,8 @@ export function TeacherTable({
   onPageChange,
   onPageSizeChange,
   onRowClick,
+  onEdit,
+  onDelete,
   hasFilters,
   onCreate,
 }: TeacherTableProps) {
@@ -103,6 +107,9 @@ export function TeacherTable({
           <TableCell className="text-right">
             <Skeleton className="h-5 w-24 ml-auto rounded-full" />
           </TableCell>
+          <TableCell className="text-center w-28">
+            <Skeleton className="h-8 w-20 mx-auto rounded" />
+          </TableCell>
         </TableRow>
       ))
     }
@@ -110,7 +117,7 @@ export function TeacherTable({
     if (isError) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="py-12 text-center">
+          <TableCell colSpan={7} className="py-12 text-center">
             <p className="font-semibold text-rose-600">
               Không thể tải danh sách giáo viên. Vui lòng thử lại sau.
             </p>
@@ -122,7 +129,7 @@ export function TeacherTable({
     if (content.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="py-14 text-center">
+          <TableCell colSpan={7} className="py-14 text-center">
             <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
               {hasFilters ? (
                 <>
@@ -219,8 +226,15 @@ export function TeacherTable({
                 {getAvatarInitials(teacher)}
               </div>
               <div className="min-w-0">
-                <div className="font-bold text-slate-900 text-sm group-hover:text-[#1565C0] transition-colors">
-                  {getTeacherPlainName(teacher)}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 text-sm group-hover:text-[#1565C0] transition-colors">
+                    {getTeacherPlainName(teacher)}
+                  </span>
+                  {teacher.teacherCode && (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-mono text-slate-600 border border-slate-200">
+                      {teacher.teacherCode}
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-slate-400 font-normal truncate">
                   {teacher.email}
@@ -264,6 +278,49 @@ export function TeacherTable({
                 (teacher.isAssigned ? 'Đã phân công' : 'Chưa phân công')}
             </span>
           </TableCell>
+
+          {/* Thao tác */}
+          <TableCell className="text-center w-28" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onRowClick(teacher)}
+                className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                title="Xem chi tiết"
+                aria-label="Xem chi tiết"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              {onEdit && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onEdit(teacher)}
+                  className="h-8 w-8 p-0 text-slate-500 hover:text-amber-600 hover:bg-amber-50"
+                  title="Sửa giảng viên"
+                  aria-label="Sửa giảng viên"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(teacher)}
+                  className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                  title="Xóa giảng viên"
+                  aria-label="Xóa giảng viên"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </TableCell>
         </TableRow>
       )
     })
@@ -303,6 +360,9 @@ export function TeacherTable({
               </TableHead>
               <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-slate-600">
                 Vai trò GVHD
+              </TableHead>
+              <TableHead className="text-center text-xs font-bold uppercase tracking-wider text-slate-600 w-28">
+                Thao tác
               </TableHead>
             </TableRow>
           </TableHeader>

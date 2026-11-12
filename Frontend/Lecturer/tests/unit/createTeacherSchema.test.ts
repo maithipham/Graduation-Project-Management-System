@@ -8,12 +8,14 @@ import {
 } from '@/features/department/lecturer_management/utils/createTeacherSchema'
 
 const VALID: CreateTeacherFormInput = {
+  teacherCode: 'GV001',
   firstName: 'Nguyễn Văn',
   lastName: 'An',
   email: 'an.nv@tlu.edu.vn',
   phone: '0987654321',
   organization: TLU_ORGANIZATION,
   major: 'Kỹ thuật phần mềm',
+  academicTitle: 'ThS.',
   amount: '15',
 }
 
@@ -64,17 +66,36 @@ describe('createTeacherSchema', () => {
     })
   })
 
+  it('ngoài trường: ngành không bắt buộc, cho phép để trống, null hoặc undefined', () => {
+    expect(createTeacherSchema.parse({ ...EXTERNAL, major: '' })).toMatchObject({
+      organization: 'Trường Đại học Bách khoa Hà Nội',
+      major: '',
+    })
+    expect(createTeacherSchema.parse({ ...EXTERNAL, major: null as any })).toMatchObject({
+      organization: 'Trường Đại học Bách khoa Hà Nội',
+      major: '',
+    })
+    expect(createTeacherSchema.parse({ ...EXTERNAL, major: undefined })).toMatchObject({
+      organization: 'Trường Đại học Bách khoa Hà Nội',
+      major: '',
+    })
+    expect(firstErrors({ ...EXTERNAL, major: '' })).toEqual({})
+    expect(firstErrors({ ...EXTERNAL, major: null as any })).toEqual({})
+  })
+
   it('hạn mức bỏ trống → null (BE tự gán)', () => {
     expect(createTeacherSchema.parse({ ...VALID, amount: '  ' }).amount).toBeNull()
   })
 
   it('ô trống báo "không được để trống"; email trống thì chưa báo lỗi ngành', () => {
     expect(firstErrors(EMPTY_CREATE_TEACHER_VALUES)).toEqual({
-      firstName: 'Họ không được để trống',
+      teacherCode: 'Mã giảng viên không được để trống',
+      firstName: 'Họ và tên đệm không được để trống',
       lastName: 'Tên không được để trống',
       email: 'Email không được để trống',
       phone: 'Số điện thoại không được để trống',
       organization: 'Đơn vị công tác không được để trống',
+      academicTitle: 'Vui lòng chọn học hàm / học vị',
     })
   })
 

@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { teacherService } from '../services/teacher.service'
-import type { TeacherListParams, TeacherAllListParams } from '../types'
+import type { TeacherListParams, TeacherAllListParams, TeacherUpdateRequest } from '../types'
 
 // Bộ "tên cache" của feature. Sau khi ghi (hạn mức/import/thêm/kích hoạt/phân công) thì invalidate theo các key này
 export const departmentTeacherKeys = {
@@ -142,5 +142,36 @@ export function useManagedMajor() {
     queryKey: [...departmentTeacherKeys.all, 'managed-major'] as const,
     queryFn: teacherService.getManagedMajor,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** Cập nhật thông tin giảng viên (PUT /api/teachers/{id}) */
+export function useUpdateTeacher() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string | number; body: TeacherUpdateRequest }) =>
+      teacherService.updateTeacher(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: departmentTeacherKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['teachers'] })
+      queryClient.invalidateQueries({ queryKey: ['supervisors'] })
+    },
+  })
+}
+
+/** Xóa giảng viên (DELETE /api/teachers/{id}) */
+export function useDeleteTeacher() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string | number) => teacherService.deleteTeacher(id),
+    onSuccess: (msg) => {
+      toast.success(msg || 'Xóa giảng viên thành công')
+      queryClient.invalidateQueries({ queryKey: departmentTeacherKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['teachers'] })
+      queryClient.invalidateQueries({ queryKey: ['supervisors'] })
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Không thể xóa giảng viên do có ràng buộc dữ liệu.')
+    },
   })
 }

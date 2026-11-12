@@ -26,6 +26,9 @@ function getStatusLabel(status: AdvisorRegistrationStatus): string {
     case 'REJECTED':
       return 'Đã từ chối'
 
+    case 'HOD_REJECTED':
+      return 'TBM từ chối'
+
     case 'ASSIGNED_BY_HOD':
       return 'Được phân công'
 
@@ -64,6 +67,7 @@ function getStatusClass(status: AdvisorRegistrationStatus): string {
       return 'bg-amber-50 text-amber-700 border-amber-200'
 
     case 'REJECTED':
+    case 'HOD_REJECTED':
       return 'bg-rose-50 text-rose-700 border-rose-200'
 
     case 'PENDING':

@@ -56,8 +56,9 @@ export function useTeacherEmailAutoFill({
             setValue('organization', autoOrganization(rule), options)
           }
           // Ngoài trường không có ngành (BE báo lỗi nếu có)
-          if (!rule.internal && values.major) {
+          if (!rule.internal) {
             setValue('major', '', options)
+            setValue('majorId', null, options)
           } else if (rule.internal && !values.major && defaultMajor) {
             setValue('major', defaultMajor, options)
           }

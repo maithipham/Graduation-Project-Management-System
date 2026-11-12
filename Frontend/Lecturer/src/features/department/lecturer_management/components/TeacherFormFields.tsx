@@ -1,10 +1,11 @@
-import { useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
+import { useEffect } from 'react'
+import { useWatch, type Control, type FieldErrors, type UseFormRegister, type UseFormSetValue } from 'react-hook-form'
 import { FormField, Input, Select } from '@/shared/components/ui'
 import type { MajorOption } from '@/features/department/student_management'
 import { useAcademicTitles } from '../hooks/useTeachers'
 import { DEFAULT_ACADEMIC_TITLES } from '../services/teacher.service'
 import {
-  getTeacherEmailRule,
+  isExternalTeacherCheck,
   type CreateTeacherFormInput,
   type CreateTeacherFormValues,
 } from '../utils/createTeacherSchema'
@@ -12,6 +13,7 @@ import {
 interface TeacherFormFieldsProps {
   register: UseFormRegister<CreateTeacherFormInput>
   control: Control<CreateTeacherFormInput, unknown, CreateTeacherFormValues>
+  setValue?: UseFormSetValue<CreateTeacherFormInput>
   errors: FieldErrors<CreateTeacherFormInput>
   majors: MajorOption[] | undefined
   majorsLoading: boolean
@@ -34,10 +36,11 @@ function getCurrentMajorLabel(currentMajor: string | undefined, majors: MajorOpt
     : `${currentMajor} (không có trong danh sách)`
 }
 
-/** 6 ô thông tin giáo viên — dùng chung cho popup "Thêm giáo viên" và form sửa dòng import lỗi */
+/** 6 ô thông tin giáo viên — dùng chung cho popup "Thêm giáo viên", popup "Sửa giáo viên" và form sửa dòng import lỗi */
 export function TeacherFormFields({
   register,
   control,
+  setValue,
   errors,
   majors,
   majorsLoading,
@@ -45,9 +48,29 @@ export function TeacherFormFields({
   lockedMajor,
   className = 'grid gap-4 sm:grid-cols-2',
 }: TeacherFormFieldsProps) {
-  // Email @gmail.com (ngoài trường) → ô Ngành bị khóa và để trống
+  // Email @gmail.com hoặc Đơn vị công tác khác Thủy Lợi → ngoài trường (ô Ngành bị khóa và không bắt buộc)
   const email = useWatch({ control, name: 'email' })
-  const external = getTeacherEmailRule(email)?.internal === false
+  const organization = useWatch({ control, name: 'organization' })
+  const external = isExternalTeacherCheck({ email, organization })
+
+  // Tự động làm rỗng trường Ngành khi xác định là giảng viên ngoài trường
+  // Hoặc gán ngành cố định của TBM khi là giảng viên trong trường
+  useEffect(() => {
+    if (external && setValue) {
+      setValue('major', '', { shouldValidate: true })
+      setValue('majorId', null)
+    } else if (!external && lockedMajor && setValue) {
+      setValue('major', lockedMajor, { shouldValidate: true })
+      const matched = majors?.find(
+        (m) =>
+          m.name.toLowerCase() === lockedMajor.toLowerCase() ||
+          (m.code && m.code.toLowerCase() === lockedMajor.toLowerCase()),
+      )
+      if (matched) {
+        setValue('majorId', matched.publicId)
+      }
+    }
+  }, [external, lockedMajor, majors, setValue])
 
   const { data: apiTitles } = useAcademicTitles()
   const titles = apiTitles && apiTitles.length > 0 ? apiTitles : DEFAULT_ACADEMIC_TITLES
@@ -56,6 +79,9 @@ export function TeacherFormFields({
 
   return (
     <div className={className}>
+      <FormField label="Mã giảng viên" required error={errors.teacherCode?.message} className="sm:col-span-2">
+        <Input placeholder="VD: GV001" {...register('teacherCode')} />
+      </FormField>
       <FormField label="Họ và tên đệm" required error={errors.firstName?.message}>
         <Input placeholder="VD: Nguyễn Văn" {...register('firstName')} />
       </FormField>
@@ -84,18 +110,18 @@ export function TeacherFormFields({
         error={errors.major?.message}
         hint={
           external
-            ? 'Giáo viên ngoài trường không điền mục này'
+            ? 'Không áp dụng cho giảng viên ngoài trường'
             : lockedMajor
               ? 'Ngành được cố định theo bộ môn quản lý'
               : undefined
         }
       >
         <Select
-          disabled={majorsLoading || external || Boolean(lockedMajor)}
+          disabled={majorsLoading || external || (!external && Boolean(lockedMajor))}
           {...register('major')}
         >
           {external ? (
-            <option value="">-- Không áp dụng cho giáo viên ngoài trường --</option>
+            <option value="">-- Không áp dụng cho giảng viên ngoài trường --</option>
           ) : lockedMajor ? (
             <option value={lockedMajor}>{lockedMajor}</option>
           ) : (

@@ -91,6 +91,8 @@ export interface SupervisorRequestItem {
   email?: string
   phone?: string
   note?: string
+  rejectedAt?: string
+  rejectReason?: string
 }
 
 export interface SupervisorRequestCounts {

@@ -275,6 +275,7 @@ export async function parseAdvisorExcelFile(
     let colName = ''
     let colLastNamePrefix = ''
     let colFirstName = ''
+    let colAcademicTitle = ''
     let colEmail = ''
     let colQuota = ''
     let colOrg = ''
@@ -282,7 +283,17 @@ export async function parseAdvisorExcelFile(
 
     for (const [col, val] of Object.entries(headerCells)) {
       const h = val.toLowerCase().trim()
-      if (h.includes('mã') || h.includes('code') || h.includes('id')) {
+      if (
+        h.includes('học hàm') ||
+        h.includes('học vị') ||
+        h.includes('chức danh') ||
+        h.includes('academic title') ||
+        h === 'title' ||
+        h.includes('học hàm/học vị') ||
+        h.includes('học hàm / học vị')
+      ) {
+        colAcademicTitle = col
+      } else if (h.includes('mã') || h.includes('code') || h.includes('id')) {
         colTeacherCode = col
       } else if (h.includes('họ và tên đệm') || h.includes('họ và đệm') || h.includes('họ đệm') || h === 'họ' || h === 'họ tên đệm' || h.includes('last name')) {
         colLastNamePrefix = col
@@ -310,8 +321,9 @@ export async function parseAdvisorExcelFile(
     if (!colEmail && !colName && !colLastNamePrefix) {
       colTeacherCode = 'B'
       colName = 'C'
-      colEmail = 'D'
-      colQuota = 'E'
+      colAcademicTitle = 'D'
+      colEmail = 'E'
+      colQuota = 'F'
     } else {
       if (!colEmail) colEmail = 'D'
     }
@@ -370,12 +382,16 @@ export async function parseAdvisorExcelFile(
         if (foundNum) quota = parseInt(foundNum, 10)
       }
 
-      // Tách học vị / học hàm nếu có trong họ tên (VD: "PGS.TS. Trần Quốc Bảo")
-      let title = ''
-      const titleMatch = name.match(/^(PGS\.TS\.|GS\.TS\.|TS\.|ThS\.|CN\.|KS\.)\s*/i)
-      if (titleMatch) {
-        title = titleMatch[1].trim()
-        name = name.replace(titleMatch[0], '').trim()
+      // Đọc học vị / học hàm từ cột riêng hoặc bóc tách từ chuỗi họ tên
+      let academicTitle = (colAcademicTitle ? cells[colAcademicTitle] : '') || ''
+      if (!academicTitle) {
+        const titleMatch = name.match(
+          /^(PGS\.TS\.|GS\.TS\.|TS\.|ThS\.|CN\.|KS\.|Phó Giáo sư|Tiến sĩ|Thạc sĩ|Giáo sư)\s*/i,
+        )
+        if (titleMatch) {
+          academicTitle = titleMatch[1].trim()
+          name = name.replace(titleMatch[0], '').trim()
+        }
       }
 
       // Suy đoán đơn vị nếu chưa có
@@ -390,7 +406,7 @@ export async function parseAdvisorExcelFile(
           rowNumber: rowNum,
           teacherCode,
           name,
-          academicTitle: title,
+          academicTitle: academicTitle.trim(),
           email,
           organization,
           department,

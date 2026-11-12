@@ -22,6 +22,7 @@ function renderDialog(onOpenChange = vi.fn()) {
 const field = (label: string) => screen.getByLabelText(new RegExp(`^${label}`))
 
 async function fillValidForm(u: ReturnType<typeof userEvent.setup>) {
+  await u.type(field('Mã giảng viên'), 'GV001')
   await u.type(field('Họ và tên đệm'), 'Nguyễn Văn')
   await u.type(field('Tên'), 'An')
   await u.type(field('Email'), 'an.nv@tlu.edu.vn')
@@ -51,7 +52,8 @@ describe('CreateTeacherDialog', () => {
 
     await u.click(screen.getByRole('button', { name: 'Lưu' }))
 
-    expect(await screen.findByText('Họ không được để trống')).toBeInTheDocument()
+    expect(await screen.findByText('Mã giảng viên không được để trống')).toBeInTheDocument()
+    expect(screen.getByText('Họ không được để trống')).toBeInTheDocument()
     expect(screen.getByText('Email không được để trống')).toBeInTheDocument()
     expect(screen.getByText('Đơn vị công tác không được để trống')).toBeInTheDocument()
     expect(create).not.toHaveBeenCalled()
@@ -215,6 +217,7 @@ describe('CreateTeacherDialog', () => {
     expect(field('Ngành')).toHaveValue('Kỹ thuật phần mềm')
     expect(field('Ngành')).toBeDisabled()
 
+    await u.type(field('Mã giảng viên'), 'GV002')
     await u.type(field('Họ và tên đệm'), 'Trần Quốc')
     await u.type(field('Tên'), 'Bảo')
     await u.type(field('Email'), 'bao.tq@tlu.edu.vn')

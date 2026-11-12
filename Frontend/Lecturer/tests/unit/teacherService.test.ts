@@ -69,6 +69,7 @@ describe('teacherService.createTeacher', () => {
     reply = { code: 1000, message: 'Thêm giáo viên thành công', data: null }
 
     const result = await teacherService.createTeacher({
+      teacherCode: 'GV001',
       firstName: 'Nguyễn Văn',
       lastName: 'An',
       email: 'an.nv@tlu.edu.vn',
@@ -86,6 +87,7 @@ describe('teacherService.createTeacher', () => {
     reply = { code: 1100, message: 'Giáo viên đã tồn tại và đang hoạt động', data: null }
 
     const result = await teacherService.createTeacher({
+      teacherCode: 'GV001',
       firstName: 'Nguyễn Văn',
       lastName: 'An',
       email: 'an.nv@tlu.edu.vn',

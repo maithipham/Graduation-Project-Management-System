@@ -213,6 +213,7 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
     mutationFn: async () => {
       return await commentingLecturerService.autoDistribute({
         semesterId,
+        departmentId: managedMajor?.publicId,
         preview: true,
       })
     },
@@ -231,6 +232,7 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
     mutationFn: async () => {
       await commentingLecturerService.autoDistribute({
         semesterId,
+        departmentId: managedMajor?.publicId,
         preview: false,
       })
     },

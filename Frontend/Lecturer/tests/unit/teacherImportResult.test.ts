@@ -8,6 +8,7 @@ import {
 
 const ROW: TeacherImportRowResult = {
   rowNumber: 3,
+  teacherCode: 'GV001',
   firstName: 'Nguyễn Văn',
   lastName: 'An',
   email: 'an.nv@tlu.edu.vn',
@@ -20,13 +21,14 @@ const ROW: TeacherImportRowResult = {
 }
 
 const VALUES = {
+  teacherCode: 'GV001',
   firstName: 'Nguyễn Văn',
   lastName: 'An',
   email: 'an.nv@tlu.edu.vn',
   phone: '0912345678',
   organization: 'Trường Đại học Thủy lợi',
   major: '7480103',
-  academicTitle: null,
+  academicTitle: '',
   amount: null,
 }
 

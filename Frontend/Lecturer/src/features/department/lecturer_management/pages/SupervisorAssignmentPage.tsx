@@ -309,14 +309,17 @@ export default function SupervisorAssignmentPage() {
     try {
       await supervisorService.assignAdvisor(effectiveSemesterId, studentIds, targetTeacherId)
       toast.success(`Đã phân công ${studentIds.length} sinh viên cho ${supervisor.name} thành công!`)
-      queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
-      queryClient.invalidateQueries({ queryKey: ['supervisors'] })
-      queryClient.invalidateQueries({ queryKey: ['supervisor-students'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] }),
+        queryClient.invalidateQueries({ queryKey: ['supervisors'] }),
+        queryClient.invalidateQueries({ queryKey: ['supervisor-students'] }),
+      ])
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Không thể phân công sinh viên cho giảng viên'
       toast.error(msg)
+      throw err
     }
   }
 
@@ -399,112 +402,118 @@ export default function SupervisorAssignmentPage() {
 
     const handleToggleLock = async (nextLockState: boolean): Promise<boolean> => {
       try {
-        await supervisorService.toggleLockAssignment(effectiveSemesterId, nextLockState)
-
-        const nowStr = new Date().toLocaleString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })
-
-          setLocalLockOverride(nextLockState)
-          if (nextLockState) {
-            setLocalLockedAt(nowStr)
-            setLocalLockedBy('Trưởng bộ môn')
-            try {
-              localStorage.setItem(lockStorageKey, 'true')
-              localStorage.setItem(
-                `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
-                nowStr,
-              )
-              localStorage.setItem(
-                `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
-                'Trưởng bộ môn',
-              )
-            } catch { }
-            toast.success('Đã khóa danh sách phân công GVHD & công bố chính thức thành công!')
-          } else {
-            setLocalLockedAt(null)
-            setLocalLockedBy(null)
-            try {
-              localStorage.setItem(lockStorageKey, 'false')
-              localStorage.removeItem(
-                `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
-              )
-              localStorage.removeItem(
-                `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
-              )
-            } catch { }
-            toast.info('Đã mở khóa danh sách phân công. Bạn có thể chỉnh sửa GVHD 1 và 2.')
-          }
-
-          await queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
-          return true
-        } catch (err: unknown) {
-          const msg =
-            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-            'Không thể thay đổi trạng thái khóa danh sách phân công'
-          toast.error(msg)
-          return false
+        if (nextLockState) {
+          const msg = await supervisorService.finalizeSupervisors(effectiveSemesterId)
+          toast.success(msg || 'Đã chốt danh sách phân công GVHD & công bố chính thức thành công!')
+        } else {
+          await supervisorService.toggleLockAssignment(effectiveSemesterId, false)
+          toast.info('Đã mở khóa danh sách phân công. Bạn có thể chỉnh sửa GVHD 1 và 2.')
         }
+
+      const nowStr = new Date().toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+
+        setLocalLockOverride(nextLockState)
+        if (nextLockState) {
+          setLocalLockedAt(nowStr)
+          setLocalLockedBy('Trưởng bộ môn')
+          try {
+            localStorage.setItem(lockStorageKey, 'true')
+            localStorage.setItem(
+              `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
+              nowStr,
+            )
+            localStorage.setItem(
+              `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
+              'Trưởng bộ môn',
+            )
+          } catch { }
+        } else {
+          setLocalLockedAt(null)
+          setLocalLockedBy(null)
+          try {
+            localStorage.setItem(lockStorageKey, 'false')
+            localStorage.removeItem(
+              `tbm_assignment_locked_at_${selectedYear}_${selectedSemesterId || 'current'}`,
+            )
+            localStorage.removeItem(
+              `tbm_assignment_locked_by_${selectedYear}_${selectedSemesterId || 'current'}`,
+            )
+          } catch { }
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
+        await queryClient.invalidateQueries({ queryKey: ['supervisors'] })
+        return true
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          (err as Error)?.message ||
+          (nextLockState ? 'Chốt danh sách GVHD thất bại' : 'Không thể thay đổi trạng thái khóa danh sách phân công')
+        toast.error(msg)
+        return false
       }
+    }
 
   return (
-        <div
-          className={cn(
-            'w-full min-h-0 flex flex-col',
-            view === 'workspace' ? 'flex-1 h-full overflow-hidden' : 'space-y-4 pb-12',
-          )}
-        >
-          {view === 'overview' ? (
-            <SupervisorOverviewView
-              lecturers={overviewLecturers}
-              students={students}
-              majors={majors}
-              selectedYear={selectedYear}
-              selectedSemesterId={selectedSemesterId}
-              academicYears={academicYears}
-              termsOfYear={termsOfYear}
-              isLoading={semestersLoading || lecturersLoading}
-              onYearChange={onYearChange}
-              onSemesterChange={onSemesterChange}
-              onUpdateQuota={handleUpdateQuota}
-              onRemoveLecturer={handleRemoveLecturer}
-              onOpenWorkspace={() => {
-                if (selectedSemesterId === 'all' && effectiveSemesterId) {
-                  onSemesterChange(effectiveSemesterId)
-                }
-                setView('workspace')
-              }}
-            />
-          ) : (
-            <SupervisorWorkspaceView
-              lecturers={workspaceLecturers}
-              students={students}
-              year={selectedYear}
-              semesterName={termName}
-              selectedSemesterId={selectedSemesterId === 'all' ? effectiveSemesterId : selectedSemesterId}
-              academicYears={academicYears}
-              termsOfYear={termsOfYear}
-              onYearChange={onYearChange}
-              onSemesterChange={onSemesterChange}
-              isLocked={isLocked}
-              lockedAt={lockedAt}
-              lockedByName={lockedByName}
-              registrationDeadline={workspace?.registrationDeadline}
-              counts={counts}
-              isLoading={workspaceLoading || lecturersLoading}
-              onBack={() => setView('overview')}
-              onAssignStudents={handleAssignStudents}
-              onApproveRegistrations={handleApproveRegistrations}
-              onRejectRegistrations={handleRejectRegistrations}
-              onChangeSupervisor={handleChangeSupervisor}
-              onChangeCoSupervisor={handleChangeCoSupervisor}
-              onToggleLock={handleToggleLock}
-            />
-          )}
-        </div>
-      )
-    }
+    <div
+      className={cn(
+        'w-full min-h-0 flex flex-col',
+        view === 'workspace' ? 'flex-1 h-full overflow-hidden' : 'space-y-4 pb-12',
+      )}
+    >
+      {view === 'overview' ? (
+        <SupervisorOverviewView
+          lecturers={overviewLecturers}
+          students={students}
+          majors={majors}
+          selectedYear={selectedYear}
+          selectedSemesterId={selectedSemesterId}
+          academicYears={academicYears}
+          termsOfYear={termsOfYear}
+          isLoading={semestersLoading || lecturersLoading}
+          onYearChange={onYearChange}
+          onSemesterChange={onSemesterChange}
+          onUpdateQuota={handleUpdateQuota}
+          onRemoveLecturer={handleRemoveLecturer}
+          onOpenWorkspace={() => {
+            if (selectedSemesterId === 'all' && effectiveSemesterId) {
+              onSemesterChange(effectiveSemesterId)
+            }
+            setView('workspace')
+          }}
+        />
+      ) : (
+        <SupervisorWorkspaceView
+          lecturers={workspaceLecturers}
+          students={students}
+          year={selectedYear}
+          semesterName={termName}
+          selectedSemesterId={selectedSemesterId === 'all' ? effectiveSemesterId : selectedSemesterId}
+          academicYears={academicYears}
+          termsOfYear={termsOfYear}
+          onYearChange={onYearChange}
+          onSemesterChange={onSemesterChange}
+          isLocked={isLocked}
+          lockedAt={lockedAt}
+          lockedByName={lockedByName}
+          registrationDeadline={workspace?.registrationDeadline}
+          counts={counts}
+          isLoading={workspaceLoading || lecturersLoading}
+          onBack={() => setView('overview')}
+          onAssignStudents={handleAssignStudents}
+          onApproveRegistrations={handleApproveRegistrations}
+          onRejectRegistrations={handleRejectRegistrations}
+          onChangeSupervisor={handleChangeSupervisor}
+          onChangeCoSupervisor={handleChangeCoSupervisor}
+          onToggleLock={handleToggleLock}
+        />
+      )}
+    </div>
+  )
+}

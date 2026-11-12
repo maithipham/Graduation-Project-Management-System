@@ -48,6 +48,20 @@ export function toApiError(error: AxiosError): ApiError {
   return new ApiError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.', NETWORK_ERROR_CODE)
 }
 
+/**
+ * Request tải file (`responseType: 'blob'`) thì body luôn là Blob, kể cả khi BE trả APIResponse JSON báo lỗi.
+ * Body là JSON → đọc ra object để xử lý lỗi giống mọi API khác; file thật thì giữ nguyên.
+ */
+async function parseJsonBlob(data: unknown): Promise<unknown> {
+  if (!(data instanceof Blob)) return data
+  try {
+    const text = await data.text()
+    return JSON.parse(text)
+  } catch {
+    return data
+  }
+}
+
 // Nhiều request cùng bị 401 thì chỉ gọi refresh 1 lần, các request còn lại chờ chung kết quả
 let refreshPromise: Promise<void> | null = null
 
@@ -66,9 +80,18 @@ function refreshSession(axiosInstance: AxiosInstance): Promise<void> {
 }
 
 export function setupInterceptors(axiosInstance: AxiosInstance): void {
+  // Request Interceptor: Chuẩn hóa URL, tránh lặp /api/api
+  axiosInstance.interceptors.request.use((config) => {
+    if (config.baseURL?.endsWith('/api') && config.url?.startsWith('/api/')) {
+      config.url = config.url.replace(/^\/api/, '')
+    }
+    return config
+  })
+
   // Response Interceptor: Chuẩn hóa phản hồi APIResponse (code 1000 = thành công, khác 1000 = thất bại)
   axiosInstance.interceptors.response.use(
-    (response) => {
+    async (response) => {
+      response.data = await parseJsonBlob(response.data)
       // Bắt trường hợp BE trả về HTTP 200 nhưng code khác 1000 (Lỗi nghiệp vụ)
       if (
         response.data &&
@@ -99,6 +122,7 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
       }
 
       const config = error.config
+      if (error.response) error.response.data = await parseJsonBlob(error.response.data)
       const apiError = toApiError(error)
 
       // Lỗi của chính request refresh: không toast, để refreshSession() báo thất bại cho request gốc

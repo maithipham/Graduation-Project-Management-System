@@ -1,5 +1,5 @@
 import { useState, useId, type DragEvent } from 'react'
-import { FileSpreadsheet, Info, UploadCloud, X } from 'lucide-react'
+import { Download, FileSpreadsheet, Info, UploadCloud, X } from 'lucide-react'
 import { toast } from '@/shared/components/feedback/toast.store'
 import {
   Button,
@@ -12,6 +12,7 @@ import {
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
 import { formatBytes } from '@/shared/utils'
+import { downloadExcelTemplate } from '@/shared/utils/download'
 
 export type ImportAccountTarget = 'student' | 'lecturer'
 
@@ -27,6 +28,7 @@ const STUDENT_IMPORT_COLUMNS = [
 ]
 
 const LECTURER_IMPORT_COLUMNS = [
+  'Mã giảng viên',
   'Họ và tên',
   'Email',
   'Số điện thoại',
@@ -187,6 +189,20 @@ export function ImportAccountDialog({ open, onOpenChange, target }: ImportAccoun
                   </li>
                 ))}
               </ol>
+              <div className="pt-2 border-t border-blue-100">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0 cursor-pointer text-[#1565C0] hover:text-[#0D47A1] font-semibold text-xs inline-flex items-center gap-1"
+                  onClick={() =>
+                    target === 'student'
+                      ? downloadExcelTemplate('/api/students/import/template', 'mau_import_sinh_vien.xlsx', '/student/import/template')
+                      : downloadExcelTemplate('/api/teachers/import/template', 'mau_import_giang_vien.xlsx', '/teacher/import/template')
+                  }
+                >
+                  <Download className="w-3.5 h-3.5" /> Tải file mẫu (.xlsx)
+                </Button>
+              </div>
             </div>
           </div>
 

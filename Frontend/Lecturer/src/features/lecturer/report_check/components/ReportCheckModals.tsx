@@ -7,10 +7,8 @@ import {
   ChevronRight,
   Clock,
   Download,
-  FileCheck,
   FileText,
   FileUp,
-  History,
   Minus,
   Plus,
   Printer,
@@ -33,7 +31,7 @@ export const PlagiarismUploadModal: React.FC<PlagiarismUploadModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [, setSelectedFile] = useState<File | null>(null)
   const [selectedFileName, setSelectedFileName] = useState('')
   const [rate, setRate] = useState<string>('15')
   const [rateError, setRateError] = useState('')

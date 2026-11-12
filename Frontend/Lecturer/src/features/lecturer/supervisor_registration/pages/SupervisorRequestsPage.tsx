@@ -76,7 +76,7 @@ function getStatusLabel(request: SupervisorRequestItem): string {
     case 'TEACHER_APPROVED':
       return 'GV đã duyệt'
     case 'HOD_APPROVED':
-      return 'TBM đã duyệt'
+      return 'TBM duyệt'
     case 'ASSIGNED_BY_HOD':
       return 'TBM phân công'
     case 'REJECTED':

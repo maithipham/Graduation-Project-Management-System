@@ -1,11 +1,9 @@
-import React from 'react'
 import {
   Check,
   ChevronDown,
   Clock,
   Eye,
   FileCheck,
-  FileText,
   History,
   Inbox,
   Search,
@@ -22,7 +20,6 @@ import type { ReportCheckItem, ReportTabStatus } from '../types/reportCheck.type
 
 export default function ReportCheckPage() {
   const {
-    filteredReports,
     pagedReports,
     counts,
     searchQuery,

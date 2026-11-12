@@ -64,9 +64,10 @@ export function toApiError(error: AxiosError): ApiError {
  * Body là JSON → đọc ra object để xử lý lỗi giống mọi API khác; file thật thì giữ nguyên.
  */
 async function parseJsonBlob(data: unknown): Promise<unknown> {
-  if (!(data instanceof Blob) || !data.type.includes('json')) return data
+  if (!(data instanceof Blob)) return data
   try {
-    return JSON.parse(await data.text())
+    const text = await data.text()
+    return JSON.parse(text)
   } catch {
     return data
   }
@@ -90,6 +91,14 @@ function refreshSession(axiosInstance: AxiosInstance): Promise<void> {
 }
 
 export function setupInterceptors(axiosInstance: AxiosInstance): void {
+  // Request Interceptor: Chuẩn hóa URL, tránh lặp /api/api
+  axiosInstance.interceptors.request.use((config) => {
+    if (config.baseURL?.endsWith('/api') && config.url?.startsWith('/api/')) {
+      config.url = config.url.replace(/^\/api/, '')
+    }
+    return config
+  })
+
   // Response Interceptor: Chuẩn hóa phản hồi APIResponse
   // (code 1000 = thành công, 11xx = thành công kèm cảnh báo, còn lại = thất bại)
   axiosInstance.interceptors.response.use(

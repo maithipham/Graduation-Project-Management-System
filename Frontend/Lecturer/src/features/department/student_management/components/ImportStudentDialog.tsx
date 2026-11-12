@@ -18,6 +18,7 @@ import {
   FormField,
 } from "@/shared/components/ui";
 import { cn } from "@/shared/utils/cn";
+import { downloadExcelTemplate } from "@/shared/utils/download";
 import { useImportStudents } from "../hooks/useStudents";
 import type {
   RowImportStatus,
@@ -216,7 +217,11 @@ export function ImportStudentDialog({
                     <button
                       type="button"
                       onClick={() =>
-                        toast.info("Chức năng tải file mẫu sẽ sớm được hỗ trợ")
+                        downloadExcelTemplate(
+                          '/api/students/import/template',
+                          'mau_import_sinh_vien.xlsx',
+                          '/student/import/template',
+                        )
                       }
                       className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1565C0] hover:text-[#0D47A1] hover:underline cursor-pointer"
                     >
