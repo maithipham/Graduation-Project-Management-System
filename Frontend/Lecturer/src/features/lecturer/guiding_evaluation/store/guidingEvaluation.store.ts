@@ -1,23 +1,65 @@
-import { useLecturerPortalStore } from '@/features/lecturer/lecturer_portal_storage'
-import type { GuidingEvaluationItem } from '../types/guidingEvaluation.types'
+import { create } from 'zustand'
+import type {
+  GuidingEvaluationTabStatus,
+  RubricScores,
+} from '../types/guidingEvaluation.types'
 
-export const useGuidingEvaluationStore = () => {
-  const guidingEvaluations = useLecturerPortalStore((s) => s.guidingEvaluations)
-  const teacher = useLecturerPortalStore((s) => s.teacher)
-  const academicYear = useLecturerPortalStore((s) => s.academicYear)
-  const semester = useLecturerPortalStore((s) => s.semester)
-  const submitEvaluationTrackingFile = useLecturerPortalStore(
-    (s) => s.submitEvaluationTrackingFile,
-  )
-  const saveEvaluationRubric = useLecturerPortalStore((s) => s.saveEvaluationRubric)
-
-  return {
-    guidingEvaluations: guidingEvaluations as GuidingEvaluationItem[],
-    teacher,
-    academicYear,
-    semester,
-    submitEvaluationTrackingFile,
-    saveEvaluationRubric,
-  }
+interface LocalRubricEntry {
+  score: number | null
+  rubricScores: RubricScores
 }
 
+interface GuidingEvaluationUiState {
+  filterStatus: GuidingEvaluationTabStatus
+  searchQuery: string
+  pageSize: number
+  currentPage: number
+  localRubrics: Record<string, LocalRubricEntry>
+  setFilterStatus: (status: GuidingEvaluationTabStatus) => void
+  setSearchQuery: (query: string) => void
+  setPageSize: (size: number) => void
+  setCurrentPage: (page: number) => void
+  saveLocalRubric: (
+    topicPublicId: string,
+    score: number,
+    rubricScores: RubricScores,
+    isDraft: boolean,
+  ) => void
+  resetFilters: () => void
+}
+
+export const useGuidingEvaluationStore = create<GuidingEvaluationUiState>(
+  (set) => ({
+    filterStatus: 'all',
+    searchQuery: '',
+    pageSize: 15,
+    currentPage: 1,
+    localRubrics: {},
+
+    setFilterStatus: (filterStatus) => set({ filterStatus, currentPage: 1 }),
+    setSearchQuery: (searchQuery) => set({ searchQuery, currentPage: 1 }),
+    setPageSize: (pageSize) => set({ pageSize, currentPage: 1 }),
+    setCurrentPage: (currentPage) => set({ currentPage }),
+    saveLocalRubric: (topicPublicId, score, rubricScores, isDraft) =>
+      set((state) => {
+        const existing = state.localRubrics[topicPublicId]
+        return {
+          localRubrics: {
+            ...state.localRubrics,
+            [topicPublicId]: {
+              score: isDraft ? (existing?.score ?? null) : score,
+              rubricScores,
+            },
+          },
+        }
+      }),
+    resetFilters: () =>
+      set({
+        filterStatus: 'all',
+        searchQuery: '',
+        pageSize: 15,
+        currentPage: 1,
+        localRubrics: {},
+      }),
+  }),
+)

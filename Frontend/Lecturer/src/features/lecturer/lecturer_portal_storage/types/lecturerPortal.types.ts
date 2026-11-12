@@ -1,16 +1,23 @@
 import type { SupervisorRequestItem } from '@/features/lecturer/supervisor_registration/types/supervisorRegistration.types'
 import type { TopicProposalItem } from '@/features/lecturer/topic_proposal/types/topicProposal.types'
 import type { OutlineReviewItem } from '@/features/lecturer/outline_review/types/outlineReview.types'
-import type { ReportCheckItem } from '@/features/lecturer/report_check/types/reportCheck.types'
-import type {
-  GuidingEvaluationItem,
-  RubricScores,
-} from '@/features/lecturer/guiding_evaluation/types/guidingEvaluation.types'
 import type {
   DefenseCouncilItem,
   DefenseReviewItem,
 } from '@/features/lecturer/defense_management/types/defenseManagement.types'
 import type { LecturerDocumentTemplate } from '@/features/lecturer/template_management/types/templateManagement.types'
+
+export interface LegacyReportCheckItem {
+  id: string
+  mssv: string
+  status: 'pending' | 'approved' | 'rejected' | 'not_submitted'
+  plagiarismFile?: string
+  plagiarismRate?: number | null
+  comment?: string
+  approvedAt?: string
+  rejectedAt?: string
+  hasDownloaded?: boolean
+}
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
@@ -45,8 +52,7 @@ export interface LecturerPortalState {
   supervisorRequests: SupervisorRequestItem[]
   topicProposals: TopicProposalItem[]
   outlines: OutlineReviewItem[]
-  reports: ReportCheckItem[]
-  guidingEvaluations: GuidingEvaluationItem[]
+  reports: LegacyReportCheckItem[]
   defenseCouncils: DefenseCouncilItem[]
   defenseReviews: DefenseReviewItem[]
   documentTemplates: LecturerDocumentTemplate[]
@@ -70,14 +76,6 @@ export interface LecturerPortalState {
   rejectReport: (id: string, comment?: string) => void
   submitPlagiarismResult: (id: string, fileName: string, rate: number) => void
   markReportDownloaded: (id: string) => void
-
-  submitEvaluationTrackingFile: (id: string, fileName: string) => void
-  saveEvaluationRubric: (
-    id: string,
-    score: number | null,
-    rubricScores: RubricScores,
-    isDraft?: boolean,
-  ) => void
 
   updateDefenseReviewScore: (id: string, score: number | null) => void
   approveDefenseReview: (id: string) => void

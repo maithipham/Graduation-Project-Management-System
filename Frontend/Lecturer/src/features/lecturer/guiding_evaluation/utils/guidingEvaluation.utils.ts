@@ -3,7 +3,6 @@ import type {
   RubricCriterionKey,
   RubricGroupConfig,
   RubricScores,
-  TrackingTimelineEntry,
 } from '../types/guidingEvaluation.types'
 
 export const RUBRIC_GROUPS: RubricGroupConfig[] = [
@@ -100,111 +99,22 @@ export const RUBRIC_GROUPS: RubricGroupConfig[] = [
   },
 ]
 
-export const DEFAULT_STUDENT_RUBRIC_SCORES: Record<string, RubricScores> = {
-  'eval-01': {
-    r1_1: 9.0, r1_2: 9.0,
-    r2_1: 8.5, r2_2: 9.0,
-    r3_1: 8.8, r3_2: 8.7,
-    r4_1: 8.5, r4_2: 9.0, r4_3: 8.5,
-  },
-  'eval-02': {
-    r1_1: 9.5, r1_2: 9.0,
-    r2_1: 9.0, r2_2: 9.5,
-    r3_1: 9.2, r3_2: 9.0,
-    r4_1: 9.0, r4_2: 9.5, r4_3: 9.0,
-  },
-  'eval-03': {
-    r1_1: 9.0, r1_2: 8.5,
-    r2_1: 8.5, r2_2: 9.0,
-    r3_1: 8.8, r3_2: 8.5,
-    r4_1: 8.5, r4_2: 9.0, r4_3: 8.5,
-  },
-  'eval-04': {
-    r1_1: 8.5, r1_2: 8.5,
-    r2_1: 8.5, r2_2: 8.5,
-    r3_1: 8.5, r3_2: 8.5,
-    r4_1: 8.5, r4_2: 8.5, r4_3: 8.5,
-  },
-  'eval-05': {
-    r1_1: 9.5, r1_2: 9.5,
-    r2_1: 9.5, r2_2: 9.5,
-    r3_1: 9.5, r3_2: 9.5,
-    r4_1: 9.5, r4_2: 9.5, r4_3: 9.5,
-  },
-  'eval-06': {
-    r1_1: 9.0, r1_2: 8.5,
-    r2_1: 8.5, r2_2: 9.0,
-    r3_1: 8.5, r3_2: 8.5,
-    r4_1: 8.0, r4_2: 8.5, r4_3: 8.0,
-  },
-  'eval-07': {
-    r1_1: 8.5, r1_2: 8.5,
-    r2_1: 8.0, r2_2: 8.5,
-    r3_1: 8.5, r3_2: 8.0,
-    r4_1: 8.0, r4_2: 8.0, r4_3: 8.0,
-  },
-  'eval-08': {
-    r1_1: 9.0, r1_2: 9.0,
-    r2_1: 9.0, r2_2: 8.5,
-    r3_1: 9.0, r3_2: 8.5,
-    r4_1: 8.5, r4_2: 9.0, r4_3: 8.5,
-  },
-  'eval-09': {
-    r1_1: 8.0, r1_2: 8.5,
-    r2_1: 8.5, r2_2: 8.0,
-    r3_1: 8.0, r3_2: 8.5,
-    r4_1: 8.0, r4_2: 8.0, r4_3: 8.0,
-  },
-  'eval-10': {
-    r1_1: 9.0, r1_2: 9.0,
-    r2_1: 8.5, r2_2: 9.0,
-    r3_1: 9.0, r3_2: 9.0,
-    r4_1: 8.5, r4_2: 9.0, r4_3: 8.5,
-  },
-  'eval-11': {
-    r1_1: 8.5, r1_2: 8.5,
-    r2_1: 8.0, r2_2: 8.5,
-    r3_1: 8.5, r3_2: 8.5,
-    r4_1: 8.0, r4_2: 8.0, r4_3: 8.0,
-  },
-  'eval-12': {
-    r1_1: 9.5, r1_2: 9.0,
-    r2_1: 9.0, r2_2: 9.0,
-    r3_1: 9.0, r3_2: 9.0,
-    r4_1: 9.0, r4_2: 9.0, r4_3: 8.5,
-  },
+const EMPTY_RUBRIC_SCORES: RubricScores = {
+  r1_1: 0,
+  r1_2: 0,
+  r2_1: 0,
+  r2_2: 0,
+  r3_1: 0,
+  r3_2: 0,
+  r4_1: 0,
+  r4_2: 0,
+  r4_3: 0,
 }
 
-// Dữ liệu 16 đợt theo dõi tiến độ chuẩn ĐH Thủy Lợi (Mẫu 1: Đủ điều kiện ra hội đồng)
-export const OFFICIAL_TRACKING_TIMELINE: TrackingTimelineEntry[] = [
-  { date: '24/3', work: 'Giao đề tài, hướng dẫn, góp ý làm đề cương', comment: 'Yêu cầu chỉnh sửa, tên, mục tiêu đề tài', location: 'Email và Zalo' },
-  { date: '31/3', work: 'Duyệt, chỉnh sửa nội dung phác thảo', comment: 'Đạt yêu cầu, nhưng cần bổ sung tài liệu tham khảo', location: 'Gặp trực tiếp' },
-  { date: '7/4', work: 'Báo cáo tiến độ thu thập dữ liệu/thực hiện Chương 1.', comment: 'Nhắc nhở về thời hạn nộp bài. Chỉnh sửa nội dung và góp ý', location: 'Zalo và google meet' },
-  { date: '14/4', work: 'Yêu cầu và nghiệp vụ của dự án', comment: 'Cần xác định các yêu cầu chức năng và phi chức năng của hệ thống', location: 'Gặp trực tiếp' },
-  { date: '21/4', work: 'Yêu cầu sv báo cáo kết quả chỉnh sửa chương 1, nội dung chương 2', comment: 'Sinh viên báo cáo kết quả thực hiện, xác định được các yêu cầu cho hệ thống', location: 'Zalo và google meet' },
-  { date: '28/4', work: 'Xác định các chức năng nghiệp vụ chính hệ thống', comment: 'Đặc tả các yêu cầu chức năng bằng biểu đồ use cases', location: 'Zalo và google meet' },
-  { date: '5/5', work: 'Yêu cầu sv báo cáo kết quả chức năng trong Inter 1, và nội dung trong chương 3', comment: 'Cần chỉnh sửa biểu đồ Use case', location: 'Gặp trực tiếp' },
-  { date: '12/5', work: 'Báo cáo kết quả Inter 1', comment: 'Tiếp tục chỉnh sửa đáp ứng yêu cầu nghiệp vụ và các định các chức năng phát triển trong inter 2', location: 'Zalo và google meet' },
-  { date: '19/5', work: 'Yêu cầu Sinh viên báo cáo kết quả chức năng và tài liệu trong Inter 2', comment: 'Sinh viên đã triển khai tốt các chức năng phân quyền người dùng', location: 'Google meet' },
-  { date: '26/5', work: 'Báo cáo kết quả Inter 2', comment: 'Tiếp tục chỉnh sửa đáp ứng yêu cầu nghiệp vụ và các định các chức năng phát triển trong inter 3', location: 'Zalo và google meet' },
-  { date: '2/6', work: 'Yêu cầu Sinh viên báo cáo kết quả chức năng và tài liệu trong Inter 3', comment: 'Sinh viên báo cáo các chức năng quản lý thuê máy, cần tổ chức nhóm các chức năng đảm bảo chỉ lấy dữ liệu khi cần thiết, nên tổ chức theo tab', location: 'Gặp trực tiếp' },
-  { date: '9/6', work: 'Báo cáo kết quả Inter 3', comment: 'Tiếp tục chỉnh sửa đáp ứng yêu cầu nghiệp vụ và các định các chức năng phát triển trong inter 4', location: 'Zalo và google meet' },
-  { date: '16/6', work: 'Sinh viên báo cáo kết quả chức năng và tài liệu trong Inter 4', comment: 'Với các chức năng thống kê báo cáo. Các chức năng cần lấy dữ liệu tổng hợp theo nhu cầu thực tế. Hoàn thiện các chức năng xuất hóa đơn và thống kê', location: 'Google meet' },
-  { date: '23/6', work: 'Sinh viên hoàn thiện tài liệu báo cáo đồ án tốt nghiệp', comment: 'Cần chỉnh sửa các tài liệu yêu cầu, bổ sung các yêu cầu chức năng, tài liệu thiết kế', location: 'Google meet' },
-  { date: '25/6', work: 'Review cuốn báo cáo và tài chương trình', comment: 'Hoàn thiện chương trình và tài liệu, báo cáo chuẩn bị để bảo vệ', location: 'Gặp trực tiếp' },
-  { date: '27/6', work: 'Review báo cáo trước khi nộp', comment: 'Sinh viên chỉnh sửa theo góp ý', location: 'Google meet' },
-]
-
-// Dữ liệu timeline Mẫu 2: Sinh viên chưa hoàn thành / không đủ điều kiện đề xuất hội đồng
-export const INCOMPLETE_TRACKING_TIMELINE: TrackingTimelineEntry[] = [
-  { date: '10/7', work: 'Giao đề tài, hướng dẫn, góp ý làm đề cương', comment: 'Yêu cầu chỉnh sửa, tên, mục tiêu...', location: 'zoom/zalo nhóm/...' },
-  { date: '20/7', work: 'Duyệt, chỉnh sửa nội dung phác thảo', comment: 'Đạt yêu cầu, nhưng cần bổ sung tài liệu...', location: 'zoom/zalo nhóm/ P212/ nhật ký HD' },
-  { date: '30/7', work: 'Báo cáo tiến độ thu thập dữ liệu/thực hiện Chương 1.', comment: 'Nhắc nhở về thời hạn nộp bài. Chỉnh sửa nội dung...', location: 'zoom/zalo nhóm/...' },
-  { date: '10/8', work: 'Yêu cầu sv báo cáo kết quả chỉnh sửa chương 1, nội dung chương 2', comment: 'Sinh viên không phản hồi, không tham gia', location: 'Gửi thông tin email/zalo...' },
-]
-
-export function hasTrackingFile(item: Pick<GuidingEvaluationItem, 'fileName'>): boolean {
-  return Boolean(item.fileName && item.fileName.trim())
+export function hasTrackingFile(
+  item: Pick<GuidingEvaluationItem, 'progressReport' | 'fileName'>,
+): boolean {
+  return Boolean(item.progressReport || (item.fileName && item.fileName.trim()))
 }
 
 export function hasEvaluationScore(item: Pick<GuidingEvaluationItem, 'score'>): boolean {
@@ -212,20 +122,9 @@ export function hasEvaluationScore(item: Pick<GuidingEvaluationItem, 'score'>): 
 }
 
 export function isEvaluationCompleted(
-  item: Pick<GuidingEvaluationItem, 'fileName' | 'score'>,
+  item: Pick<GuidingEvaluationItem, 'progressReport' | 'fileName'>,
 ): boolean {
-  return hasTrackingFile(item) && hasEvaluationScore(item)
-}
-
-export function getMissingEvaluationStatus(
-  item: Pick<GuidingEvaluationItem, 'fileName' | 'score'>,
-): string | null {
-  const hasFile = hasTrackingFile(item)
-  const hasScore = hasEvaluationScore(item)
-  if (hasFile && hasScore) return null
-  if (!hasFile && !hasScore) return 'Thiếu cả 2 mục'
-  if (!hasFile) return 'Chưa nộp phiếu theo dõi'
-  return 'Chưa chấm điểm hướng dẫn'
+  return hasTrackingFile(item)
 }
 
 export function clampRubricValue(val: number): number {
@@ -235,10 +134,11 @@ export function clampRubricValue(val: number): number {
   return val
 }
 
-export function getInitialRubricScores(item: GuidingEvaluationItem): RubricScores {
+export function getInitialRubricScores(
+  item: Pick<GuidingEvaluationItem, 'rubricScores'>,
+): RubricScores {
   if (item.rubricScores) return { ...item.rubricScores }
-  const preset = DEFAULT_STUDENT_RUBRIC_SCORES[item.id] ?? DEFAULT_STUDENT_RUBRIC_SCORES['eval-01']
-  return { ...preset }
+  return { ...EMPTY_RUBRIC_SCORES }
 }
 
 export function computeRubricSummary(scores: RubricScores) {
@@ -276,13 +176,3 @@ export function computeRubricSummary(scores: RubricScores) {
     totalScore,
   }
 }
-
-export function verifyTrackingFileContent(
-  contentString: string,
-  fileName: string,
-  student: Pick<GuidingEvaluationItem, 'mssv'>,
-): boolean {
-  const combined = `${contentString} ${fileName}`.trim()
-  return Boolean(student.mssv && combined.includes(student.mssv))
-}
-

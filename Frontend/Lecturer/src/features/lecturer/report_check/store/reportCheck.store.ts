@@ -1,18 +1,33 @@
-import { useLecturerPortalStore } from '@/features/lecturer/lecturer_portal_storage'
-import type { ReportCheckItem } from '../types/reportCheck.types'
+import { create } from 'zustand'
+import type { ReportTabStatus } from '../types/reportCheck.types'
 
-export const useReportCheckStore = () => {
-  const reports = useLecturerPortalStore((s) => s.reports)
-  const approveReport = useLecturerPortalStore((s) => s.approveReport)
-  const rejectReport = useLecturerPortalStore((s) => s.rejectReport)
-  const submitPlagiarismResult = useLecturerPortalStore((s) => s.submitPlagiarismResult)
-  const markReportDownloaded = useLecturerPortalStore((s) => s.markReportDownloaded)
-
-  return {
-    reports: reports as ReportCheckItem[],
-    approveReport,
-    rejectReport,
-    submitPlagiarismResult,
-    markReportDownloaded,
-  }
+interface ReportCheckUiState {
+  searchQuery: string
+  filterStatus: ReportTabStatus
+  pageSize: number
+  currentPage: number
+  setSearchQuery: (query: string) => void
+  setFilterStatus: (status: ReportTabStatus) => void
+  setPageSize: (size: number) => void
+  setCurrentPage: (page: number) => void
+  resetFilters: () => void
 }
+
+export const useReportCheckStore = create<ReportCheckUiState>((set) => ({
+  searchQuery: '',
+  filterStatus: 'pending',
+  pageSize: 15,
+  currentPage: 1,
+
+  setSearchQuery: (searchQuery) => set({ searchQuery, currentPage: 1 }),
+  setFilterStatus: (filterStatus) => set({ filterStatus, currentPage: 1 }),
+  setPageSize: (pageSize) => set({ pageSize, currentPage: 1 }),
+  setCurrentPage: (currentPage) => set({ currentPage }),
+  resetFilters: () =>
+    set({
+      searchQuery: '',
+      filterStatus: 'pending',
+      pageSize: 15,
+      currentPage: 1,
+    }),
+}))

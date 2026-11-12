@@ -1,19 +1,18 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
+  LegacyReportCheckItem,
   LecturerNavBadges,
   LecturerPortalState,
 } from '../types/lecturerPortal.types'
 import type { SupervisorRequestItem } from '@/features/lecturer/supervisor_registration/types/supervisorRegistration.types'
 import type { TopicProposalItem } from '@/features/lecturer/topic_proposal/types/topicProposal.types'
 import type { OutlineReviewItem } from '@/features/lecturer/outline_review/types/outlineReview.types'
-import type { ReportCheckItem } from '@/features/lecturer/report_check/types/reportCheck.types'
 import {
   DEFAULT_TEACHER_PROFILE,
   INITIAL_DEFENSE_COUNCILS,
   INITIAL_DEFENSE_REVIEWS,
   INITIAL_DOCUMENT_TEMPLATES,
-  INITIAL_GUIDING_EVALUATIONS,
   INITIAL_OUTLINES,
   INITIAL_REPORTS,
   INITIAL_SUPERVISOR_REQUESTS,
@@ -62,7 +61,6 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
       topicProposals: INITIAL_TOPIC_PROPOSALS,
       outlines: INITIAL_OUTLINES,
       reports: INITIAL_REPORTS,
-      guidingEvaluations: INITIAL_GUIDING_EVALUATIONS,
       defenseCouncils: INITIAL_DEFENSE_COUNCILS,
       defenseReviews: INITIAL_DEFENSE_REVIEWS,
       documentTemplates: INITIAL_DOCUMENT_TEMPLATES,
@@ -284,42 +282,6 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
           ),
         })),
 
-      submitEvaluationTrackingFile: (id, fileName) =>
-        set((state) => {
-          const now = getNowFormatted()
-          return {
-            guidingEvaluations: state.guidingEvaluations.map((item) =>
-              item.id === id
-                ? {
-                    ...item,
-                    fileName:
-                      fileName.trim() || `Phieu_tiendo_${item.mssv}.pdf`,
-                    submittedAt: now,
-                  }
-                : item,
-            ),
-          }
-        }),
-
-      saveEvaluationRubric: (id, score, rubricScores, isDraft = false) =>
-        set((state) => ({
-          guidingEvaluations: state.guidingEvaluations.map((item) => {
-            if (item.id !== id) return item
-            if (isDraft) {
-              return {
-                ...item,
-                rubricScores,
-                score: item.score !== null ? score : item.score,
-              }
-            }
-            return {
-              ...item,
-              score,
-              rubricScores,
-            }
-          }),
-        })),
-
       updateDefenseReviewScore: (id, score) =>
         set((state) => ({
           defenseReviews: state.defenseReviews.map((rev) =>
@@ -356,7 +318,6 @@ export const useLecturerPortalStore = create<LecturerPortalState>()(
         topicProposals: state.topicProposals,
         outlines: state.outlines,
         reports: state.reports,
-        guidingEvaluations: state.guidingEvaluations,
         defenseCouncils: state.defenseCouncils,
         defenseReviews: state.defenseReviews,
       }),
@@ -368,7 +329,7 @@ export function computeLecturerBadges(state: {
   supervisorRequests: SupervisorRequestItem[]
   topicProposals: TopicProposalItem[]
   outlines: OutlineReviewItem[]
-  reports: ReportCheckItem[]
+  reports: LegacyReportCheckItem[]
 }): LecturerNavBadges {
   return {
     supervisorRequests: state.supervisorRequests.filter((r) => r.status === 'pending').length,

@@ -94,6 +94,14 @@ export const API_ENDPOINTS = {
     base: '/semester',
     current: '/semester/current',
   },
+  // Báo cáo đồ án Final & Phiếu theo dõi tiến độ (GVHD / SV)
+  report: {
+    supervisorList: '/report/supervisor-list',
+    detail: (publicId: string) => `/report/${publicId}`,
+    review: (publicId: string) => `/report/${publicId}/review`,
+    submitProgressReport: '/report/progress-report',
+    deadlines: '/api/v1/deadlines',
+  },
   lecturer: {
     dashboard: '/lecturer/dashboard',
     topics: '/lecturer/topics',

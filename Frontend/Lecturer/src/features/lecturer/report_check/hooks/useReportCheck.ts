@@ -1,55 +1,217 @@
 import { useMemo, useState } from 'react'
+import {
+  keepPreviousData,
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import {
+  apiClient,
+  API_ENDPOINTS,
+  referenceDataQueryOptions,
+} from '@/shared/api'
 import { toast } from '@/shared/components/feedback/toast.store'
+import { semesterService } from '@/shared/services/semester.service'
+import type { ApiResponse } from '@/shared/types'
+import type { SemesterResponse } from '@/shared/types/semester.types'
+import { formatDate } from '@/shared/utils'
+import {
+  downloadReportFile,
+  formatReportDeadlineForReview,
+  mapFinalReportToCheckItem,
+  reportCheckService,
+} from '../services/reportCheck.service'
 import { useReportCheckStore } from '../store/reportCheck.store'
 import type {
-  ReportCheckCounts,
+  FinalReportDecision,
   ReportCheckItem,
-  ReportTabStatus,
+  ReportDeadlineSnapshot,
+  ReviewFinalReportPayload,
 } from '../types/reportCheck.types'
 
-export function useReportCheck() {
+export const reportCheckKeys = {
+  all: ['lecturer', 'report-check'] as const,
+  semesters: ['lecturer', 'report-check', 'semesters'] as const,
+  currentSemester: ['lecturer', 'report-check', 'current-semester'] as const,
+  lists: () => [...reportCheckKeys.all, 'list'] as const,
+  list: (semesterId: string | undefined) =>
+    [...reportCheckKeys.lists(), semesterId] as const,
+  details: () => [...reportCheckKeys.all, 'detail'] as const,
+  detail: (publicId: string | undefined) =>
+    [...reportCheckKeys.details(), publicId] as const,
+  deadlines: () => [...reportCheckKeys.all, 'deadline'] as const,
+  deadline: (semesterId: string | undefined) =>
+    [...reportCheckKeys.deadlines(), semesterId] as const,
+}
+
+/** Danh sách học kỳ cho dropdown chọn năm học / học kỳ */
+export function useReportCheckSemesters() {
+  return useQuery({
+    queryKey: reportCheckKeys.semesters,
+    queryFn: () => semesterService.getAllSemesters(),
+    ...referenceDataQueryOptions,
+  })
+}
+
+/** Học kỳ hiện tại (tắt toast lỗi tự động vì có fallback sang học kỳ đầu danh sách) */
+export function useReportCheckCurrentSemester() {
+  return useQuery({
+    queryKey: reportCheckKeys.currentSemester,
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<SemesterResponse>>(
+        API_ENDPOINTS.semester.current,
+        { skipErrorToast: true },
+      )
+      return response.data.data
+    },
+    ...referenceDataQueryOptions,
+    retry: false,
+  })
+}
+
+/** Danh sách báo cáo Final của sinh viên hướng dẫn theo học kỳ */
+export function useSupervisorFinalReports(
+  semesterId: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: reportCheckKeys.list(semesterId),
+    queryFn: () => reportCheckService.getSupervisorFinalReports({ semesterId }),
+    placeholderData: keepPreviousData,
+    enabled: enabled && Boolean(semesterId),
+  })
+}
+
+/** Fallback lấy mốc hạn nộp GĐ 4 từ /api/v1/deadlines khi supervisor-list trả rỗng [] */
+export function useFallbackReportDeadline(
+  semesterId: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: reportCheckKeys.deadline(semesterId),
+    queryFn:
+      semesterId && enabled
+        ? () => reportCheckService.getFallbackReportDeadline(semesterId)
+        : skipToken,
+    retry: false,
+  })
+}
+
+/** Chi tiết một Báo cáo Final (kèm histories & progressReport) */
+export function useFinalReportDetail(publicId: string | undefined) {
+  return useQuery({
+    queryKey: reportCheckKeys.detail(publicId),
+    queryFn: publicId
+      ? () => reportCheckService.getFinalReportDetailForSupervisor(publicId)
+      : skipToken,
+  })
+}
+
+/** GVHD chính nộp kết quả kiểm tra trùng lặp và thẩm định báo cáo Final */
+export function useReviewFinalReport() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: ReviewFinalReportPayload) =>
+      reportCheckService.reviewStudentFinalReport(payload),
+    onSuccess: (_data, variables) => {
+      const actionLabel =
+        variables.decision === 'APPROVED'
+          ? 'Đã duyệt đạt báo cáo Final'
+          : variables.decision === 'REQUEST_CHANGES'
+            ? 'Đã gửi yêu cầu chỉnh sửa báo cáo Final'
+            : 'Đã ghi nhận kết quả không đạt cho báo cáo Final'
+      toast.success(actionLabel)
+      return queryClient.invalidateQueries({ queryKey: reportCheckKeys.all })
+    },
+  })
+}
+
+export interface ReviewModalTarget {
+  item: ReportCheckItem
+  initialDecision?: FinalReportDecision
+}
+
+export function useReportCheck(semesterId?: string, enabled = true) {
   const {
-    reports,
-    approveReport,
-    rejectReport,
-    submitPlagiarismResult,
-    markReportDownloaded,
+    searchQuery,
+    filterStatus,
+    pageSize,
+    currentPage,
+    setSearchQuery,
+    setFilterStatus,
+    setPageSize,
+    setCurrentPage,
   } = useReportCheckStore()
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterStatus, setFilterStatus] = useState<ReportTabStatus>('pending')
-  const [pageSize, setPageSize] = useState<number>(15)
-  const [currentPage, setCurrentPage] = useState<number>(1)
+  const reportsQuery = useSupervisorFinalReports(semesterId, enabled)
+  const rawReports = useMemo(
+    () => reportsQuery.data ?? [],
+    [reportsQuery.data],
+  )
+
+  const shouldFetchFallbackDeadline =
+    Boolean(semesterId) &&
+    reportsQuery.isSuccess &&
+    !reportsQuery.isPlaceholderData &&
+    rawReports.length === 0
+
+  const fallbackDeadlineQuery = useFallbackReportDeadline(
+    semesterId,
+    shouldFetchFallbackDeadline,
+  )
+
+  const reports = useMemo(
+    () => rawReports.map(mapFinalReportToCheckItem),
+    [rawReports],
+  )
+
+  const deadlineSnapshot: ReportDeadlineSnapshot | null = useMemo(() => {
+    if (rawReports.length > 0) {
+      const first = rawReports[0]
+      return {
+        deadlineName: first.deadlineName,
+        deadlineStartDate: first.deadlineStartDate,
+        deadlineEndDate: first.deadlineEndDate,
+        deadlineActive: first.deadlineActive,
+        deadlineStatus: first.deadlineStatus ?? 'NOT_CONFIGURED',
+      }
+    }
+    if (fallbackDeadlineQuery.data) {
+      return fallbackDeadlineQuery.data
+    }
+    return null
+  }, [rawReports, fallbackDeadlineQuery.data])
+
+  const deadlineInfo = useMemo(
+    () =>
+      formatReportDeadlineForReview(
+        deadlineSnapshot?.deadlineEndDate,
+        deadlineSnapshot?.deadlineStatus,
+        (iso) => formatDate(iso, 'full'),
+        deadlineSnapshot?.deadlineStartDate,
+      ),
+    [deadlineSnapshot],
+  )
+
+  const reviewMutation = useReviewFinalReport()
 
   // Targets cho các modal
-  const [plagiarismTarget, setPlagiarismTarget] = useState<ReportCheckItem | null>(null)
-  const [approveTarget, setApproveTarget] = useState<ReportCheckItem | null>(null)
-  const [rejectTarget, setRejectTarget] = useState<ReportCheckItem | null>(null)
-  const [historyTarget, setHistoryTarget] = useState<ReportCheckItem | null>(null)
-  const [previewTarget, setPreviewTarget] = useState<ReportCheckItem | null>(null)
+  const [reviewTarget, setReviewTarget] = useState<ReviewModalTarget | null>(
+    null,
+  )
+  const [historyTarget, setHistoryTarget] = useState<ReportCheckItem | null>(
+    null,
+  )
+  const [previewTarget, setPreviewTarget] = useState<ReportCheckItem | null>(
+    null,
+  )
 
   // Thống kê đếm số lượng cho các tab
-  const counts: ReportCheckCounts = useMemo(() => {
-    let pending = 0
-    let rejected = 0
-    let notSubmitted = 0
-    let approved = 0
-
-    for (const r of reports) {
-      if (r.status === 'pending') pending++
-      else if (r.status === 'rejected') rejected++
-      else if (r.status === 'not_submitted') notSubmitted++
-      else if (r.status === 'approved') approved++
-    }
-
-    return {
-      pending,
-      rejected,
-      notSubmitted,
-      approved,
-      all: reports.length,
-    }
-  }, [reports])
+  const counts = useMemo(
+    () => reportCheckService.getCounts(reports),
+    [reports],
+  )
 
   // Lọc dữ liệu theo tab và từ khóa tìm kiếm
   const filteredReports = useMemo(() => {
@@ -63,7 +225,10 @@ export function useReportCheck() {
         item.reportFileName.toLowerCase().includes(q)
 
       let matchStatus = true
-      if (filterStatus) {
+      if (filterStatus === 'rejected') {
+        matchStatus =
+          item.status === 'rejected' || item.status === 'request_changes'
+      } else if (filterStatus) {
         matchStatus = item.status === filterStatus
       }
 
@@ -71,7 +236,7 @@ export function useReportCheck() {
     })
   }, [reports, searchQuery, filterStatus])
 
-  // Phân trang
+  // Phân trang phía client trên danh sách của học kỳ
   const totalItems = filteredReports.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(Math.max(1, currentPage), totalPages)
@@ -83,55 +248,23 @@ export function useReportCheck() {
     return filteredReports.slice(from, from + pageSize)
   }, [filteredReports, safePage, pageSize])
 
-  const handleTabChange = (status: ReportTabStatus) => {
-    setFilterStatus(status)
-    setCurrentPage(1)
-  }
-
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val)
-    setCurrentPage(1)
-  }
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size)
-    setCurrentPage(1)
-  }
-
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page)
     }
   }
 
-  // Thao tác duyệt báo cáo
-  const handleConfirmApprove = (id: string, comment?: string) => {
-    const studentName = approveTarget?.name ?? ''
-    approveReport(id, comment)
-    setApproveTarget(null)
-    toast.success(`Đã phê duyệt báo cáo đồ án của sinh viên ${studentName} thành công!`)
+  const handleSubmitReview = async (payload: ReviewFinalReportPayload) => {
+    await reviewMutation.mutateAsync(payload)
+    setReviewTarget(null)
   }
 
-  // Thao tác từ chối báo cáo
-  const handleConfirmReject = (id: string, comment?: string) => {
-    const studentName = rejectTarget?.name ?? ''
-    rejectReport(id, comment)
-    setRejectTarget(null)
-    toast.info(`Đã xác nhận từ chối báo cáo của sinh viên ${studentName}!`)
-  }
-
-  // Cập nhật kết quả đạo văn
-  const handleConfirmPlagiarism = (id: string, fileName: string, rate: number) => {
-    const studentName = plagiarismTarget?.name ?? ''
-    submitPlagiarismResult(id, fileName, rate)
-    setPlagiarismTarget(null)
-    toast.success(`Đã cập nhật kết quả kiểm tra trùng lặp cho sinh viên ${studentName}!`)
-  }
-
-  // Download báo cáo
   const handleDownloadReport = (item: ReportCheckItem) => {
-    markReportDownloaded(item.id)
-    toast.success(`Đang tải xuống tệp: ${item.reportFileName || `${item.name}-Bao-cao.pdf`}`)
+    if (!item.reportFileUrl) return
+    void downloadReportFile(
+      item.reportFileUrl,
+      item.reportFileName || `${item.mssv}-bao-cao-final.pdf`,
+    )
   }
 
   return {
@@ -139,12 +272,23 @@ export function useReportCheck() {
     filteredReports,
     pagedReports,
     counts,
+    isLoading: reportsQuery.isPending,
+    isFetching: reportsQuery.isFetching,
+    isError: reportsQuery.isError,
+    isPlaceholderData: reportsQuery.isPlaceholderData,
+    refetch: reportsQuery.refetch,
+    deadlineSnapshot,
+    deadlineInfo,
+    isDeadlineLoading:
+      reportsQuery.isPending ||
+      (shouldFetchFallbackDeadline && fallbackDeadlineQuery.isPending),
+
     searchQuery,
-    setSearchQuery: handleSearchChange,
+    setSearchQuery,
     filterStatus,
-    setFilterStatus: handleTabChange,
+    setFilterStatus,
     pageSize,
-    setPageSize: handlePageSizeChange,
+    setPageSize,
     currentPage: safePage,
     totalPages,
     startIdx,
@@ -153,21 +297,16 @@ export function useReportCheck() {
     handlePageChange,
 
     // Modal targets
-    plagiarismTarget,
-    setPlagiarismTarget,
-    approveTarget,
-    setApproveTarget,
-    rejectTarget,
-    setRejectTarget,
+    reviewTarget,
+    setReviewTarget,
     historyTarget,
     setHistoryTarget,
     previewTarget,
     setPreviewTarget,
 
     // Actions
-    handleConfirmApprove,
-    handleConfirmReject,
-    handleConfirmPlagiarism,
+    isReviewPending: reviewMutation.isPending,
+    handleSubmitReview,
     handleDownloadReport,
   }
 }
