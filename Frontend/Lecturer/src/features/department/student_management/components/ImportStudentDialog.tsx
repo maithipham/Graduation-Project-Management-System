@@ -18,7 +18,6 @@ import {
   FormField,
 } from "@/shared/components/ui";
 import { cn } from "@/shared/utils/cn";
-import { downloadExcelTemplate } from "@/shared/utils/download";
 import { useImportStudents } from "../hooks/useStudents";
 import type {
   RowImportStatus,
@@ -214,20 +213,14 @@ export function ImportStudentDialog({
                     ))}
                   </div>
                   <div className="pt-1 border-t border-sky-100/80">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        downloadExcelTemplate(
-                          '/api/students/import/template',
-                          'mau_import_sinh_vien.xlsx',
-                          '/student/import/template',
-                        )
-                      }
-                      className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1565C0] hover:text-[#0D47A1] hover:underline cursor-pointer"
+                    <a
+                      href="/student_import_template.xlsx"
+                      download="student_import_template.xlsx"
+                      className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1565C0] hover:text-[#0D47A1] underline underline-offset-2 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" /> Tải file Excel mẫu
                       (.xlsx)
-                    </button>
+                    </a>
                   </div>
                 </div>
               </fieldset>

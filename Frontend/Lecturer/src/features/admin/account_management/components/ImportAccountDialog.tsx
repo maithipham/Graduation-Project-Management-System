@@ -190,18 +190,30 @@ export function ImportAccountDialog({ open, onOpenChange, target }: ImportAccoun
                 ))}
               </ol>
               <div className="pt-2 border-t border-blue-100">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto p-0 cursor-pointer text-[#1565C0] hover:text-[#0D47A1] font-semibold text-xs inline-flex items-center gap-1"
-                  onClick={() =>
-                    target === 'student'
-                      ? downloadExcelTemplate('/api/students/import/template', 'mau_import_sinh_vien.xlsx', '/student/import/template')
-                      : downloadExcelTemplate('/api/teachers/import/template', 'mau_import_giang_vien.xlsx', '/teacher/import/template')
-                  }
-                >
-                  <Download className="w-3.5 h-3.5" /> Tải file mẫu (.xlsx)
-                </Button>
+                {target === 'student' ? (
+                  <a
+                    href="/student_import_template.xlsx"
+                    download="student_import_template.xlsx"
+                    className="h-auto p-0 cursor-pointer text-[#1565C0] hover:text-[#0D47A1] font-semibold text-xs inline-flex items-center gap-1 underline underline-offset-2"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Tải file Excel mẫu (.xlsx)
+                  </a>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 cursor-pointer text-[#1565C0] hover:text-[#0D47A1] font-semibold text-xs inline-flex items-center gap-1 underline underline-offset-2"
+                    onClick={() =>
+                      downloadExcelTemplate(
+                        '/api/teachers/import/template',
+                        'mau_import_giang_vien.xlsx',
+                        '/teacher/import/template',
+                      )
+                    }
+                  >
+                    <Download className="w-3.5 h-3.5" /> Tải file mẫu (.xlsx)
+                  </Button>
+                )}
               </div>
             </div>
           </div>
