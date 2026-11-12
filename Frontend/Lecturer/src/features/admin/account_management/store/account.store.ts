@@ -47,6 +47,7 @@ export const useAccountStore = create<AccountState>()(
 
         const newAccount: UserAccount = {
           id: newId,
+          teacherCode: values.teacherCode || undefined,
           name: values.name,
           email: values.email,
           role: values.role,

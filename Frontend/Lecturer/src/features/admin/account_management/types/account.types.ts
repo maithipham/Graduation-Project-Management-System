@@ -22,6 +22,7 @@ export interface AccountActivity {
 
 export interface UserAccount {
   id: number
+  teacherCode?: string
   name: string
   email: string
   role: AccountRole
@@ -40,6 +41,12 @@ export interface UserAccount {
 }
 
 export const addAccountSchema = z.object({
+  teacherCode: z
+    .string()
+    .trim()
+    .max(50, 'Mã giáo viên tối đa 50 ký tự')
+    .optional()
+    .or(z.literal('')),
   name: z
     .string()
     .trim()
@@ -69,6 +76,15 @@ export const addAccountSchema = z.object({
   department: z.string().trim().max(200, 'Đơn vị công tác tối đa 200 ký tự').optional().or(z.literal('')),
   status: z.enum(['active', 'inactive']),
 })
+  .superRefine((data, ctx) => {
+    if (data.role === 'Giảng viên' && !data.teacherCode?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Vui lòng nhập mã giáo viên',
+        path: ['teacherCode'],
+      })
+    }
+  })
 
 export type AddAccountFormValues = z.infer<typeof addAccountSchema>
 

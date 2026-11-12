@@ -79,7 +79,7 @@ export function TeacherFormFields({
 
   return (
     <div className={className}>
-      <FormField label="Mã giảng viên" required error={errors.teacherCode?.message} className="sm:col-span-2">
+      <FormField label="Mã giảng viên (Mã giáo viên)" required error={errors.teacherCode?.message} className="sm:col-span-2">
         <Input placeholder="VD: GV001" {...register('teacherCode')} />
       </FormField>
       <FormField label="Họ và tên đệm" required error={errors.firstName?.message}>
