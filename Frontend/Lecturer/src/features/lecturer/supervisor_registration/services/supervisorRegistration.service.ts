@@ -19,13 +19,14 @@ const mapStatus = (
   switch (status) {
     case 'PENDING':
       return 'pending'
-    case 'REJECTED':
-    case 'HOD_REJECTED':
-      return 'rejected'
     case 'TEACHER_APPROVED':
     case 'HOD_APPROVED':
-    case 'ASSIGNED_BY_HOD':
+    case 'HOD_REJECTED':
       return 'approved'
+    case 'REJECTED':
+      return 'rejected'
+    case 'ASSIGNED_BY_HOD':
+      return 'assigned'
     default:
       return 'pending'
   }
@@ -34,11 +35,15 @@ const mapStatus = (
 const APPROVED_TAB_STATUSES: ReadonlySet<ApiRegistrationStatus> = new Set([
   'TEACHER_APPROVED',
   'HOD_APPROVED',
+  'HOD_REJECTED',
 ])
 
 const REJECTED_TAB_STATUSES: ReadonlySet<ApiRegistrationStatus> = new Set([
   'REJECTED',
-  'HOD_REJECTED',
+])
+
+const ASSIGNED_TAB_STATUSES: ReadonlySet<ApiRegistrationStatus> = new Set([
+  'ASSIGNED_BY_HOD',
 ])
 
 const mapTabToApiStatus = (
@@ -47,9 +52,12 @@ const mapTabToApiStatus = (
   switch (status) {
     case 'pending':
       return 'PENDING'
-    // BE chỉ nhận 1 enum RegistrationStatus mỗi request, nên tab 'approved'/'rejected' lấy toàn bộ rồi lọc nhóm trạng thái tương ứng
-    case 'approved':
     case 'rejected':
+      return 'REJECTED'
+    case 'assigned':
+      return 'ASSIGNED_BY_HOD'
+    // tab 'approved' gồm nhiều trạng thái (TEACHER_APPROVED, HOD_APPROVED, HOD_REJECTED), BE chỉ nhận 1 enum nên không truyền status để lấy toàn bộ rồi lọc
+    case 'approved':
     default:
       return undefined
   }
@@ -92,24 +100,56 @@ export const supervisorRegistrationService = {
     const data = response.data.data
     const rawRegistrations = data?.registrations ?? []
     const filteredRegistrations =
-      params.status === 'approved'
-        ? rawRegistrations.filter((item) =>
-            APPROVED_TAB_STATUSES.has(item.status),
-          )
-        : params.status === 'rejected'
+      params.status === 'pending'
+        ? rawRegistrations.filter((item) => item.status === 'PENDING')
+        : params.status === 'approved'
           ? rawRegistrations.filter((item) =>
-              REJECTED_TAB_STATUSES.has(item.status),
+              APPROVED_TAB_STATUSES.has(item.status),
             )
-          : rawRegistrations
+          : params.status === 'rejected'
+            ? rawRegistrations.filter((item) =>
+                REJECTED_TAB_STATUSES.has(item.status),
+              )
+            : params.status === 'assigned'
+              ? rawRegistrations.filter((item) =>
+                  ASSIGNED_TAB_STATUSES.has(item.status),
+                )
+              : rawRegistrations
+
+    // Đếm số lượng theo từng tab:
+    // Khi lấy toàn bộ danh sách (tab approved hoặc không truyền status), đếm trực tiếp từ danh sách trả về để khớp chính xác các tab gộp/tách.
+    const hasFullList = !params.status || params.status === 'approved'
+    const assignedFromApi = (data as { assignedCount?: number } | undefined)?.assignedCount
+    const calculatedAssigned =
+      assignedFromApi !== undefined
+        ? assignedFromApi
+        : Math.max(
+            0,
+            (data?.totalCount ?? 0) -
+              (data?.pendingCount ?? 0) -
+              (data?.approvedCount ?? 0) -
+              (data?.rejectedCount ?? 0),
+          )
+
+    const counts: SupervisorRequestCounts = hasFullList
+      ? {
+          pending: rawRegistrations.filter((item) => item.status === 'PENDING').length,
+          approved: rawRegistrations.filter((item) => APPROVED_TAB_STATUSES.has(item.status)).length,
+          rejected: rawRegistrations.filter((item) => REJECTED_TAB_STATUSES.has(item.status)).length,
+          assigned: rawRegistrations.filter((item) => ASSIGNED_TAB_STATUSES.has(item.status)).length,
+          all: data?.totalCount ?? rawRegistrations.length,
+        }
+      : {
+          pending: data?.pendingCount ?? 0,
+          approved: data?.approvedCount ?? 0,
+          rejected: data?.rejectedCount ?? 0,
+          assigned: calculatedAssigned,
+          all: data?.totalCount ?? 0,
+        }
 
     return {
       items: filteredRegistrations.map(mapRequest),
-      counts: {
-        pending: data?.pendingCount ?? 0,
-        approved: data?.approvedCount ?? 0,
-        rejected: data?.rejectedCount ?? 0,
-        all: data?.totalCount ?? 0,
-      },
+      counts,
     }
   },
 

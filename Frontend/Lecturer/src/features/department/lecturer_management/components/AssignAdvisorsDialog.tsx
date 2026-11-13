@@ -131,7 +131,6 @@ export function AssignAdvisorsDialog({
       {
         semesterId: targetSemesterId,
         teacherIds,
-        maxStudentsPerTeacher: 20,
       },
       {
         onSuccess: () => {

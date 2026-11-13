@@ -189,7 +189,7 @@ afterEach(() => {
 })
 
 describe('SupervisorRequestsPage', () => {
-  it('hiển thị danh sách đơn, bộ đếm 4 tab và deadline thật từ BE', async () => {
+  it('hiển thị danh sách đơn, bộ đếm các tab và deadline thật từ BE', async () => {
     renderPage()
 
     await waitFor(() => {
@@ -201,6 +201,7 @@ describe('SupervisorRequestsPage', () => {
     expect(screen.getByRole('button', { name: /Chưa duyệt/ })).toHaveTextContent('2')
     expect(screen.getByRole('button', { name: /Đã duyệt/ })).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: /Đã từ chối/ })).toHaveTextContent('0')
+    expect(screen.getByRole('button', { name: /Được phân công/ })).toHaveTextContent('0')
     expect(screen.getByRole('button', { name: /Tất cả/ })).toHaveTextContent('3')
     expect(screen.getByText(/Hạn: 15\/03\/2099/)).toBeInTheDocument()
   })
@@ -365,6 +366,7 @@ describe('SupervisorRequestsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Phạm GV Đã Duyệt')).toBeInTheDocument()
       expect(screen.getByText('Đỗ TBM Đã Duyệt')).toBeInTheDocument()
+      expect(screen.getByText('Lê TBM Từ Chối')).toBeInTheDocument()
       expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument()
       expect(screen.queryByText('Hoàng TBM Phân Công')).not.toBeInTheDocument()
     })
@@ -372,10 +374,16 @@ describe('SupervisorRequestsPage', () => {
     await user.click(screen.getByRole('button', { name: /Đã từ chối/ }))
     await waitFor(() => {
       expect(screen.getByText('Trần Bị Từ Chối')).toBeInTheDocument()
-      expect(screen.getByText('Lê TBM Từ Chối')).toBeInTheDocument()
-      expect(screen.getByText('TBM từ chối')).toBeInTheDocument()
       expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument()
       expect(screen.queryByText('Phạm GV Đã Duyệt')).not.toBeInTheDocument()
+      expect(screen.queryByText('Hoàng TBM Phân Công')).not.toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /Được phân công/ }))
+    await waitFor(() => {
+      expect(screen.getByText('Hoàng TBM Phân Công')).toBeInTheDocument()
+      expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument()
+      expect(screen.queryByText('Trần Bị Từ Chối')).not.toBeInTheDocument()
     })
 
     await user.click(screen.getByRole('button', { name: /Tất cả/ }))

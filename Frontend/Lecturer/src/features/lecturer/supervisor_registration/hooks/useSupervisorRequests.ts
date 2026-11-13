@@ -33,6 +33,7 @@ const INITIAL_COUNTS: SupervisorRequestCounts = {
   pending: 0,
   approved: 0,
   rejected: 0,
+  assigned: 0,
   all: 0,
 }
 
