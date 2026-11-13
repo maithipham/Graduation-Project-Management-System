@@ -187,6 +187,20 @@ export function SupervisorWorkspaceView({
     slot: 1 | 2
   } | null>(null)
 
+  // Theo dõi thời điểm thao tác gần nhất của từng sinh viên để đưa lên đầu danh sách
+  const [recentActionTimestamps, setRecentActionTimestamps] = useState<Record<string, number>>({})
+
+  const markRecentStudents = (studentIds: string[]) => {
+    const now = Date.now()
+    setRecentActionTimestamps((prev) => {
+      const next = { ...prev }
+      studentIds.forEach((id, idx) => {
+        next[id] = now + idx
+      })
+      return next
+    })
+  }
+
   // Đếm sinh viên theo 3 tab (tính trực tiếp từ localStudents để phản ứng tức thì khi duyệt/từ chối/gán)
   const countReceived = useMemo(
     () =>
@@ -279,9 +293,9 @@ export function SupervisorWorkspaceView({
     }
   }
 
-  // Lọc sinh viên theo tab & tìm kiếm
+  // Lọc sinh viên theo tab & tìm kiếm (ưu tiên hiển thị sinh viên mới thao tác lên trên cùng)
   const filteredStudents = useMemo(() => {
-    return localStudents.filter((s) => {
+    const list = localStudents.filter((s) => {
       if (s.status !== currentTab) return false
       if (studentSearch.trim()) {
         const q = studentSearch.trim().toLowerCase()
@@ -293,7 +307,14 @@ export function SupervisorWorkspaceView({
       }
       return true
     })
-  }, [localStudents, currentTab, studentSearch])
+
+    return [...list].sort((a, b) => {
+      const timeA = recentActionTimestamps[a.id] || 0
+      const timeB = recentActionTimestamps[b.id] || 0
+      if (timeA !== timeB) return timeB - timeA
+      return 0
+    })
+  }, [localStudents, currentTab, studentSearch, recentActionTimestamps])
 
   // Danh sách giảng viên với số lượng SV đang nhận được đồng bộ từ localStudents
   const liveLecturers = useMemo(() => {
@@ -455,9 +476,10 @@ export function SupervisorWorkspaceView({
         return
       }
 
+      markRecentStudents([student.id])
       onChangeCoSupervisor(student.id, selectedLecturer)
-      setLocalStudents((prev) =>
-        prev.map((item) =>
+      setLocalStudents((prev) => {
+        const updated = prev.map((item) =>
           item.id === student.id
             ? {
               ...item,
@@ -465,8 +487,11 @@ export function SupervisorWorkspaceView({
               supervisor2Name: selectedLecturer.name,
             }
             : item,
-        ),
-      )
+        )
+        const touched = updated.filter((item) => item.id === student.id)
+        const others = updated.filter((item) => item.id !== student.id)
+        return [...touched, ...others]
+      })
       toast.success(
         `Đã gán ${selectedLecturer.name} làm GVHD 2 cho sinh viên ${student.name} thành công!`,
       )
@@ -500,11 +525,12 @@ export function SupervisorWorkspaceView({
       }
 
       try {
+        markRecentStudents(targetIds)
         for (const sId of targetIds) {
           await onChangeSupervisor(sId, selectedLecturer)
         }
-        setLocalStudents((prev) =>
-          prev.map((item) =>
+        setLocalStudents((prev) => {
+          const updated = prev.map((item) =>
             targetIds.includes(item.id)
               ? {
                 ...item,
@@ -512,8 +538,11 @@ export function SupervisorWorkspaceView({
                 supervisorName: selectedLecturer.name,
               }
               : item,
-          ),
-        )
+          )
+          const touched = updated.filter((item) => targetIds.includes(item.id))
+          const others = updated.filter((item) => !targetIds.includes(item.id))
+          return [...touched, ...others]
+        })
       } catch {
         // Lỗi đã được thông báo qua toast ở handler
       } finally {
@@ -534,20 +563,24 @@ export function SupervisorWorkspaceView({
     }
 
     try {
+      markRecentStudents(targetStudentIds)
       await onAssignStudents(targetStudentIds, selectedLecturer)
-      setLocalStudents((prev) =>
-        prev.map((item) =>
+      setLocalStudents((prev) => {
+        const updated = prev.map((item): SupervisorStudent =>
           targetStudentIds.includes(item.id)
             ? {
               ...item,
-              status: 'approved',
+              status: 'approved' as const,
               registrationStatus: 'ASSIGNED_BY_HOD',
               supervisorId: selectedLecturer.id,
               supervisorName: selectedLecturer.name,
             }
             : item,
-        ),
-      )
+        )
+        const touched = updated.filter((item) => targetStudentIds.includes(item.id))
+        const others = updated.filter((item) => !targetStudentIds.includes(item.id))
+        return [...touched, ...others]
+      })
       setSelectedStudentIds(new Set())
       setEditingTarget(null)
     } catch {
@@ -584,14 +617,18 @@ export function SupervisorWorkspaceView({
     }
 
     // Chuyển sinh viên sang tab "Đã phân công" (approved) và cập nhật badge thành HOD_APPROVED ("TBM duyệt")
-    setLocalStudents((prev) =>
-      prev.map((s) => {
+    markRecentStudents(selectedIdsArray)
+    setLocalStudents((prev) => {
+      const updated = prev.map((s): SupervisorStudent => {
         if (selectedStudentIds.has(s.id)) {
-          return { ...s, status: 'approved', registrationStatus: 'HOD_APPROVED' }
+          return { ...s, status: 'approved' as const, registrationStatus: 'HOD_APPROVED' }
         }
         return s
-      }),
-    )
+      })
+      const touched = updated.filter((s) => selectedStudentIds.has(s.id))
+      const others = updated.filter((s) => !selectedStudentIds.has(s.id))
+      return [...touched, ...others]
+    })
     setSelectedStudentIds(new Set())
 
     try {
@@ -635,12 +672,13 @@ export function SupervisorWorkspaceView({
     }
 
     // Chuyển sinh viên sang tab "Chưa nhận GV" (unassigned), xóa thông tin GVHD và gán trạng thái HOD_REJECTED ("TBM từ chối")
-    setLocalStudents((prev) =>
-      prev.map((s) => {
+    markRecentStudents(selectedIdsArray)
+    setLocalStudents((prev) => {
+      const updated = prev.map((s): SupervisorStudent => {
         if (selectedStudentIds.has(s.id)) {
           return {
             ...s,
-            status: 'unassigned',
+            status: 'unassigned' as const,
             registrationStatus: 'HOD_REJECTED',
             supervisorId: null,
             supervisorName: null,
@@ -649,8 +687,11 @@ export function SupervisorWorkspaceView({
           }
         }
         return s
-      }),
-    )
+      })
+      const touched = updated.filter((s) => selectedStudentIds.has(s.id))
+      const others = updated.filter((s) => !selectedStudentIds.has(s.id))
+      return [...touched, ...others]
+    })
     setSelectedStudentIds(new Set())
 
     try {
@@ -1029,59 +1070,45 @@ export function SupervisorWorkspaceView({
             </button>
           </div>
 
-          {/* Khung Bảng Sinh viên hoàn chỉnh (Header cố định + Body cuộn độc lập) */}
-          <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-            {/* Header cố định */}
-            <div className="shrink-0 bg-slate-100 border-b border-slate-200">
-              <table className="w-full text-left text-sm border-collapse table-fixed">
-                <colgroup>
-                  <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
-                  <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
-                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
-                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
-                </colgroup>
-                <thead>
-                  <tr className="text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11">
-                    <th className="py-0 px-2.5 align-middle">SINH VIÊN</th>
-                    <th className="py-0 px-2.5 align-middle">ĐỀ TÀI</th>
-                    <th className="py-0 px-2.5 align-middle">
-                      {currentTab === 'approved' ? 'GVHD 1' : 'GIẢNG VIÊN HƯỚNG DẪN'}
+          {/* Khung Bảng Sinh viên hoàn chỉnh (Duy nhất 1 table với Header sticky top-0, đảm bảo checkbox thẳng tuyệt đối) */}
+          <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-xl shadow-xs overflow-y-auto [scrollbar-gutter:stable]">
+            <table className="w-full text-left text-sm border-collapse table-fixed">
+              <colgroup>
+                <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
+                <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
+                <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
+                <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-slate-100 shadow-[0_1px_0_0_#e2e8f0]">
+                <tr className="text-[11px] font-bold text-slate-700 uppercase tracking-wider h-11 border-b border-slate-200">
+                  <th className="py-0 px-2.5 align-middle bg-slate-100">SINH VIÊN</th>
+                  <th className="py-0 px-2.5 align-middle bg-slate-100">ĐỀ TÀI</th>
+                  <th className="py-0 px-2.5 align-middle bg-slate-100">
+                    {currentTab === 'approved' ? 'GVHD 1' : 'GIẢNG VIÊN HƯỚNG DẪN'}
+                  </th>
+                  {currentTab === 'approved' ? (
+                    <th className="py-0 px-2.5 text-blue-900 font-extrabold align-middle bg-slate-100">GVHD 2</th>
+                  ) : (
+                    <th className="py-0 px-1 text-center align-middle bg-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={isAllStudentsSelected}
+                        onChange={toggleSelectAllStudents}
+                        disabled={isLocked || isDeadlineOpen}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed align-middle"
+                        title={
+                          isDeadlineOpen
+                            ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
+                            : isLocked
+                              ? 'Danh sách đã khóa'
+                              : 'Chọn tất cả sinh viên trong tab'
+                        }
+                      />
                     </th>
-                    {currentTab === 'approved' ? (
-                      <th className="py-0 px-2.5 text-blue-900 font-extrabold align-middle">GVHD 2</th>
-                    ) : (
-                      <th className="py-0 px-1 text-center align-middle">
-                        <input
-                          type="checkbox"
-                          checked={isAllStudentsSelected}
-                          onChange={toggleSelectAllStudents}
-                          disabled={isLocked || isDeadlineOpen}
-                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed align-middle"
-                          title={
-                            isDeadlineOpen
-                              ? 'Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.'
-                              : isLocked
-                                ? 'Danh sách đã khóa'
-                                : 'Chọn tất cả sinh viên trong tab'
-                          }
-                        />
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-              </table>
-            </div>
-
-            {/* Thân bảng sinh viên cuộn độc lập */}
-            <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-              <table className="w-full text-left text-sm border-collapse table-fixed">
-                <colgroup>
-                  <col className={currentTab === 'approved' ? 'w-[26%]' : 'w-[30%]'} />
-                  <col className={currentTab === 'approved' ? 'w-[32%]' : 'w-[38%]'} />
-                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-[26%]'} />
-                  <col className={currentTab === 'approved' ? 'w-[21%]' : 'w-10'} />
-                </colgroup>
-                <tbody className="divide-y divide-slate-100 text-[12.5px]">
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-[12.5px]">
                   {filteredStudents.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
@@ -1335,9 +1362,10 @@ export function SupervisorWorkspaceView({
                                               `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
                                             )
                                           ) {
+                                            markRecentStudents([s.id])
                                             onChangeCoSupervisor(s.id, null)
-                                            setLocalStudents((prev) =>
-                                              prev.map((item) =>
+                                            setLocalStudents((prev) => {
+                                              const updated = prev.map((item) =>
                                                 item.id === s.id
                                                   ? {
                                                     ...item,
@@ -1345,8 +1373,11 @@ export function SupervisorWorkspaceView({
                                                     supervisor2Name: null,
                                                   }
                                                   : item,
-                                              ),
-                                            )
+                                              )
+                                              const touched = updated.filter((item) => item.id === s.id)
+                                              const others = updated.filter((item) => item.id !== s.id)
+                                              return [...touched, ...others]
+                                            })
                                           }
                                         }}
                                         className={cn(
@@ -1435,7 +1466,6 @@ export function SupervisorWorkspaceView({
                 </tbody>
               </table>
             </div>
-          </div>
         </div>
 
         {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */}

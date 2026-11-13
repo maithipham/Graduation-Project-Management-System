@@ -21,8 +21,9 @@ export const useToastStore = create<ToastState>((set) => ({
   addToast: ({ type, message, duration = 3000 }) => {
     const id = Math.random().toString(36).substring(2, 9)
 
-    set((state) => ({
-      toasts: [...state.toasts, { id, type, message, duration }],
+    // Chỉ hiển thị tối đa 1 thông báo trên màn hình tại một thời điểm
+    set(() => ({
+      toasts: [{ id, type, message, duration }],
     }))
 
     // Mặc định tự động đóng sau 3 giây (3000ms)

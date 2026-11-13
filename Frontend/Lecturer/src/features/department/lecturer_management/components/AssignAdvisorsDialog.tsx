@@ -122,8 +122,9 @@ export function AssignAdvisorsDialog({
 
     const teacherIds = localTeachers
       .map((t) => {
-        const rawId = getTeacherId(t)
-        return typeof rawId === 'number' ? rawId : t.id
+        const idVal = t.id ?? t.teacherId ?? (typeof getTeacherId(t) === 'number' ? getTeacherId(t) : undefined)
+        const num = Number(idVal)
+        return !isNaN(num) && num > 0 ? num : undefined
       })
       .filter((id): id is number => typeof id === 'number')
 
