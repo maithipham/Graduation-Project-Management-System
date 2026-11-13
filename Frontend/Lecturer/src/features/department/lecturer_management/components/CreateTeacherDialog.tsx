@@ -17,9 +17,11 @@ import type { MajorOption } from "@/features/department/student_management";
 import { useAcademicTitles, useCreateTeacher } from "../hooks/useTeachers";
 import { DEFAULT_ACADEMIC_TITLES } from "../services/teacher.service";
 import { useTeacherEmailAutoFill } from "../hooks/useTeacherEmailAutoFill";
+import type { TeacherCreationRequest } from "../types";
 import {
   createTeacherSchema,
   EMPTY_CREATE_TEACHER_VALUES,
+  isExternalTeacherCheck,
   type CreateTeacherFormInput,
   type CreateTeacherFormValues,
 } from "../utils/createTeacherSchema";
@@ -33,6 +35,7 @@ interface CreateTeacherDialogProps {
   majors: MajorOption[] | undefined;
   majorsLoading: boolean;
   lockedMajor?: string;
+  onSuccess?: () => void;
 }
 
 export function CreateTeacherDialog({
@@ -41,6 +44,7 @@ export function CreateTeacherDialog({
   majors,
   majorsLoading,
   lockedMajor,
+  onSuccess,
 }: CreateTeacherDialogProps) {
   const createTeacher = useCreateTeacher();
   const { data: academicTitles } = useAcademicTitles();
@@ -86,16 +90,38 @@ export function CreateTeacherDialog({
   };
 
   const onSubmit = (values: CreateTeacherFormValues) => {
-    const isExternal = values.email.toLowerCase().endsWith('@gmail.com');
+    const isExternal = isExternalTeacherCheck({
+      email: values.email,
+      organization: values.organization,
+    });
+
     const allTitles = academicTitles && academicTitles.length > 0 ? academicTitles : DEFAULT_ACADEMIC_TITLES;
     const matchedTitle = allTitles.find(
       (t) => t.abbreviation === values.academicTitle || String(t.id) === String(values.academicTitleId),
     );
-    const payload: CreateTeacherFormValues = {
+
+    let majorId: string | number | null = null;
+    let majorName: string | null = null;
+
+    if (!isExternal) {
+      const selectedMajorName = (activeMajor || values.major || '').trim();
+      const matchedMajor = majors?.find(
+        (m) =>
+          m.name.toLowerCase() === selectedMajorName.toLowerCase() ||
+          m.publicId === values.majorId ||
+          (m.code && m.code.toLowerCase() === selectedMajorName.toLowerCase()),
+      );
+      majorId = matchedMajor ? matchedMajor.publicId : (values.majorId ?? null);
+      majorName = matchedMajor ? matchedMajor.name : (selectedMajorName || null);
+    }
+
+    const payload: TeacherCreationRequest = {
       ...values,
-      major: isExternal ? '' : (activeMajor || values.major || ''),
+      teacherCode: values.teacherCode,
+      major: isExternal ? '' : (majorName || ''),
+      majorId: isExternal ? null : majorId,
       academicTitleId: matchedTitle ? matchedTitle.id : (values.academicTitleId ?? null),
-      academicTitle: matchedTitle ? matchedTitle.abbreviation : (values.academicTitle || null),
+      academicTitle: matchedTitle ? matchedTitle.abbreviation : (values.academicTitle || ''),
     };
     createTeacher.mutate(payload, {
       onSuccess: (result) => {
@@ -105,6 +131,7 @@ export function CreateTeacherDialog({
           toast.success(result.message || DEFAULT_SUCCESS_MESSAGE);
         }
         onOpenChange(false);
+        onSuccess?.();
       },
       // 3006 (email thuộc tài khoản khác), 3007 (không khớp hồ sơ gốc), 4000, 2007, mất mạng:
       // hiện ngay trong form, giữ nguyên dữ liệu để sửa
@@ -131,6 +158,7 @@ export function CreateTeacherDialog({
           <TeacherFormFields
             register={register}
             control={control}
+            setValue={setValue}
             errors={errors}
             majors={majors}
             majorsLoading={majorsLoading}

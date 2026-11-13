@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Eye, Plus, Search, Upload, X } from 'lucide-react'
+import { Eye, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import {
   Button,
   Card,
@@ -19,6 +19,8 @@ import { cn } from '@/shared/utils/cn'
 import { useMajors } from '@/features/department/student_management'
 import { useTeachers } from '@/features/department/lecturer_management/hooks/useTeachers'
 import { CreateTeacherDialog } from '@/features/department/lecturer_management/components/CreateTeacherDialog'
+import { EditTeacherDialog } from '@/features/department/lecturer_management/components/EditTeacherDialog'
+import { DeleteTeacherDialog } from '@/features/department/lecturer_management/components/DeleteTeacherDialog'
 import { ImportTeacherDialog } from '@/features/department/lecturer_management/components/ImportTeacherDialog'
 import { TeacherDetailDialog } from '@/features/department/lecturer_management/components/TeacherDetailDialog'
 import {
@@ -57,6 +59,8 @@ export function LecturerAccountListView() {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [detailTeacherId, setDetailTeacherId] = useState<string | undefined>()
+  const [editingTeacher, setEditingTeacher] = useState<TeacherListItem | null>(null)
+  const [deletingTeacher, setDeletingTeacher] = useState<TeacherListItem | null>(null)
 
   // Lọc client trạng thái nếu cần
   const teachersContent = data?.content
@@ -199,7 +203,7 @@ export function LecturerAccountListView() {
                 <TableHead className={HEAD_CLASS}>Số điện thoại</TableHead>
                 <TableHead className={HEAD_CLASS}>Bộ môn / Đơn vị</TableHead>
                 <TableHead className={HEAD_CLASS}>Trạng thái</TableHead>
-                <TableHead className={cn(HEAD_CLASS, 'w-20 text-center')}>Thao tác</TableHead>
+                <TableHead className={cn(HEAD_CLASS, 'w-28 text-center')}>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -258,8 +262,15 @@ export function LecturerAccountListView() {
                             {initials}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-bold text-slate-900 text-sm hover:text-[#1565C0] transition">
-                              {getTeacherPlainName(teacher)}
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 text-sm hover:text-[#1565C0] transition">
+                                {getTeacherPlainName(teacher)}
+                              </span>
+                              {teacher.teacherCode && (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-mono text-slate-600 border border-slate-200">
+                                  {teacher.teacherCode}
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-slate-400 truncate">{teacher.email}</div>
                           </div>
@@ -309,16 +320,41 @@ export function LecturerAccountListView() {
 
                       {/* Thao tác */}
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDetailTeacherId(teacher.publicId)}
-                          className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDetailTeacherId(teacher.publicId)}
+                            className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                            title="Xem chi tiết"
+                            aria-label="Xem chi tiết"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingTeacher(teacher)}
+                            className="h-8 w-8 p-0 text-slate-500 hover:text-amber-600 hover:bg-amber-50"
+                            title="Sửa giảng viên"
+                            aria-label="Sửa giảng viên"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeletingTeacher(teacher)}
+                            className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                            title="Xóa giảng viên"
+                            aria-label="Xóa giảng viên"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </tr>
                   )
@@ -346,6 +382,24 @@ export function LecturerAccountListView() {
         majors={majors}
         majorsLoading={majorsLoading}
         lockedMajor={undefined}
+        onSuccess={() => setPage(0)}
+      />
+
+      {/* Dialog Cập nhật thông tin giảng viên */}
+      <EditTeacherDialog
+        open={editingTeacher !== null}
+        onOpenChange={(open) => !open && setEditingTeacher(null)}
+        teacher={editingTeacher}
+        majors={majors}
+        majorsLoading={majorsLoading}
+        lockedMajor={undefined}
+      />
+
+      {/* Dialog Xác nhận Xóa giảng viên */}
+      <DeleteTeacherDialog
+        open={deletingTeacher !== null}
+        onOpenChange={(open) => !open && setDeletingTeacher(null)}
+        teacher={deletingTeacher}
       />
 
       {/* Dialog Import giảng viên (Admin có quyền ACCESS_ALL_MAJORS nên import được tất cả các ngành) */}

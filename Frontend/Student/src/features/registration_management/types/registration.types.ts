@@ -4,6 +4,7 @@ export type AdvisorRegistrationStatus =
   | 'TEACHER_APPROVED'
   | 'HOD_APPROVED'
   | 'REJECTED'
+  | 'HOD_REJECTED'
   | 'ASSIGNED_BY_HOD'
 
 export type AdvisorRegistrationDeadlineStatus =

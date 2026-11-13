@@ -21,6 +21,7 @@ import { toast } from '@/shared/components/feedback'
 import { cn } from '@/shared/utils/cn'
 import type { SemesterOption } from '@/features/department/student_management'
 import type { SupervisorLecturer, SupervisorStudent, RegistrationDeadlineInfo } from '../types'
+import { matchTeacher } from '../services/supervisor.service'
 
 function formatDeadlineDateTime(val?: string | null): string {
   if (!val) return ''
@@ -79,9 +80,9 @@ interface SupervisorWorkspaceViewProps {
   counts?: { received: number; unassigned: number; approved: number }
   isLoading?: boolean
   onBack: () => void
-  onAssignStudents: (studentIds: string[], supervisor: SupervisorLecturer) => void
-  onApproveRegistrations: (registrationPublicIds: string[]) => void
-  onRejectRegistrations: (registrationPublicIds: string[]) => void
+  onAssignStudents: (studentIds: string[], supervisor: SupervisorLecturer) => void | Promise<void>
+  onApproveRegistrations: (registrationPublicIds: string[]) => void | Promise<void>
+  onRejectRegistrations: (registrationPublicIds: string[]) => void | Promise<void>
   onChangeSupervisor: (studentId: string, newSupervisor: SupervisorLecturer) => void | Promise<void>
   onChangeCoSupervisor: (studentId: string, coSupervisor: SupervisorLecturer | null) => void
   onToggleLock: (isLocked: boolean) => Promise<boolean | void> | void
@@ -294,6 +295,32 @@ export function SupervisorWorkspaceView({
     })
   }, [localStudents, currentTab, studentSearch])
 
+  // Danh sách giảng viên với số lượng SV đang nhận được đồng bộ từ localStudents
+  const liveLecturers = useMemo(() => {
+    return lecturers.map((l) => {
+      // Đếm số lượng sinh viên trong localStudents đang nhận GV này (loại trừ tab unassigned)
+      const countInLocal = localStudents.filter((s) => {
+        if (s.status === 'unassigned') return false
+        const isSup1 = matchTeacher(
+          { id: l.id, teacherPublicId: l.teacherPublicId, teacherCode: l.teacherCode, email: l.email, name: l.name },
+          { id: s.supervisorId || undefined, teacherPublicId: s.supervisorId || undefined, name: s.supervisorName || undefined },
+        )
+        const isSup2 = matchTeacher(
+          { id: l.id, teacherPublicId: l.teacherPublicId, teacherCode: l.teacherCode, email: l.email, name: l.name },
+          { id: s.supervisor2Id || undefined, teacherPublicId: s.supervisor2Id || undefined, name: s.supervisor2Name || undefined },
+        )
+        return isSup1 || isSup2
+      }).length
+
+      const assigned = localStudents.length > 0 ? countInLocal : (l.assigned || 0)
+
+      return {
+        ...l,
+        assigned,
+      }
+    })
+  }, [lecturers, localStudents])
+
   // Lọc và chia danh sách giảng viên: còn chỉ tiêu & đã đủ chỉ tiêu
   const { availableLecturers, unavailableLecturers } = useMemo(() => {
     const filterLec = (list: SupervisorLecturer[]) => {
@@ -310,8 +337,8 @@ export function SupervisorWorkspaceView({
       return res
     }
 
-    const available = filterLec(lecturers.filter((l) => (l.assigned || 0) < l.quota))
-    const unavailable = filterLec(lecturers.filter((l) => (l.assigned || 0) >= l.quota))
+    const available = filterLec(liveLecturers.filter((l) => (l.assigned || 0) < l.quota))
+    const unavailable = filterLec(liveLecturers.filter((l) => (l.assigned || 0) >= l.quota))
 
     const sortFn = (a: SupervisorLecturer, b: SupervisorLecturer) => {
       if (lecturerSort === 'asc') {
@@ -332,7 +359,7 @@ export function SupervisorWorkspaceView({
     unavailable.sort(sortFn)
 
     return { availableLecturers: available, unavailableLecturers: unavailable }
-  }, [lecturers, lecturerCategory, lecturerSearch, lecturerSort])
+  }, [liveLecturers, lecturerCategory, lecturerSearch, lecturerSort])
 
   // Tự động chọn GV khi ở tab Chưa nhận GV hoặc Đã phân công / Đang sửa
   const effectiveSelectedLecturerId = useMemo(() => {
@@ -350,8 +377,8 @@ export function SupervisorWorkspaceView({
   }, [currentTab, selectedLecturerId, availableLecturers, unavailableLecturers, editingTarget])
 
   const selectedLecturer = useMemo(() => {
-    return lecturers.find((l) => l.id === effectiveSelectedLecturerId) || null
-  }, [lecturers, effectiveSelectedLecturerId])
+    return liveLecturers.find((l) => l.id === effectiveSelectedLecturerId) || null
+  }, [liveLecturers, effectiveSelectedLecturerId])
 
   // Checkbox toggle sinh viên
   const toggleSelectStudent = (id: string) => {
@@ -506,21 +533,26 @@ export function SupervisorWorkspaceView({
       return
     }
 
-    onAssignStudents(targetStudentIds, selectedLecturer)
-    setLocalStudents((prev) =>
-      prev.map((item) =>
-        targetStudentIds.includes(item.id)
-          ? {
-            ...item,
-            status: 'approved',
-            supervisorId: selectedLecturer.id,
-            supervisorName: selectedLecturer.name,
-          }
-          : item,
-      ),
-    )
-    setSelectedStudentIds(new Set())
-    setEditingTarget(null)
+    try {
+      await onAssignStudents(targetStudentIds, selectedLecturer)
+      setLocalStudents((prev) =>
+        prev.map((item) =>
+          targetStudentIds.includes(item.id)
+            ? {
+              ...item,
+              status: 'approved',
+              registrationStatus: 'ASSIGNED_BY_HOD',
+              supervisorId: selectedLecturer.id,
+              supervisorName: selectedLecturer.name,
+            }
+            : item,
+        ),
+      )
+      setSelectedStudentIds(new Set())
+      setEditingTarget(null)
+    } catch {
+      setLocalStudents(students)
+    }
   }
 
   // Hành động Phê duyệt (tab Đã nhận GV)
@@ -551,7 +583,7 @@ export function SupervisorWorkspaceView({
       return
     }
 
-    // Chuyển sinh viên sang tab "Đã phân công" (approved) và cập nhật badge thành HOD_APPROVED
+    // Chuyển sinh viên sang tab "Đã phân công" (approved) và cập nhật badge thành HOD_APPROVED ("TBM duyệt")
     setLocalStudents((prev) =>
       prev.map((s) => {
         if (selectedStudentIds.has(s.id)) {
@@ -583,7 +615,7 @@ export function SupervisorWorkspaceView({
 
     const selectedIdsArray = Array.from(selectedStudentIds)
     const confirmReject = confirm(
-      `Bạn có chắc chắn muốn từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn? Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (Chưa có GVHD).`,
+      `Bạn có chắc chắn muốn từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn? Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (TBM từ chối).`,
     )
     if (!confirmReject) return
 
@@ -602,13 +634,14 @@ export function SupervisorWorkspaceView({
       return
     }
 
-    // Chuyển sinh viên sang tab "Chưa nhận GV" (unassigned) và xóa thông tin GVHD
+    // Chuyển sinh viên sang tab "Chưa nhận GV" (unassigned), xóa thông tin GVHD và gán trạng thái HOD_REJECTED ("TBM từ chối")
     setLocalStudents((prev) =>
       prev.map((s) => {
         if (selectedStudentIds.has(s.id)) {
           return {
             ...s,
             status: 'unassigned',
+            registrationStatus: 'HOD_REJECTED',
             supervisorId: null,
             supervisorName: null,
             supervisor2Id: null,
@@ -797,7 +830,7 @@ export function SupervisorWorkspaceView({
                 )}
               >
                 <Lock className="w-4 h-4" />
-                <span>Khóa danh sách</span>
+                <span>Chốt danh sách GVHD</span>
               </button>
             </div>
           )}
@@ -1116,9 +1149,17 @@ export function SupervisorWorkspaceView({
                                 ) : (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Trưởng bộ môn đã phê duyệt chính thức">
                                     <Check className="w-3 h-3 text-emerald-600" />
-                                    TBM đã duyệt
+                                    TBM duyệt
                                   </span>
                                 )
+                              )}
+                              {currentTab === 'unassigned' && (
+                                (s.registrationStatus === 'HOD_REJECTED' || s.registrationStatus === 'REJECTED') ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10.5px] font-semibold bg-rose-50 text-rose-700 border border-rose-200" title="Trưởng bộ môn đã từ chối đơn">
+                                    <X className="w-3 h-3 text-rose-600" />
+                                    TBM từ chối
+                                  </span>
+                                ) : null
                               )}
                             </div>
                           </td>
@@ -1126,7 +1167,16 @@ export function SupervisorWorkspaceView({
                           {/* Cột 2: Đề tài */}
                           <td className="py-2.5 px-2.5">
                             {currentTab === 'unassigned' ? (
-                              <span className="text-slate-400 italic text-[11.5px]">—</span>
+                              s.topic ? (
+                                <span
+                                  className="text-[12px] text-slate-700 line-clamp-2 leading-snug"
+                                  title={s.topic}
+                                >
+                                  {s.topic}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11.5px]">—</span>
+                              )
                             ) : s.topic ? (
                               <span
                                 className="text-[12px] text-slate-700 line-clamp-2 leading-snug"
@@ -1656,7 +1706,7 @@ export function SupervisorWorkspaceView({
                 </div>
                 <div>
                   <h3 className="text-[16px] font-bold text-slate-900 leading-snug">
-                    Xác nhận Khóa danh sách & Công bố chính thức
+                    Xác nhận Chốt danh sách GVHD & Công bố chính thức
                   </h3>
                   <p className="text-[12px] text-slate-500 mt-0.5">
                     Năm học {year} ({semesterName})
@@ -1728,7 +1778,7 @@ export function SupervisorWorkspaceView({
                 className="h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSubmittingLock && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>{isSubmittingLock ? 'Đang khóa danh sách...' : 'Xác nhận khóa'}</span>
+                <span>{isSubmittingLock ? 'Đang chốt danh sách...' : 'Xác nhận chốt danh sách'}</span>
               </button>
             </div>
           </div>

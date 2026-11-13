@@ -28,13 +28,39 @@ export function getTeacherEmailRule(email: string): TeacherEmailRule | undefined
   return TEACHER_EMAIL_RULES.find((rule) => value.endsWith(rule.domain))
 }
 
+/**
+ * Nhận diện linh hoạt trường Đại học Thủy lợi (bao gồm cả chuẩn gõ dấu trên u "Thủy" hoặc dấu trên y "Thuỷ",
+ * chữ hoa, thường, viết tắt)
+ */
+export function isTLU(text?: string | null): boolean {
+  if (!text) return false
+  const clean = String(text)
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return (
+    clean === 'trường đại học thủy lợi' ||
+    clean === 'trường đại học thuỷ lợi' ||
+    clean === 'đại học thủy lợi' ||
+    clean === 'đại học thuỷ lợi' ||
+    clean.includes('thủy lợi') ||
+    clean.includes('thuỷ lợi')
+  )
+}
+
 /** "trường đại học THỦY LỢI" → "Trường Đại học Thủy lợi" (BE không phân biệt hoa/thường); tên trường khác giữ nguyên */
-function toOrganization(text: string): string {
-  return text.toLowerCase() === TLU_ORGANIZATION.toLowerCase() ? TLU_ORGANIZATION : text
+export function toOrganization(text: string): string {
+  const norm = normalizeTeacherText(text)
+  return isTLU(norm) ? TLU_ORGANIZATION : norm
 }
 
 export function isValidOrganization(organization: string): boolean {
-  return organization.length > 0 && organization.length <= MAX_LENGTH && ORGANIZATION_PATTERN.test(organization)
+  return (
+    organization.length > 0 &&
+    organization.length <= MAX_LENGTH &&
+    (isTLU(organization) || ORGANIZATION_PATTERN.test(organization))
+  )
 }
 
 /** Cắt khoảng trắng đầu cuối, gộp nhiều khoảng trắng giữa thành 1 */
@@ -54,8 +80,52 @@ const readText = (value: unknown): string => normalizeTeacherText(value)
 const readEmailRule = (values: Record<string, unknown>): TeacherEmailRule | undefined =>
   getTeacherEmailRule(readText(values.email))
 
+export function isExternalTeacherCheck(params: {
+  email?: string | null
+  organization?: string | null
+  isInternal?: boolean | null
+  unitType?: string | null
+}): boolean {
+  const email = (params.email || '').trim().toLowerCase()
+  if (email.endsWith('@tlu.edu.vn')) return false
+  if (email.endsWith('@gmail.com')) return true
+
+  if (params.isInternal === false || params.unitType === 'EXTERNAL') return true
+  if (params.isInternal === true || params.unitType === 'INTERNAL') return false
+
+  const org = params.organization
+  if (org && !isTLU(org)) return true
+
+  return false
+}
+
+export function isInternalTeacherValues(values: Record<string, unknown>): boolean {
+  const email = readText(values.email).toLowerCase()
+  if (email.endsWith('@tlu.edu.vn')) return true
+  if (email.endsWith('@gmail.com')) return false
+  const org = readText(values.organization)
+  return isTLU(org)
+}
+
+export function isExternalTeacherValues(values: Record<string, unknown>): boolean {
+  const email = readText(values.email).toLowerCase()
+  if (email.endsWith('@gmail.com')) return true
+  if (email.endsWith('@tlu.edu.vn')) return false
+  const org = readText(values.organization)
+  return org !== '' && !isTLU(org)
+}
+
 export const createTeacherSchema = z
   .object({
+    teacherCode: z
+      .string()
+      .transform(normalizeTeacherText)
+      .pipe(
+        z
+          .string()
+          .min(1, 'Mã giảng viên không được để trống')
+          .max(50, 'Mã giảng viên không được vượt quá 50 ký tự'),
+      ),
     firstName: z
       .string()
       .transform(normalizeTeacherText)
@@ -108,12 +178,13 @@ export const createTeacherSchema = z
           .max(MAX_LENGTH, 'Đơn vị công tác không được vượt quá 100 ký tự')
           .regex(ORGANIZATION_PATTERN, 'Đơn vị công tác chỉ được chứa chữ cái, số và dấu câu hợp lệ'),
       ),
-    // Gửi tên ngành (BE nhận tên hoặc mã ngành). Bắt buộc hay phải trống tùy email → kiểm tra ở refine bên dưới
-    major: z.string().transform(normalizeTeacherText),
+    // Gửi tên hoặc mã ngành. Ngoài trường không bắt buộc (cho phép null/rỗng)
+    majorId: z.union([z.string(), z.number()]).optional().nullable(),
+    major: z.string().optional().nullable().transform(normalizeTeacherText),
     // Học hàm / Học vị (bắt buộc: POST /teacher: academicTitleId từ bảng academic_title hoặc academicTitle viết tắt)
     academicTitleId: z.coerce.number().optional().nullable(),
     academicTitle: z
-      .string({ required_error: 'Vui lòng chọn học hàm / học vị' })
+      .string()
       .min(1, 'Vui lòng chọn học hàm / học vị')
       .transform(normalizeTeacherText),
     amount: z
@@ -145,21 +216,39 @@ export const createTeacherSchema = z
       when: () => true,
     },
   )
-  // Email chưa hợp lệ (kể cả sai đuôi) thì BE chưa biết trong hay ngoài trường → không báo lỗi ngành
-  .refine((values) => readEmailRule(values)?.internal !== true || readText(values.major) !== '', {
-    message: 'Ngành học không được để trống',
-    path: ['major'],
-    when: () => true,
-  })
+  // Ngành học: Giáo viên trong trường bắt buộc phải chọn ngành. Giáo viên ngoài trường không bắt buộc (cho phép để trống)
   .refine(
-    (values) => readEmailRule(values)?.internal !== true || readText(values.major).length <= MAX_LENGTH,
+    (values) => {
+      if (isExternalTeacherValues(values)) return true
+      if (isInternalTeacherValues(values)) {
+        return readText(values.major) !== ''
+      }
+      return true
+    },
+    {
+      message: 'Ngành học không được để trống',
+      path: ['major'],
+      when: () => true,
+    },
+  )
+  .refine(
+    (values) => {
+      const majorText = readText(values.major)
+      return majorText === '' || majorText.length <= MAX_LENGTH
+    },
     { message: 'Ngành học không tồn tại trong hệ thống', path: ['major'], when: () => true },
   )
-  .refine((values) => readEmailRule(values)?.internal !== false || readText(values.major) === '', {
-    message: 'Giáo viên ngoài trường không được điền ngành',
-    path: ['major'],
-    when: () => true,
-  })
+  .refine(
+    (values) => {
+      if (!isExternalTeacherValues(values)) return true
+      return readText(values.major) === ''
+    },
+    {
+      message: 'Giáo viên ngoài trường không được điền ngành',
+      path: ['major'],
+      when: () => true,
+    },
+  )
 
 /** Giá trị người dùng nhập trên form (trước khi chuẩn hóa) */
 export type CreateTeacherFormInput = z.input<typeof createTeacherSchema>
@@ -167,11 +256,13 @@ export type CreateTeacherFormInput = z.input<typeof createTeacherSchema>
 export type CreateTeacherFormValues = z.output<typeof createTeacherSchema>
 
 export const EMPTY_CREATE_TEACHER_VALUES: CreateTeacherFormInput = {
+  teacherCode: '',
   firstName: '',
   lastName: '',
   email: '',
   phone: '',
   organization: '',
+  majorId: null,
   major: '',
   amount: '',
   academicTitleId: null,

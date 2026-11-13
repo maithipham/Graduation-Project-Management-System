@@ -213,16 +213,14 @@ export function ImportStudentDialog({
                     ))}
                   </div>
                   <div className="pt-1 border-t border-sky-100/80">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toast.info("Chức năng tải file mẫu sẽ sớm được hỗ trợ")
-                      }
-                      className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1565C0] hover:text-[#0D47A1] hover:underline cursor-pointer"
+                    <a
+                      href="/student_import_template.xlsx"
+                      download="student_import_template.xlsx"
+                      className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1565C0] hover:text-[#0D47A1] underline underline-offset-2 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" /> Tải file Excel mẫu
                       (.xlsx)
-                    </button>
+                    </a>
                   </div>
                 </div>
               </fieldset>

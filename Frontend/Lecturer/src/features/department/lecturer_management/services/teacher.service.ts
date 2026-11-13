@@ -7,6 +7,7 @@ import type {
   AdvisorImportResponse,
   AssignAdvisorsRequest,
   TeacherCreationRequest,
+  TeacherUpdateRequest,
   TeacherDetail,
   TeacherImportResponse,
   TeacherListItem,
@@ -85,13 +86,34 @@ export const teacherService = {
     return toSpringPage(res.data.data, params)
   },
 
-  // POST /semesters/{semesterId}/advisors — Cấu hình danh sách giáo viên hướng dẫn
+  // POST /api/advisors/assign hoặc /semesters/{semesterId}/advisors — Cấu hình danh sách giáo viên hướng dẫn
   async assignAdvisors(semesterId: string, body: AssignAdvisorsRequest): Promise<string> {
-    const res = await apiClient.post<ApiResponse<null>>(TEACHER.advisors(semesterId), {
+    const payload = {
+      semesterId,
       teacherIds: body.teacherIds,
       maxStudentsPerTeacher: body.maxStudentsPerTeacher ?? 20,
-    })
-    return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
+    }
+    try {
+      const res = await apiClient.post<ApiResponse<null>>('/api/advisors/assign', payload)
+      return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        try {
+          const res = await apiClient.post<ApiResponse<null>>(TEACHER.advisors(semesterId), {
+            teacherIds: body.teacherIds,
+            maxStudentsPerTeacher: body.maxStudentsPerTeacher ?? 20,
+          })
+          return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
+        } catch (innerErr: any) {
+          if (innerErr?.response?.status === 404) {
+            const res = await apiClient.post<ApiResponse<null>>('/api/advisors', payload)
+            return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
+          }
+          throw innerErr
+        }
+      }
+      throw err
+    }
   },
 
   // GET /teacher/{publicId} — publicId sai định dạng UUID hoặc không có → 404, code 3009 (Giáo viên không tồn tại)
@@ -178,5 +200,37 @@ export const teacherService = {
   async getManagedMajor(): Promise<MajorOption | null> {
     const res = await apiClient.get<ApiResponse<MajorOption | null>>('/teacher/managed-major')
     return res.data.data
+  },
+
+  // PUT /api/teachers/{id} — cập nhật thông tin giảng viên
+  async updateTeacher(id: string | number, body: TeacherUpdateRequest): Promise<TeacherWriteResult> {
+    try {
+      const res = await apiClient.put<ApiResponse<unknown>>(`/api/teachers/${id}`, body, {
+        skipErrorToast: true,
+      })
+      return { code: res.data.code, message: res.data.message }
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        const res = await apiClient.put<ApiResponse<unknown>>(TEACHER.detail(String(id)), body, {
+          skipErrorToast: true,
+        })
+        return { code: res.data.code, message: res.data.message }
+      }
+      throw err
+    }
+  },
+
+  // DELETE /api/teachers/{id} — xóa giảng viên
+  async deleteTeacher(id: string | number): Promise<string> {
+    try {
+      const res = await apiClient.delete<ApiResponse<unknown>>(`/api/teachers/${id}`)
+      return res.data.message || 'Xóa giảng viên thành công'
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        const res = await apiClient.delete<ApiResponse<unknown>>(TEACHER.detail(String(id)))
+        return res.data.message || 'Xóa giảng viên thành công'
+      }
+      throw err
+    }
   },
 }

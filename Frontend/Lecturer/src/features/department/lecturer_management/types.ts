@@ -112,16 +112,34 @@ export interface SemesterAdvisorResponse {
 
 // Body POST /teacher (thêm thủ công 1 giáo viên). BE nhận mọi field dạng chuỗi → gửi chuỗi hết, kể cả phone
 export interface TeacherCreationRequest {
+  teacherCode: string
   firstName: string
   lastName: string
   email: string // chỉ @tlu.edu.vn hoặc @gmail.com
   phone: string
   organization: string // tên trường, phải khớp email (@tlu.edu.vn ⇔ "Trường Đại học Thủy lợi", @gmail.com ⇔ trường khác)
   major: string // tên hoặc mã ngành; ngoài trường gửi ""
+  majorId?: string | number | null // ID hoặc publicId của ngành; ngoài trường gửi null
   academicTitleId?: number | null // ID từ bảng academic_title
   academicTitle?: string | null // ThS., TS., PGS.TS., GS.TS.
   /** @deprecated */
   amount?: string | number | null
+}
+
+// Body PUT /api/teachers/{id} (sửa thông tin 1 giáo viên)
+export interface TeacherUpdateRequest {
+  teacherCode: string
+  firstName: string
+  lastName: string
+  name?: string
+  email: string
+  phone: string
+  organization: string
+  major?: string
+  majorName?: string | null
+  majorId?: string | number | null
+  academicTitleId?: number | null
+  academicTitle?: string | null
 }
 
 /**
@@ -137,6 +155,7 @@ export interface TeacherWriteResult {
 // Kết quả POST /teacher/import (TeacherImportResponse). Trạng thái dòng dùng chung với import sinh viên
 export interface TeacherImportRowResult {
   rowNumber: number // dòng thật trên Excel (tiêu đề = 1)
+  teacherCode?: string
   // Giá trị BE đã chuẩn hóa (trim, email chữ thường...); ô trống là "" chứ không phải null
   firstName: string
   lastName: string
@@ -246,7 +265,15 @@ export interface SupervisorStudent {
   supervisor2Name?: string | null
   assignedTime: string | null
   status: 'received' | 'unassigned' | 'approved'
-  registrationStatus?: 'PENDING' | 'TEACHER_APPROVED' | 'HOD_APPROVED' | 'ASSIGNED_BY_HOD' | 'REJECTED' | string | null
+  registrationStatus?:
+    | 'PENDING'
+    | 'TEACHER_APPROVED'
+    | 'HOD_APPROVED'
+    | 'ASSIGNED_BY_HOD'
+    | 'HOD_REJECTED'
+    | 'REJECTED'
+    | string
+    | null
   year: string
   semester: string
 }

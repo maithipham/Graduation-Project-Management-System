@@ -16,13 +16,15 @@ import {
   FormField,
 } from "@/shared/components/ui";
 import { cn } from "@/shared/utils/cn";
+import { downloadExcelTemplate } from "@/shared/utils/download";
 import { useImportTeachers } from "../hooks/useTeachers";
 import { TeacherImportResult } from "./TeacherImportResult";
 
 const MAX_IMPORT_SIZE = 50 * 1024 * 1024; // 50MB, trùng giới hạn của BE
 
-// Thứ tự cột A–F trong file mẫu (Mục 6.2 api_addLecturer.md). Không có cột hạn mức: BE tự gán theo email
+// Thứ tự cột trong file mẫu: bổ sung Mã giảng viên
 const IMPORT_COLUMNS = [
+  "Mã giảng viên",
   "Họ và tên đệm",
   "Tên",
   "Email",
@@ -169,10 +171,16 @@ export function ImportTeacherDialog({
                   <Button
                     type="button"
                     variant="link"
-                    className="h-auto p-0"
-                    onClick={() => toast.info("Sẽ hỗ trợ sau")}
+                    className="h-auto p-0 cursor-pointer text-[#1565C0] hover:text-[#0D47A1] font-semibold"
+                    onClick={() =>
+                      downloadExcelTemplate(
+                        '/api/teachers/import/template',
+                        'mau_import_giang_vien.xlsx',
+                        '/teacher/import/template',
+                      )
+                    }
                   >
-                    <Download /> Tải file mẫu
+                    <Download className="w-4 h-4 mr-1" /> Tải file mẫu (.xlsx)
                   </Button>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import {
   FormField,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
+import { downloadExcelTemplate } from '@/shared/utils/download'
 import { toast } from '@/shared/components/feedback'
 import { useImportAdvisorsExcel, useTeachers } from '../hooks/useTeachers'
 import type { AdvisorImportResponse, SupervisorLecturer } from '../types'
@@ -24,6 +25,7 @@ const ADVISOR_IMPORT_COLUMNS = [
   'STT',
   'Mã GV',
   'Họ và tên',
+  'Học hàm / Học vị',
   'Email',
   'Số lượng SV tối đa',
 ]
@@ -129,23 +131,7 @@ export function ImportAdvisorsDialog({
   }
 
   const handleDownloadSample = () => {
-    const header = 'STT,Mã GV,Họ và tên,Email,Số lượng SV tối đa\n'
-    const sampleRows = [
-      '1,GV001,PGS.TS. Trần Quốc Bảo,bao.tq@tlu.edu.vn,8',
-      '2,GV002,TS. Vũ Thị Lan,lan.vt@tlu.edu.vn,7',
-      '3,GV003,ThS. Nguyễn Văn Bình,binh.nv@gmail.com,5',
-    ].join('\n')
-    const blob = new Blob(['\uFEFF' + header + sampleRows], {
-      type: 'text/csv;charset=utf-8;',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'mau_danh_sach_gvhd.csv'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadExcelTemplate('/api/advisors/import/template', 'mau_import_gvhd.xlsx', '/api/supervisors/import/template')
   }
 
   return (
@@ -240,6 +226,9 @@ export function ImportAdvisorsDialog({
                         </li>
                       ))}
                     </ol>
+                    <p className="text-[11px] text-slate-500 mt-1.5 italic">
+                      * Học hàm / Học vị là bắt buộc (ví dụ: TS., ThS., PGS.TS., GS.TS.). Có thể điền ở cột riêng hoặc đặt trước họ tên.
+                    </p>
                   </div>
 
                   <div>

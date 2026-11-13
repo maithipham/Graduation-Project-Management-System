@@ -1,5 +1,6 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
+import { getFilenameFromDisposition, downloadExcelTemplate, type DownloadedFile } from '@/shared/utils'
 import { teacherService } from './teacher.service'
 import { studentService } from '@/features/department/student_management/services/student.service'
 import type {
@@ -103,6 +104,60 @@ export function toSupervisorLecturer(
     semester: semesterName,
     status: t.status ? 'active' : 'busy',
   }
+}
+
+/**
+ * So khớp an toàn giữa 2 thực thể hoặc tham chiếu giảng viên (tránh trường hợp undefined === undefined dẫn đến khớp nhầm).
+ */
+export function matchTeacher(
+  a?: {
+    id?: string | number | null
+    teacherPublicId?: string | null
+    teacherCode?: string | null
+    email?: string | null
+    name?: string | null
+    fullName?: string | null
+  } | null,
+  b?: {
+    id?: string | number | null
+    teacherPublicId?: string | null
+    teacherCode?: string | null
+    email?: string | null
+    name?: string | null
+    fullName?: string | null
+  } | null,
+): boolean {
+  if (!a || !b) return false
+
+  // 1. So khớp bằng publicId nếu cả hai đều có giá trị hợp lệ
+  const pubA = a.teacherPublicId || (typeof a.id === 'string' && a.id.includes('-') ? a.id : null)
+  const pubB = b.teacherPublicId || (typeof b.id === 'string' && b.id.includes('-') ? b.id : null)
+  if (pubA && pubB && pubA.toLowerCase() === pubB.toLowerCase()) return true
+
+  // 2. So khớp id (nếu cả hai là số hoặc chuỗi số không rỗng)
+  if (a.id && b.id && String(a.id) === String(b.id)) return true
+
+  // 3. So khớp email (định danh duy nhất không trùng)
+  const emailA = a.email?.trim().toLowerCase()
+  const emailB = b.email?.trim().toLowerCase()
+  if (emailA && emailB && emailA === emailB) return true
+
+  // 4. So khớp mã giảng viên (teacherCode)
+  const codeA = a.teacherCode?.trim().toLowerCase()
+  const codeB = b.teacherCode?.trim().toLowerCase()
+  if (codeA && codeB && codeA === codeB) return true
+
+  // 5. So khớp họ tên (chuẩn hóa bỏ học hàm, học vị)
+  const stripTitle = (name: string) =>
+    name
+      .replace(/^(PGS\.TS\.|GS\.TS\.|TS\.|ThS\.|CN\.|KS\.|PGS\.|GS\.)\s*/i, '')
+      .trim()
+      .toLowerCase()
+  const nameA = a.name || a.fullName
+  const nameB = b.name || b.fullName
+  if (nameA && nameB && stripTitle(nameA) === stripTitle(nameB)) return true
+
+  return false
 }
 
 export function toSupervisorLecturerFromAdvisor(
@@ -290,14 +345,16 @@ export function toSupervisorStudentFromWorkspace(
     null
 
   const resolvedRegStatus =
-    regStatus ||
-    (status === 'received'
-      ? 'TEACHER_APPROVED'
-      : status === 'approved'
-        ? rawStatus === 'ASSIGNED_BY_HOD'
-          ? 'ASSIGNED_BY_HOD'
-          : 'HOD_APPROVED'
-        : null)
+    regStatus === 'REJECTED'
+      ? 'HOD_REJECTED'
+      : regStatus ||
+        (status === 'received'
+          ? 'TEACHER_APPROVED'
+          : status === 'approved'
+            ? rawStatus === 'ASSIGNED_BY_HOD'
+              ? 'ASSIGNED_BY_HOD'
+              : 'HOD_APPROVED'
+            : null)
 
   return {
     id: item.studentPublicId,
@@ -429,10 +486,24 @@ export const supervisorService = {
     teacherPublicId: string,
   ): Promise<void> {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
-    await apiClient.post<ApiResponse<void>>(
-      API_ENDPOINTS.advisorAssignment.assign(cleanSemesterId),
-      { studentPublicIds, teacherPublicId },
-    )
+    try {
+      await apiClient.post<ApiResponse<void>>(
+        API_ENDPOINTS.advisorAssignment.assign(cleanSemesterId),
+        {
+          studentPublicIds,
+          teacherPublicId,
+        },
+      )
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        await apiClient.post<ApiResponse<void>>(
+          `/semesters/${cleanSemesterId}/advisors/assign`,
+          { studentPublicIds, teacherPublicId },
+        )
+      } else {
+        throw err
+      }
+    }
   },
 
   // PUT /semesters/{semesterId}/advisor-assignments/students/{studentPublicId}/supervisor: Đổi GVHD 1
@@ -469,6 +540,99 @@ export const supervisorService = {
       { isLocked },
     )
   },
+
+  // POST /api/advisors/finalize — Chốt danh sách GVHD chính thức cho học kỳ
+  async finalizeSupervisors(semesterId: string): Promise<string> {
+    const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    try {
+      const res = await apiClient.post<ApiResponse<null>>('/api/advisors/finalize', {
+        semesterId: cleanSemesterId,
+      })
+      return res.data?.message || 'Chốt danh sách giảng viên hướng dẫn thành công'
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        const res = await apiClient.post<ApiResponse<null>>('/api/supervisors/finalize', {
+          semesterId: cleanSemesterId,
+        })
+        return res.data?.message || 'Chốt danh sách giảng viên hướng dẫn thành công'
+      }
+      throw err
+    }
+  },
+
+  async finalizeAdvisors(semesterId: string): Promise<string> {
+    return this.finalizeSupervisors(semesterId)
+  },
+
+  // GET /api/advisors/export — Xuất danh sách GVHD theo bộ lọc ra file .xlsx
+  async exportSupervisors(params: {
+    semesterId?: string
+    keyword?: string
+    department?: string
+    unitType?: string
+    status?: string
+  }): Promise<DownloadedFile> {
+    const cleanParams: Record<string, any> = {}
+    if (params.semesterId && params.semesterId !== 'all') {
+      cleanParams.semesterId = params.semesterId
+    }
+    if (params.keyword?.trim()) {
+      cleanParams.keyword = params.keyword.trim()
+    }
+    if (params.department && params.department !== 'all') {
+      cleanParams.department = params.department
+    }
+    if (params.unitType && params.unitType !== 'all') {
+      cleanParams.unitType = params.unitType
+    }
+    if (params.status && params.status !== 'all') {
+      cleanParams.status = params.status
+    }
+
+    let res: any
+    try {
+      res = await apiClient.get<Blob>('/api/advisors/export', {
+        params: cleanParams,
+        responseType: 'blob',
+        timeout: 2 * 60 * 1000,
+      })
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        res = await apiClient.get<Blob>('/api/supervisors/export', {
+          params: cleanParams,
+          responseType: 'blob',
+          timeout: 2 * 60 * 1000,
+        })
+      } else {
+        throw err
+      }
+    }
+
+    const filename = getFilenameFromDisposition(
+      res.headers?.['content-disposition'],
+      `danh_sach_gvhd_${params.semesterId || 'hoc_ky'}.xlsx`,
+    )
+
+    const excelBlob = new Blob([res.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+
+    return { blob: excelBlob, filename }
+  },
+
+  async exportAdvisors(params: {
+    semesterId?: string
+    keyword?: string
+    department?: string
+    unitType?: string
+    status?: string
+  }): Promise<DownloadedFile> {
+    return this.exportSupervisors(params)
+  },
+  async downloadImportTemplate(): Promise<void> {
+    await downloadExcelTemplate('/api/advisors/import/template', 'mau_import_gvhd.xlsx', '/api/supervisors/import/template')
+  },
+
   // GET /semesters/{semesterId}/advisors: Lấy danh sách GVHD trong kỳ (từ bảng semester_advisor)
   async getAssignedAdvisors(
     semesterId?: string,

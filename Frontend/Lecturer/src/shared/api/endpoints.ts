@@ -52,6 +52,11 @@ export const API_ENDPOINTS = {
   },
   // Quản lý Giáo viên hướng dẫn (GVHD) theo học kỳ
   advisor: {
+    base: '/api/advisors',
+    template: '/api/advisors/import/template',
+    export: '/api/advisors/export',
+    finalize: '/api/advisors/finalize',
+    assign: '/api/advisors/assign',
     // GET: lấy danh sách GVHD trong kỳ · POST: phân công GVHD
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
     // DELETE: xóa/loại bỏ GVHD khỏi học kỳ

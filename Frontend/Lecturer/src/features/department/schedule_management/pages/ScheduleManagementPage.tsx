@@ -77,7 +77,7 @@ export const ScheduleManagementPage: React.FC = () => {
     () => managedMajor ?? majorList?.[0],
     [managedMajor, majorList]
   );
-  const selectedMajorId = activeMajor?.publicId || (activeMajor?.id ? String(activeMajor.id) : '');
+  const selectedMajorId = activeMajor?.publicId || ((activeMajor as { id?: number | string })?.id ? String((activeMajor as { id?: number | string }).id) : '');
   const majorDisplayName = activeMajor
     ? `${activeMajor.name}${activeMajor.code ? ` (${activeMajor.code})` : ''}`
     : managedMajorLoading

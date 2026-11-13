@@ -15,7 +15,6 @@ import {
   Users,
   ArrowRight,
   Loader2,
-  ShieldCheck,
 } from 'lucide-react'
 import type {
   CommentingLecturer,
@@ -67,14 +66,6 @@ export function AutoDistributeModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Thông báo đảm bảo an toàn nghiệp vụ */}
-          <div className="flex items-center gap-2.5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>
-              <strong>Đảm bảo nguyên tắc BR-05:</strong> Tuyệt đối không có sinh viên nào bị trùng giữa GVHD và Giảng viên nhận xét.
-            </span>
-          </div>
-
           {/* Thống kê biến động tải công việc */}
           <div>
             <h4 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-3 flex items-center gap-2">

@@ -15,6 +15,7 @@ const DEFAULT_RETRY_SUCCESS_MESSAGE = 'Thêm giáo viên thành công'
 export function importRowToFormValues(row: TeacherImportRowResult): CreateTeacherFormInput {
   const external = getTeacherEmailRule(row.email)?.internal === false
   return {
+    teacherCode: row.teacherCode || '',
     firstName: row.firstName,
     lastName: row.lastName,
     email: row.email,
@@ -33,6 +34,7 @@ function withValues(
 ): TeacherImportRowResult {
   return {
     ...row,
+    teacherCode: values.teacherCode,
     firstName: values.firstName,
     lastName: values.lastName,
     email: values.email,

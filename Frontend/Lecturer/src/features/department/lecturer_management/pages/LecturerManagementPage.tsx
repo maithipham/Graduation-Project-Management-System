@@ -6,6 +6,8 @@ import { useMajors } from '@/features/department/student_management'
 import type { SpringPage } from '@/shared/types'
 import { AssignAdvisorsDialog } from '../components/AssignAdvisorsDialog'
 import { CreateTeacherDialog } from '../components/CreateTeacherDialog'
+import { EditTeacherDialog } from '../components/EditTeacherDialog'
+import { DeleteTeacherDialog } from '../components/DeleteTeacherDialog'
 import { ImportTeacherDialog } from '../components/ImportTeacherDialog'
 import { TeacherDetailDialog } from '../components/TeacherDetailDialog'
 import { TeacherTable } from '../components/TeacherTable'
@@ -37,6 +39,8 @@ export default function LecturerManagementPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
+  const [editingTeacher, setEditingTeacher] = useState<TeacherListItem | null>(null)
+  const [deletingTeacher, setDeletingTeacher] = useState<TeacherListItem | null>(null)
 
   // Chờ người dùng ngừng gõ 400ms mới gọi API tìm kiếm
   const keyword = useDebounce((filters.keyword ?? filters.name ?? '').trim(), SEARCH_DEBOUNCE_MS)
@@ -316,6 +320,8 @@ export default function LecturerManagementPage() {
         onPageChange={setPage}
         onPageSizeChange={handlePageSizeChange}
         onRowClick={(teacher) => setSelectedId(teacher.publicId)}
+        onEdit={(teacher) => setEditingTeacher(teacher)}
+        onDelete={(teacher) => setDeletingTeacher(teacher)}
         hasFilters={filtered}
         onCreate={() => setCreateOpen(true)}
       />
@@ -343,6 +349,27 @@ export default function LecturerManagementPage() {
         majors={majors}
         majorsLoading={majorsLoading}
         lockedMajor={tbmMajor}
+        onSuccess={() => {
+          setPage(0)
+          setSort(undefined)
+        }}
+      />
+
+      {/* Popup Cập nhật thông tin giảng viên */}
+      <EditTeacherDialog
+        open={editingTeacher !== null}
+        onOpenChange={(open) => !open && setEditingTeacher(null)}
+        teacher={editingTeacher}
+        majors={majors}
+        majorsLoading={majorsLoading}
+        lockedMajor={tbmMajor}
+      />
+
+      {/* Popup Xác nhận Xóa giảng viên */}
+      <DeleteTeacherDialog
+        open={deletingTeacher !== null}
+        onOpenChange={(open) => !open && setDeletingTeacher(null)}
+        teacher={deletingTeacher}
       />
 
       {/* Popup Import file Excel */}

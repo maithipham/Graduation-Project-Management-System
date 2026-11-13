@@ -32,6 +32,7 @@ interface AddAccountDialogProps {
 }
 
 const defaultValues: AddAccountFormValues = {
+  teacherCode: '',
   name: '',
   email: '',
   phone: '',
@@ -128,6 +129,7 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
     try {
       onAccountAdded({
         ...values,
+        teacherCode: values.teacherCode || '',
         major: finalMajor,
         batch: finalBatch,
         className: finalClassName,
@@ -159,12 +161,28 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
         >
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Nếu là Giảng viên: Hiển thị trường Mã giáo viên */}
+              {currentRole === 'Giảng viên' && (
+                <div className="sm:col-span-2">
+                  <FormField
+                    label="Mã giáo viên"
+                    required
+                    error={errors.teacherCode?.message}
+                  >
+                    <Input
+                      placeholder="Ví dụ: GV001"
+                      {...register('teacherCode')}
+                    />
+                  </FormField>
+                </div>
+              )}
+
               <div className="sm:col-span-2">
-              <FormField
-                label="Họ và tên"
-                required
-                error={errors.name?.message}
-              >
+                <FormField
+                  label="Họ và tên"
+                  required
+                  error={errors.name?.message}
+                >
                 <Input
                   placeholder="Ví dụ: Nguyễn Văn A"
                   {...register('name')}
