@@ -106,7 +106,8 @@ export default function StudentOutlinePage() {
     Boolean(topicOverview?.status) && topicOverview?.status !== 'IN_PROGRESS'
   const isInitial =
     hasTopic &&
-    topicOverview?.currentStage === 'STAGE_1_ADVISOR_ASSIGNED' &&
+    (topicOverview?.currentStage === 'STAGE_1_ADVISOR_ASSIGNED' ||
+      topicOverview?.currentStage === 'STAGE_2_TOPIC_CONFIRMED') &&
     !topicOverview?.officialName
   const isChange = hasTopic && topicOverview?.officialName != null && !hasPendingRequest
 

@@ -21,6 +21,7 @@ import { toast } from '@/shared/components/feedback'
 import { cn } from '@/shared/utils/cn'
 import type { SemesterOption } from '@/features/department/student_management'
 import type { SupervisorLecturer, SupervisorStudent, RegistrationDeadlineInfo } from '../types'
+import { matchTeacher } from '../services/supervisor.service'
 
 function formatDeadlineDateTime(val?: string | null): string {
   if (!val) return ''
@@ -294,6 +295,32 @@ export function SupervisorWorkspaceView({
     })
   }, [localStudents, currentTab, studentSearch])
 
+  // Danh sách giảng viên với số lượng SV đang nhận được đồng bộ từ localStudents
+  const liveLecturers = useMemo(() => {
+    return lecturers.map((l) => {
+      // Đếm số lượng sinh viên trong localStudents đang nhận GV này (loại trừ tab unassigned)
+      const countInLocal = localStudents.filter((s) => {
+        if (s.status === 'unassigned') return false
+        const isSup1 = matchTeacher(
+          { id: l.id, teacherPublicId: l.teacherPublicId, teacherCode: l.teacherCode, email: l.email, name: l.name },
+          { id: s.supervisorId || undefined, teacherPublicId: s.supervisorId || undefined, name: s.supervisorName || undefined },
+        )
+        const isSup2 = matchTeacher(
+          { id: l.id, teacherPublicId: l.teacherPublicId, teacherCode: l.teacherCode, email: l.email, name: l.name },
+          { id: s.supervisor2Id || undefined, teacherPublicId: s.supervisor2Id || undefined, name: s.supervisor2Name || undefined },
+        )
+        return isSup1 || isSup2
+      }).length
+
+      const assigned = localStudents.length > 0 ? countInLocal : (l.assigned || 0)
+
+      return {
+        ...l,
+        assigned,
+      }
+    })
+  }, [lecturers, localStudents])
+
   // Lọc và chia danh sách giảng viên: còn chỉ tiêu & đã đủ chỉ tiêu
   const { availableLecturers, unavailableLecturers } = useMemo(() => {
     const filterLec = (list: SupervisorLecturer[]) => {
@@ -310,8 +337,8 @@ export function SupervisorWorkspaceView({
       return res
     }
 
-    const available = filterLec(lecturers.filter((l) => (l.assigned || 0) < l.quota))
-    const unavailable = filterLec(lecturers.filter((l) => (l.assigned || 0) >= l.quota))
+    const available = filterLec(liveLecturers.filter((l) => (l.assigned || 0) < l.quota))
+    const unavailable = filterLec(liveLecturers.filter((l) => (l.assigned || 0) >= l.quota))
 
     const sortFn = (a: SupervisorLecturer, b: SupervisorLecturer) => {
       if (lecturerSort === 'asc') {
@@ -332,7 +359,7 @@ export function SupervisorWorkspaceView({
     unavailable.sort(sortFn)
 
     return { availableLecturers: available, unavailableLecturers: unavailable }
-  }, [lecturers, lecturerCategory, lecturerSearch, lecturerSort])
+  }, [liveLecturers, lecturerCategory, lecturerSearch, lecturerSort])
 
   // Tự động chọn GV khi ở tab Chưa nhận GV hoặc Đã phân công / Đang sửa
   const effectiveSelectedLecturerId = useMemo(() => {
@@ -350,8 +377,8 @@ export function SupervisorWorkspaceView({
   }, [currentTab, selectedLecturerId, availableLecturers, unavailableLecturers, editingTarget])
 
   const selectedLecturer = useMemo(() => {
-    return lecturers.find((l) => l.id === effectiveSelectedLecturerId) || null
-  }, [lecturers, effectiveSelectedLecturerId])
+    return liveLecturers.find((l) => l.id === effectiveSelectedLecturerId) || null
+  }, [liveLecturers, effectiveSelectedLecturerId])
 
   // Checkbox toggle sinh viên
   const toggleSelectStudent = (id: string) => {

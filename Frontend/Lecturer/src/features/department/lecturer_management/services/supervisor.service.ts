@@ -106,6 +106,60 @@ export function toSupervisorLecturer(
   }
 }
 
+/**
+ * So khớp an toàn giữa 2 thực thể hoặc tham chiếu giảng viên (tránh trường hợp undefined === undefined dẫn đến khớp nhầm).
+ */
+export function matchTeacher(
+  a?: {
+    id?: string | number | null
+    teacherPublicId?: string | null
+    teacherCode?: string | null
+    email?: string | null
+    name?: string | null
+    fullName?: string | null
+  } | null,
+  b?: {
+    id?: string | number | null
+    teacherPublicId?: string | null
+    teacherCode?: string | null
+    email?: string | null
+    name?: string | null
+    fullName?: string | null
+  } | null,
+): boolean {
+  if (!a || !b) return false
+
+  // 1. So khớp bằng publicId nếu cả hai đều có giá trị hợp lệ
+  const pubA = a.teacherPublicId || (typeof a.id === 'string' && a.id.includes('-') ? a.id : null)
+  const pubB = b.teacherPublicId || (typeof b.id === 'string' && b.id.includes('-') ? b.id : null)
+  if (pubA && pubB && pubA.toLowerCase() === pubB.toLowerCase()) return true
+
+  // 2. So khớp id (nếu cả hai là số hoặc chuỗi số không rỗng)
+  if (a.id && b.id && String(a.id) === String(b.id)) return true
+
+  // 3. So khớp email (định danh duy nhất không trùng)
+  const emailA = a.email?.trim().toLowerCase()
+  const emailB = b.email?.trim().toLowerCase()
+  if (emailA && emailB && emailA === emailB) return true
+
+  // 4. So khớp mã giảng viên (teacherCode)
+  const codeA = a.teacherCode?.trim().toLowerCase()
+  const codeB = b.teacherCode?.trim().toLowerCase()
+  if (codeA && codeB && codeA === codeB) return true
+
+  // 5. So khớp họ tên (chuẩn hóa bỏ học hàm, học vị)
+  const stripTitle = (name: string) =>
+    name
+      .replace(/^(PGS\.TS\.|GS\.TS\.|TS\.|ThS\.|CN\.|KS\.|PGS\.|GS\.)\s*/i, '')
+      .trim()
+      .toLowerCase()
+  const nameA = a.name || a.fullName
+  const nameB = b.name || b.fullName
+  if (nameA && nameB && stripTitle(nameA) === stripTitle(nameB)) return true
+
+  return false
+}
+
 export function toSupervisorLecturerFromAdvisor(
   item: SemesterAdvisorResponse,
   students: StudentListItem[] = [],

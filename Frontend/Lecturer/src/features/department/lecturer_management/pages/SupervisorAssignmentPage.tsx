@@ -5,6 +5,7 @@ import { cn } from '@/shared/utils/cn'
 import { useMajors } from '@/features/department/student_management'
 import {
   supervisorService,
+  matchTeacher,
   toSupervisorStudentFromWorkspace,
   toSupervisorLecturerFromWorkspace,
 } from '../services/supervisor.service'
@@ -120,12 +121,23 @@ export default function SupervisorAssignmentPage() {
   const workspaceLecturers = useMemo(() => {
     if (remoteLecturers.length > 0) {
       return remoteLecturers.map((remoteLec) => {
-        const matchedWorkspace = workspace?.lecturers?.find(
-          (wl) =>
-            wl.teacherPublicId === remoteLec.teacherPublicId ||
-            wl.teacherPublicId === remoteLec.id ||
-            (wl.teacherCode && wl.teacherCode === remoteLec.teacherCode) ||
-            wl.fullName?.trim().toLowerCase() === remoteLec.name?.trim().toLowerCase(),
+        const matchedWorkspace = workspace?.lecturers?.find((wl) =>
+          matchTeacher(
+            {
+              id: remoteLec.id,
+              teacherPublicId: remoteLec.teacherPublicId,
+              teacherCode: remoteLec.teacherCode,
+              email: remoteLec.email,
+              name: remoteLec.name,
+            },
+            {
+              id: wl.teacherPublicId,
+              teacherPublicId: wl.teacherPublicId,
+              teacherCode: wl.teacherCode,
+              email: wl.email,
+              fullName: wl.fullName,
+            },
+          ),
         )
 
         const quota =
@@ -136,20 +148,21 @@ export default function SupervisorAssignmentPage() {
         // Đếm số sinh viên đang nhận từ danh sách students của workspace nếu có
         const assignedFromStudents = students.filter(
           (s) =>
-            (s.supervisorId === remoteLec.id ||
-              s.supervisorId === remoteLec.teacherPublicId ||
-              (s.supervisorName &&
-                s.supervisorName.trim().toLowerCase() === remoteLec.name.trim().toLowerCase()) ||
-              s.supervisor2Id === remoteLec.id ||
-              s.supervisor2Id === remoteLec.teacherPublicId ||
-              (s.supervisor2Name &&
-                s.supervisor2Name.trim().toLowerCase() === remoteLec.name.trim().toLowerCase())) &&
+            (matchTeacher(
+              { id: remoteLec.id, teacherPublicId: remoteLec.teacherPublicId, teacherCode: remoteLec.teacherCode, email: remoteLec.email, name: remoteLec.name },
+              { id: s.supervisorId || undefined, teacherPublicId: s.supervisorId || undefined, name: s.supervisorName || undefined },
+            ) ||
+              matchTeacher(
+                { id: remoteLec.id, teacherPublicId: remoteLec.teacherPublicId, teacherCode: remoteLec.teacherCode, email: remoteLec.email, name: remoteLec.name },
+                { id: s.supervisor2Id || undefined, teacherPublicId: s.supervisor2Id || undefined, name: s.supervisor2Name || undefined },
+              )) &&
             s.status !== 'unassigned',
         ).length
 
         const assigned =
-          matchedWorkspace?.assignedCount ??
-          (assignedFromStudents > 0 ? assignedFromStudents : remoteLec.assigned)
+          students.length > 0
+            ? assignedFromStudents
+            : (matchedWorkspace?.assignedCount ?? remoteLec.assigned ?? 0)
 
         return {
           ...remoteLec,
