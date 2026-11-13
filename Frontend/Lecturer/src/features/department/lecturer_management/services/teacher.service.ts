@@ -88,10 +88,12 @@ export const teacherService = {
 
   // POST /api/advisors/assign hoặc /semesters/{semesterId}/advisors — Cấu hình danh sách giáo viên hướng dẫn
   async assignAdvisors(semesterId: string, body: AssignAdvisorsRequest): Promise<string> {
-    const payload = {
+    const payload: Record<string, any> = {
       semesterId,
       teacherIds: body.teacherIds,
-      maxStudentsPerTeacher: body.maxStudentsPerTeacher ?? 20,
+    }
+    if (body.maxStudentsPerTeacher !== undefined) {
+      payload.maxStudentsPerTeacher = body.maxStudentsPerTeacher
     }
     try {
       const res = await apiClient.post<ApiResponse<null>>('/api/advisors/assign', payload)
@@ -99,10 +101,13 @@ export const teacherService = {
     } catch (err: any) {
       if (err?.response?.status === 404) {
         try {
-          const res = await apiClient.post<ApiResponse<null>>(TEACHER.advisors(semesterId), {
+          const fallbackPayload: Record<string, any> = {
             teacherIds: body.teacherIds,
-            maxStudentsPerTeacher: body.maxStudentsPerTeacher ?? 20,
-          })
+          }
+          if (body.maxStudentsPerTeacher !== undefined) {
+            fallbackPayload.maxStudentsPerTeacher = body.maxStudentsPerTeacher
+          }
+          const res = await apiClient.post<ApiResponse<null>>(TEACHER.advisors(semesterId), fallbackPayload)
           return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
         } catch (innerErr: any) {
           if (innerErr?.response?.status === 404) {

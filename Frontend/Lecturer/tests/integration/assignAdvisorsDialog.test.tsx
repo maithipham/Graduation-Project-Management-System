@@ -153,7 +153,6 @@ describe('AssignAdvisorsDialog — Popup xác nhận phân công GVHD', () => {
     await waitFor(() => {
       expect(assignSpy).toHaveBeenCalledWith('sem-1', {
         teacherIds: [1, 2],
-        maxStudentsPerTeacher: 20,
       })
     })
     expect(onSuccess).toHaveBeenCalled()
