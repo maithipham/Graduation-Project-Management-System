@@ -102,6 +102,22 @@ export const API_ENDPOINTS = {
     submitProgressReport: '/report/progress-report',
     deadlines: '/api/v1/deadlines',
   },
+  // Quản lý & Thẩm định yêu cầu đổi / chốt tên đề tài (GVHD)
+  topicTitle: {
+    supervisorRequests: '/topic/title-request',
+    review: (publicId: string) => `/topic/title-request/${publicId}/review`,
+    historyByTopic: (topicPublicId: string) => `/topic/${topicPublicId}/title-history`,
+    deadlines: '/api/v1/deadlines',
+  },
+  // Quản lý & Thẩm định đề cương đồ án tốt nghiệp (GVHD / GVNX)
+  outline: {
+    supervisorList: '/outline/supervisor-list',
+    reviewList: '/outline/review-list',
+    detail: (publicId: string) => `/outline/${publicId}`,
+    review: (publicId: string) => `/outline/${publicId}/review`,
+    advisorFeedback: (publicId: string) => `/outline/${publicId}/advisor-feedback`,
+    deadlines: '/api/v1/deadlines',
+  },
   lecturer: {
     dashboard: '/lecturer/dashboard',
     topics: '/lecturer/topics',

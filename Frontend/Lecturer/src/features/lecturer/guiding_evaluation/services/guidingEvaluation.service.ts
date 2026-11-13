@@ -145,7 +145,7 @@ export function canLecturerSubmitProgressReport(item: {
   return (
     item.canSubmitProgressReport === true &&
     item.topicStatus === 'IN_PROGRESS' &&
-    item.currentStage === 'STAGE_4_REPORT_APPROVED' &&
+    item.currentStage === 'STAGE_3_OUTLINE_APPROVED' &&
     isDeadlineOpenForSupervisor
   )
 }
@@ -162,8 +162,8 @@ export function getProgressUploadBlockedReason(item: {
   if (item.topicStatus !== 'IN_PROGRESS') {
     return 'Đề tài không ở trạng thái đang thực hiện'
   }
-  if (item.currentStage !== 'STAGE_4_REPORT_APPROVED') {
-    return 'Đề tài chưa đạt giai đoạn nộp phiếu theo dõi'
+  if (item.currentStage !== 'STAGE_3_OUTLINE_APPROVED') {
+    return 'Đề tài không ở giai đoạn làm báo cáo'
   }
   if (item.deadlineStatus === 'CLOSED') {
     return 'Đã hết hạn nộp phiếu theo dõi'

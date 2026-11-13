@@ -1,17 +1,17 @@
-import { useMemo, useRef, useState } from 'react'
+import { useRef } from 'react'
 import {
   AlertCircle,
   Clock,
+  Download,
   Eye,
-  Filter,
+  History,
   Inbox,
   MessageSquare,
   Search,
   User,
   UserCheck,
 } from 'lucide-react'
-import { toast } from '@/shared/components/feedback/toast.store'
-import { useLecturerPortalStore } from '@/features/lecturer/lecturer_portal_storage'
+import { formatDate } from '@/shared/utils'
 import { OutlineClassroomPreviewModal } from '../components/OutlineClassroomPreviewModal'
 import {
   ApproveOutlineModal,
@@ -19,265 +19,136 @@ import {
   OutlineHistoryModal,
   RejectOutlineModal,
 } from '../components/OutlineReviewModals'
+import { useOutlineReview } from '../hooks/useOutlineReview'
 import type {
-  OutlineReviewItem,
-  OutlineRole,
   OutlineTabStatus,
-  RejectedSubTab,
+  ThesisOutlineResponse,
 } from '../types/outlineReview.types'
-import { getOutlineCategory, parseDateVi } from '../utils/outlineReview.utils'
-
-const PAGE_SIZE = 15
+import {
+  getFileNameFromUrl,
+  getOutlineStatusBadgeClass,
+  getOutlineStatusLabel,
+} from '../utils/outlineReview.utils'
 
 export default function OutlineReviewPage() {
-  const outlines = useLecturerPortalStore((s) => s.outlines)
-  const readOutlineIds = useLecturerPortalStore((s) => s.readOutlineIds)
-  const markOutlineAsRead = useLecturerPortalStore((s) => s.markOutlineAsRead)
-  const approveOutline = useLecturerPortalStore((s) => s.approveOutline)
-  const rejectOutline = useLecturerPortalStore((s) => s.rejectOutline)
-  const updateOutlineFeedback = useLecturerPortalStore((s) => s.updateOutlineFeedback)
-
-  const [currentRole, setCurrentRole] = useState<OutlineRole>('guide')
-  const [tabStatus, setOutlineTabStatus] = useState<OutlineTabStatus>('pending')
-  const [rejectedSubTab, setRejectedSubTab] = useState<RejectedSubTab>('rejected_resubmitted')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-
-  const [previewTarget, setPreviewTarget] = useState<OutlineReviewItem | null>(null)
-  const [approveTarget, setApproveTarget] = useState<OutlineReviewItem | null>(null)
-  const [rejectTarget, setRejectTarget] = useState<OutlineReviewItem | null>(null)
-  const [feedbackTarget, setFeedbackTarget] = useState<OutlineReviewItem | null>(null)
-  const [historyTarget, setHistoryTarget] = useState<OutlineReviewItem | null>(null)
+  const {
+    semesters,
+    semestersLoading,
+    selectedSemesterId,
+    setSelectedSemesterId,
+    deadlineInfo,
+    activeRole,
+    setActiveRole,
+    tabStatus,
+    setTabStatus,
+    searchQuery,
+    setSearchQuery,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    counts,
+    badges,
+    filtered,
+    pageData,
+    isLoading,
+    readOutlineIds,
+    previewItem,
+    setPreviewItem,
+    approveItem,
+    setApproveItem,
+    rejectItem,
+    setRejectItem,
+    feedbackItem,
+    setFeedbackItem,
+    historyItem,
+    setHistoryItem,
+    handleOpenPreview,
+    handleUnlockRead,
+    handleClickApprove,
+    handleClickReject,
+    handleConfirmApprove,
+    handleConfirmReject,
+    handleSaveFeedback,
+    isReviewing,
+    isSubmittingFeedback,
+  } = useOutlineReview()
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  const badges = useMemo(() => {
-    let guideTotal = 0
-    let reviewerTotal = 0
-    let pendingCount = 0
-    let approvedCount = 0
-    let resubmittedCount = 0
-    let unsubmittedCount = 0
-    let allCount = 0
-
-    for (const item of outlines) {
-      if (item.role === 'reviewer') reviewerTotal++
-      else guideTotal++
-
-      const matchRole =
-        currentRole === 'reviewer' ? item.role === 'reviewer' : item.role !== 'reviewer'
-      if (!matchRole) continue
-
-      allCount++
-      const cat = getOutlineCategory(item)
-      if (cat === 'pending') pendingCount++
-      else if (cat === 'approved') approvedCount++
-      else if (cat === 'resubmitted') resubmittedCount++
-      else if (cat === 'rejected') unsubmittedCount++
-    }
-
-    return {
-      guideTotal,
-      reviewerTotal,
-      pendingCount,
-      approvedCount,
-      rejectedTotal: unsubmittedCount + resubmittedCount,
-      resubmittedCount,
-      unsubmittedCount,
-      allCount,
-    }
-  }, [outlines, currentRole])
-
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    const matched = outlines.filter((item) => {
-      const matchRole =
-        currentRole === 'reviewer' ? item.role === 'reviewer' : item.role !== 'reviewer'
-      if (!matchRole) return false
-
-      const matchQ =
-        !q ||
-        item.name.toLowerCase().includes(q) ||
-        item.mssv.toLowerCase().includes(q) ||
-        item.topic.toLowerCase().includes(q) ||
-        item.fileName.toLowerCase().includes(q) ||
-        Boolean(item.supervisorName && item.supervisorName.toLowerCase().includes(q))
-
-      const cat = getOutlineCategory(item)
-      let matchSt = true
-      if (tabStatus === 'pending') {
-        matchSt = cat === 'pending'
-      } else if (tabStatus === 'approved') {
-        matchSt = cat === 'approved'
-      } else if (tabStatus === 'rejected') {
-        if (rejectedSubTab === 'rejected_unsubmitted') {
-          matchSt = cat === 'rejected'
-        } else if (rejectedSubTab === 'rejected_resubmitted') {
-          matchSt = cat === 'resubmitted'
-        } else {
-          matchSt = cat === 'rejected' || cat === 'resubmitted'
-        }
-      }
-
-      return matchQ && matchSt
-    })
-
-    matched.sort((a, b) => {
-      if (tabStatus === 'approved') {
-        return (
-          parseDateVi(b.approvedAt || b.submittedDate) -
-          parseDateVi(a.approvedAt || a.submittedDate)
-        )
-      }
-      return parseDateVi(b.submittedDate) - parseDateVi(a.submittedDate)
-    })
-
-    return matched
-  }, [outlines, currentRole, searchQuery, tabStatus, rejectedSubTab])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(Math.max(1, currentPage), totalPages)
-  const startIdx = (safePage - 1) * PAGE_SIZE
-  const endIdx = Math.min(startIdx + PAGE_SIZE, filtered.length)
-  const pageData = filtered.slice(startIdx, endIdx)
-
-  const showFeedbackCol = tabStatus === 'rejected'
-  const colSpan = showFeedbackCol ? 7 : 6
 
   const handlePageChange = (nextPage: number) => {
     setCurrentPage(nextPage)
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleClickApprove = (item: OutlineReviewItem) => {
-    if (!readOutlineIds.includes(item.id)) {
-      setPreviewTarget(item)
-      toast.info(
-        `Vui lòng cuộn đọc đến hết đề cương của ${item.name} để mở khóa phê duyệt!`,
-      )
-      return
-    }
-    setApproveTarget(item)
-  }
-
-  const handleClickReject = (item: OutlineReviewItem) => {
-    if (!readOutlineIds.includes(item.id)) {
-      setPreviewTarget(item)
-      toast.info(`Vui lòng cuộn đọc đến hết đề cương của ${item.name} để mở khóa từ chối!`)
-      return
-    }
-    setRejectTarget(item)
-  }
-
-  const handleUnlockRead = (item: OutlineReviewItem) => {
-    if (readOutlineIds.includes(item.id)) return
-    markOutlineAsRead(item.id)
-    toast.success(
-      `Đã đọc hết đề cương! Đã mở khóa quyền duyệt đề cương cho sinh viên ${item.name}`,
-    )
-  }
-
-  const handleConfirmApprove = (id: string) => {
-    const studentName = approveTarget?.name ?? ''
-    approveOutline(id)
-    setApproveTarget(null)
-    setPreviewTarget(null)
-    toast.success(`Đã phê duyệt đề cương của sinh viên ${studentName} thành công!`)
-  }
-
-  const handleConfirmReject = (id: string, feedback: string) => {
-    const studentName = rejectTarget?.name ?? ''
-    rejectOutline(id, feedback)
-    setRejectTarget(null)
-    setPreviewTarget(null)
-    toast.info(`Đã từ chối đề cương và gửi yêu cầu sửa cho sinh viên ${studentName}.`)
-  }
-
-  const handleSaveFeedback = (id: string, feedback: string) => {
-    const studentName = feedbackTarget?.name ?? ''
-    updateOutlineFeedback(id, feedback)
-    setFeedbackTarget(null)
-    toast.success(`Đã cập nhật lý do từ chối cho sinh viên ${studentName} thành công!`)
-  }
-
-  const getInitialFeedbackValue = (item: OutlineReviewItem | null): string => {
-    if (!item) return ''
-    return (
-      item.feedback ||
-      item.previousRejectReason ||
-      item.history.find((h) => h.status === 'Từ chối' || h.status === 'Đã từ chối')?.note ||
-      ''
-    )
-  }
-
   const statusTabs: Array<{
     status: OutlineTabStatus
     label: string
     count: number
-    badgeId: string
     badgeClass: string
   }> = [
     {
-      status: 'pending',
-      label: 'Chưa duyệt',
-      count: badges.pendingCount,
-      badgeId: 'tabCountPending',
-      badgeClass: 'tab-badge-pending bg-amber-100 text-amber-800',
+      status: 'PENDING',
+      label: 'Chờ duyệt',
+      count: counts.pending,
+      badgeClass: 'bg-amber-100 text-amber-800',
     },
     {
-      status: 'approved',
+      status: 'APPROVED',
       label: 'Đã duyệt',
-      count: badges.approvedCount,
-      badgeId: 'tabCountApproved',
-      badgeClass: 'tab-badge-default bg-slate-100 text-slate-600',
+      count: counts.approved,
+      badgeClass: 'bg-emerald-100 text-emerald-800',
     },
     {
-      status: 'rejected',
-      label: 'Đã từ chối',
-      count: badges.rejectedTotal,
-      badgeId: 'tabCountRejected',
-      badgeClass: 'tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800',
+      status: 'REQUEST_CHANGES',
+      label: 'Yêu cầu sửa',
+      count: counts.requestChanges,
+      badgeClass: 'bg-sky-100 text-sky-800',
+    },
+    {
+      status: 'REJECTED',
+      label: 'Không đạt',
+      count: counts.rejected,
+      badgeClass: 'bg-rose-100 text-rose-800',
     },
     {
       status: '',
       label: 'Tất cả',
-      count: badges.allCount,
-      badgeId: 'tabCountAll',
-      badgeClass: 'tab-badge-default bg-slate-100 text-slate-600',
+      count: counts.all,
+      badgeClass: 'bg-slate-100 text-slate-600',
     },
   ]
 
   return (
     <div
-      className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col"
+      className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col select-none"
       style={{
         fontFamily:
           '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Cụm Tab Vai trò chính: Sinh viên đang hướng dẫn / Sinh viên được phân công nhận xét */}
-      <div className="shrink-0 border-b border-slate-200/80 px-5 py-2 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
+      {/* 1. Cụm Tab Vai trò chính: GVHD / GVNX */}
+      <div className="shrink-0 border-b border-slate-200/80 px-5 py-2.5 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2.5" id="roleTabs">
           <button
             type="button"
             data-role="guide"
             onClick={() => {
-              setCurrentRole('guide')
+              setActiveRole('guide')
               setCurrentPage(1)
             }}
             className={`role-tab px-4 py-2 rounded-xl text-[13.5px] transition flex items-center gap-2 cursor-pointer ${
-              currentRole === 'guide'
+              activeRole === 'guide'
                 ? 'active font-bold bg-white text-[#1565C0] shadow-2xs border border-blue-200'
                 : 'font-semibold bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border border-transparent'
             }`}
           >
             <UserCheck
-              className={`w-4 h-4 ${currentRole === 'guide' ? 'text-[#1565C0]' : 'text-slate-400'}`}
+              className={`w-4 h-4 ${activeRole === 'guide' ? 'text-[#1565C0]' : 'text-slate-400'}`}
             />
             <span>Sinh viên đang hướng dẫn</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                currentRole === 'guide'
+                activeRole === 'guide'
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-slate-200 text-slate-700'
               }`}
@@ -291,22 +162,22 @@ export default function OutlineReviewPage() {
             type="button"
             data-role="reviewer"
             onClick={() => {
-              setCurrentRole('reviewer')
+              setActiveRole('reviewer')
               setCurrentPage(1)
             }}
             className={`role-tab px-4 py-2 rounded-xl text-[13.5px] transition flex items-center gap-2 cursor-pointer ${
-              currentRole === 'reviewer'
+              activeRole === 'reviewer'
                 ? 'active font-bold bg-white text-[#1565C0] shadow-2xs border border-blue-200'
                 : 'font-semibold bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border border-transparent'
             }`}
           >
             <MessageSquare
-              className={`w-4 h-4 ${currentRole === 'reviewer' ? 'text-[#1565C0]' : 'text-slate-400'}`}
+              className={`w-4 h-4 ${activeRole === 'reviewer' ? 'text-[#1565C0]' : 'text-slate-400'}`}
             />
             <span>Sinh viên được phân công nhận xét</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                currentRole === 'reviewer'
+                activeRole === 'reviewer'
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-slate-200 text-slate-700'
               }`}
@@ -316,11 +187,33 @@ export default function OutlineReviewPage() {
             </span>
           </button>
         </div>
+
+        {/* Học kỳ Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            Học kỳ:
+          </span>
+          <select
+            value={selectedSemesterId}
+            onChange={(e) => {
+              setSelectedSemesterId(e.target.value)
+              setCurrentPage(1)
+            }}
+            disabled={semestersLoading}
+            className="text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] cursor-pointer shadow-2xs"
+          >
+            {semesters.map((sem) => (
+              <option key={sem.publicId} value={sem.publicId}>
+                {sem.name} {sem.academicYear ? `(${sem.academicYear})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Toolbar Header: Tabs + Tìm kiếm + Hạn review */}
+      {/* 2. Toolbar Header: Tabs trạng thái + Tìm kiếm + Mốc thời hạn */}
       <div className="shrink-0 border-b border-slate-200/80 px-5 flex items-center justify-between gap-4 bg-white flex-wrap xl:flex-nowrap">
-        {/* 1. Tabs trạng thái */}
+        {/* Tabs trạng thái */}
         <div className="flex items-center gap-1 sm:gap-2 -mb-px shrink-0 overflow-x-auto" id="statusTabs">
           {statusTabs.map((tab) => {
             const isActive = tabStatus === tab.status
@@ -331,11 +224,8 @@ export default function OutlineReviewPage() {
                 data-status={tab.status}
                 data-active={isActive ? 'true' : 'false'}
                 onClick={() => {
-                  setOutlineTabStatus(tab.status)
+                  setTabStatus(tab.status)
                   setCurrentPage(1)
-                  if (tab.status === 'rejected') {
-                    setRejectedSubTab('rejected_resubmitted')
-                  }
                 }}
                 className={`tab-btn px-4 py-3 border-b-2 text-[13.5px] transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                   isActive
@@ -345,14 +235,7 @@ export default function OutlineReviewPage() {
               >
                 <span>{tab.label}</span>
                 <span
-                  className={
-                    tab.status === 'rejected'
-                      ? 'tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800'
-                      : tab.status === 'pending'
-                        ? 'tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800'
-                        : 'tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600'
-                  }
-                  id={tab.badgeId}
+                  className={`tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold ${tab.badgeClass}`}
                 >
                   {tab.count}
                 </span>
@@ -361,7 +244,7 @@ export default function OutlineReviewPage() {
           })}
         </div>
 
-        {/* 2. Ô tìm kiếm sinh viên, đề tài */}
+        {/* Ô tìm kiếm sinh viên, đề tài */}
         <div className="flex items-center gap-2 h-9 flex-1 min-w-[200px] max-w-[480px] xl:max-w-[560px] px-3 bg-slate-50 border border-slate-200 rounded-lg focus-within:border-[#1565C0] focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition shadow-2xs my-1.5">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
@@ -377,95 +260,85 @@ export default function OutlineReviewPage() {
           />
         </div>
 
-        {/* 3. Hạn review */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-800 text-[12px] font-semibold shrink-0 my-1.5 shadow-2xs">
-          <Clock className="w-3.5 h-3.5 text-amber-600" />
-          <span>
-            Hạn review: <b className="font-bold text-amber-900">05/11/2026 23:59</b>
-          </span>
+        {/* Mốc thời hạn lấy động từ BE (SV_CHINH_SUA_NOP_LAI_DE_CUONG) */}
+        <div className="flex items-center shrink-0 my-1.5">
+          {deadlineInfo.status === 'NOT_CONFIGURED' && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-[12px] font-medium shadow-2xs"
+              title="Chưa cấu hình thời hạn nộp & duyệt đề cương cho học kỳ này"
+            >
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>Thời hạn: Chưa cấu hình</span>
+            </div>
+          )}
+          {deadlineInfo.status === 'OPEN' && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[12px] font-semibold shadow-2xs"
+              title={`Thời hạn mở đến ${formatDate(deadlineInfo.endDate, 'full')}`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{deadlineInfo.label} (Đang mở)</span>
+            </div>
+          )}
+          {deadlineInfo.status === 'EXTENDED' && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-800 text-[12px] font-semibold shadow-2xs"
+              title="Đang trong thời gian gia hạn chấm của giảng viên"
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+              <span>{deadlineInfo.label}</span>
+            </div>
+          )}
+          {deadlineInfo.status === 'CLOSED' && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200/80 text-rose-800 text-[12px] font-semibold shadow-2xs"
+              title="Đã hết hạn thẩm định đề cương. Vui lòng liên hệ Trưởng bộ môn để được gia hạn chấm"
+            >
+              <Clock className="w-3.5 h-3.5 text-rose-600" />
+              <span>{deadlineInfo.label}</span>
+            </div>
+          )}
+          {deadlineInfo.status === 'NOT_STARTED' && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-800 text-[12px] font-semibold shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-blue-600" />
+              <span>{deadlineInfo.label}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 2 Nhánh con khi vào Tab 'Đã từ chối' (Chưa nộp lại / Đã nộp lại) */}
-      {tabStatus === 'rejected' && (
-        <div
-          id="rejectedSubTabs"
-          className="shrink-0 px-5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-2 animate-in fade-in duration-150"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold text-slate-500 mr-1 flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5" /> Phân loại:
-            </span>
-            <button
-              type="button"
-              data-substatus="rejected_resubmitted"
-              onClick={() => {
-                setRejectedSubTab('rejected_resubmitted')
-                setCurrentPage(1)
-              }}
-              className={`subtab-btn px-3.5 py-1.5 rounded-xl text-[12px] font-bold transition flex items-center gap-2 cursor-pointer ${
-                rejectedSubTab === 'rejected_resubmitted'
-                  ? 'active bg-white text-sky-800 shadow-2xs border border-sky-300'
-                  : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 border border-transparent'
-              }`}
-            >
-              <span>Đã nộp lại</span>
-              <span
-                id="subCountResubmitted"
-                className="px-2 py-0.5 rounded-full text-[12px] font-bold bg-sky-100 text-sky-800"
-              >
-                {badges.resubmittedCount}
-              </span>
-            </button>
-            <button
-              type="button"
-              data-substatus="rejected_unsubmitted"
-              onClick={() => {
-                setRejectedSubTab('rejected_unsubmitted')
-                setCurrentPage(1)
-              }}
-              className={`subtab-btn px-3.5 py-1.5 rounded-xl text-[12px] font-bold transition flex items-center gap-2 cursor-pointer ${
-                rejectedSubTab === 'rejected_unsubmitted'
-                  ? 'active bg-white text-rose-700 shadow-2xs border border-rose-200'
-                  : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 border border-transparent'
-              }`}
-            >
-              <span>Chưa nộp lại</span>
-              <span
-                id="subCountUnsubmitted"
-                className="px-2 py-0.5 rounded-full text-[12px] font-bold bg-rose-100 text-rose-800"
-              >
-                {badges.unsubmittedCount}
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Table Duyệt đề cương */}
+      {/* 3. Table Duyệt đề cương */}
       <div id="tableScrollContainer" ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-left text-[13px] border-collapse">
           <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200 shadow-2xs">
             <tr>
-              <th className="px-5 py-3.5 w-16 text-slate-400 bg-slate-50">STT</th>
-              <th className="px-5 py-3.5 min-w-[190px] bg-slate-50">SINH VIÊN</th>
+              <th className="px-5 py-3.5 w-14 text-slate-400 bg-slate-50 text-center">STT</th>
+              <th className="px-5 py-3.5 min-w-[200px] bg-slate-50">SINH VIÊN</th>
               <th className="px-5 py-3.5 min-w-[260px] bg-slate-50">ĐỀ TÀI</th>
               <th className="px-5 py-3.5 min-w-[220px] bg-slate-50">
                 FILE ĐỀ CƯƠNG &amp; THỜI GIAN NỘP
               </th>
-              <th className="px-5 py-3.5 min-w-[170px] bg-slate-50">TRẠNG THÁI</th>
-              {showFeedbackCol && (
-                <th className="px-5 py-3.5 min-w-[210px] bg-slate-50" id="thFeedback">
-                  LÝ DO TỪ CHỐI
-                </th>
-              )}
-              <th className="px-5 py-3.5 w-32 text-center bg-slate-50">LỊCH SỬ NỘP</th>
+              <th className="px-5 py-3.5 min-w-[150px] bg-slate-50">TRẠNG THÁI</th>
+              <th className="px-5 py-3.5 min-w-[200px] bg-slate-50">
+                {activeRole === 'reviewer' ? 'GÓP Ý GVHD & NHẬN XÉT GVNX' : 'NHẬN XÉT GVNX & GÓP Ý GVHD'}
+              </th>
+              <th className="px-5 py-3.5 min-w-[180px] text-right bg-slate-50">THAO TÁC</th>
             </tr>
           </thead>
           <tbody id="tableBody" className="divide-y divide-slate-100 bg-white">
-            {pageData.length === 0 ? (
+            {isLoading ? (
               <tr>
-                <td colSpan={colSpan} className="px-6 py-12 text-center text-slate-400 text-[13px]">
+                <td colSpan={7} className="p-6">
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="h-12 bg-slate-50 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ) : pageData.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-14 text-center text-slate-400 text-[13px]">
                   <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
                     <Inbox className="w-6 h-6" />
                   </div>
@@ -473,225 +346,247 @@ export default function OutlineReviewPage() {
                 </td>
               </tr>
             ) : (
-              pageData.map((item, idx) => {
-                const rowNumber = startIdx + idx + 1
-                const cat = getOutlineCategory(item)
-                const isResubmitted = cat === 'resubmitted'
-                const isPending = cat === 'pending'
-                const isApproved = cat === 'approved'
-                const isRejected = cat === 'rejected'
-                const isRead = readOutlineIds.includes(item.id)
-                const histCount =
-                  item.history && item.history.length > 0
-                    ? item.history.length
-                    : item.submitCount || 1
-                const rejectReason =
-                  item.previousRejectReason ||
-                  item.feedback ||
-                  item.history.find((h) => h.status === 'Từ chối' || h.status === 'Đã từ chối')
-                    ?.note ||
-                  ''
+              pageData.map((item: ThesisOutlineResponse, idx) => {
+                const rowNumber = (currentPage - 1) * 15 + idx + 1
+                const isPending = item.status === 'PENDING'
+                const isRead = readOutlineIds.includes(item.publicId)
+                const fileName = getFileNameFromUrl(item.outlineFile)
+
+                const isMainSupervisor = item.canWriteAdvisorFeedback === true
+                const canReviewerAction =
+                  activeRole === 'reviewer' &&
+                  isPending &&
+                  item.canReview &&
+                  deadlineInfo.canReview
+                const canSupervisorAction =
+                  activeRole === 'guide' &&
+                  isMainSupervisor &&
+                  deadlineInfo.canWriteFeedback
 
                 return (
                   <tr
-                    key={item.id}
-                    data-id={item.id}
+                    key={item.publicId}
+                    data-id={item.publicId}
                     className="hover:bg-slate-50/70 transition border-b border-slate-100"
                   >
-                    <td className="px-5 py-4 text-[13px] font-semibold text-slate-400">
+                    <td className="px-5 py-4 text-[13px] font-semibold text-slate-400 text-center">
                       {rowNumber}
                     </td>
 
                     {/* SINH VIÊN */}
                     <td className="px-5 py-4">
                       <div className="font-bold text-[13.5px] text-slate-900 leading-snug">
-                        {item.name}
+                        {item.studentName}
                       </div>
-                      <div className="text-[12px] text-slate-500 font-mono mt-0.5">{item.mssv}</div>
-                      {currentRole === 'reviewer' && item.supervisorName && (
+                      <div className="text-[12px] text-slate-500 font-mono mt-0.5">
+                        {item.studentCode}
+                      </div>
+                      {activeRole === 'reviewer' && item.lecturerName && (
                         <div className="inline-flex items-center gap-1 text-[11px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded-md mt-1 border border-blue-200/60">
-                          <User className="w-3 h-3" /> GVHD: {item.supervisorName}
+                          <User className="w-3 h-3" /> GVHD: {item.lecturerName}
+                        </div>
+                      )}
+                      {activeRole === 'guide' && item.reviewerName && (
+                        <div className="inline-flex items-center gap-1 text-[11px] text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded-md mt-1 border border-indigo-200/60">
+                          <MessageSquare className="w-3 h-3" /> GVNX: {item.reviewerName}
                         </div>
                       )}
                     </td>
 
                     {/* ĐỀ TÀI */}
-                    <td className="px-5 py-4 max-w-[260px]">
+                    <td className="px-5 py-4 max-w-[280px]">
                       <div
-                        className="text-[13px] font-medium text-slate-800 line-clamp-2"
-                        title={item.topic}
+                        className="text-[13px] font-medium text-slate-800 line-clamp-2 leading-snug"
+                        title={item.topicName || item.title || ''}
                       >
-                        {item.topic}
+                        {item.topicName || item.title || '—'}
+                      </div>
+                      <div className="mt-1">
+                        {item.currentStage === 'STAGE_2_TOPIC_CONFIRMED' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Đã chốt tên GĐ 2
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            Chưa chốt tên GĐ 2
+                          </span>
+                        )}
                       </div>
                     </td>
 
                     {/* FILE ĐỀ CƯƠNG & THỜI GIAN NỘP */}
                     <td className="px-5 py-4 min-w-[220px]">
-                      {item.fileName ? (
+                      {item.outlineFile ? (
                         <div>
                           <div className="file-name-cell-wrap inline-flex items-center gap-1.5 whitespace-nowrap">
                             <button
                               type="button"
-                              data-id={item.id}
-                              data-file={item.fileName}
-                              onClick={() => setPreviewTarget(item)}
-                              className="btn-preview-file font-bold text-[12px] text-blue-600 hover:text-blue-800 hover:underline leading-snug cursor-pointer text-left"
+                              onClick={() => handleOpenPreview(item)}
+                              className="font-bold text-[12px] text-blue-600 hover:text-blue-800 hover:underline leading-snug cursor-pointer text-left flex items-center gap-1"
+                              title="Xem trước đề cương"
                             >
-                              {item.fileName}
+                              <Eye className="w-3.5 h-3.5 text-blue-500" />
+                              <span className="truncate max-w-[150px]">{fileName}</span>
                             </button>
-                            <button
-                              type="button"
-                              data-id={item.id}
-                              data-file={item.fileName}
-                              onClick={() => setPreviewTarget(item)}
-                              title="Xem trước tài liệu (Google Classroom Preview)"
-                              aria-label="Xem trước tài liệu"
-                              className="btn-preview-eye p-0.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                            <a
+                              href={item.outlineFile}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Tải xuống tệp đính kèm"
+                              className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                             >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
                           </div>
-                          <div className="text-[12px] text-slate-600 mt-1">
-                            Thời gian nộp:{' '}
-                            <span className="font-semibold text-slate-800">
-                              {item.submittedDate || '—'}
+                          <div className="text-[11.5px] text-slate-600 mt-1">
+                            Nộp:{' '}
+                            <span className="font-semibold text-slate-800 font-mono">
+                              {formatDate(item.submittedAt, 'full')}
                             </span>
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            Lần nộp thứ {histCount}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">Chưa nộp</span>
+                        <span className="text-slate-400 italic">Chưa nộp file</span>
                       )}
                     </td>
 
                     {/* TRẠNG THÁI */}
                     <td className="px-5 py-4 whitespace-nowrap">
-                      {isResubmitted || isPending ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            data-id={item.id}
-                            onClick={() => handleClickApprove(item)}
-                            title={
-                              isRead
-                                ? 'Phê duyệt đề cương'
-                                : 'Kéo đọc hết đề cương trong bản xem trước để mở khóa phê duyệt'
-                            }
-                            className="btn-approve h-8 px-3.5 rounded-lg bg-[#10B981] hover:bg-[#059669] text-white text-[12px] font-bold transition cursor-pointer shadow-xs"
-                          >
-                            Duyệt
-                          </button>
-                          <button
-                            type="button"
-                            data-id={item.id}
-                            onClick={() => handleClickReject(item)}
-                            title={
-                              isRead
-                                ? 'Từ chối đề cương (yêu cầu sửa)'
-                                : 'Kéo đọc hết đề cương trong bản xem trước để mở khóa từ chối'
-                            }
-                            className="btn-reject h-8 px-3 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-[12px] font-bold transition cursor-pointer shadow-2xs"
-                          >
-                            Từ chối
-                          </button>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-bold border ${getOutlineStatusBadgeClass(
+                          item.status,
+                        )}`}
+                      >
+                        {item.statusDescription || getOutlineStatusLabel(item.status)}
+                      </span>
+                      {item.reviewedAt && (
+                        <div className="text-[10.5px] text-slate-400 font-mono mt-1">
+                          Duyệt: {formatDate(item.reviewedAt, 'full')}
                         </div>
-                      ) : isApproved ? (
-                        <div className="flex flex-col items-start">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Đã duyệt
-                          </span>
-                          {item.approvedAt && (
-                            <span className="text-[11px] text-slate-400 font-mono mt-1">
-                              {item.approvedAt}
-                            </span>
-                          )}
-                        </div>
-                      ) : isRejected ? (
-                        <div className="flex flex-col items-start">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-[11.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            Chưa nộp lại
-                          </span>
-                          {item.rejectedAt && (
-                            <span className="text-[11px] text-slate-400 font-mono mt-1">
-                              {item.rejectedAt}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[11.5px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                          Chưa nộp
-                        </span>
                       )}
                     </td>
 
-                    {/* LÝ DO TỪ CHỐI */}
-                    {showFeedbackCol && (
-                      <td className="px-5 py-4 max-w-[220px]">
-                        {isResubmitted || isRejected ? (
-                          rejectReason ? (
-                            <div className="space-y-1">
-                              <div className="text-[12px] font-bold text-rose-600 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> Lý do từ chối lần trước:
-                              </div>
-                              <div
-                                className="text-[12px] text-slate-700 line-clamp-2 leading-snug"
-                                title={rejectReason}
-                              >
-                                {rejectReason}
-                              </div>
-                              <button
-                                type="button"
-                                data-id={item.id}
-                                onClick={() => setFeedbackTarget(item)}
-                                className="btn-edit-feedback text-[12px] font-bold text-blue-600 hover:underline cursor-pointer"
-                              >
-                                Sửa lý do
-                              </button>
+                    {/* GÓP Ý & NHẬN XÉT */}
+                    <td className="px-5 py-4 max-w-[220px]">
+                      <div className="space-y-1.5 text-xs">
+                        {item.advisorFeedback && (
+                          <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-200/60 text-blue-950">
+                            <div className="font-bold text-[11px] text-blue-700 flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" /> Góp ý GVHD:
                             </div>
-                          ) : (
-                            <button
-                              type="button"
-                              data-id={item.id}
-                              onClick={() => setFeedbackTarget(item)}
-                              className="btn-edit-feedback text-[12px] font-bold text-rose-600 hover:underline cursor-pointer"
-                            >
-                              Nhập lý do từ chối
-                            </button>
-                          )
-                        ) : item.feedback ? (
-                          <div className="space-y-1">
-                            <div className="text-[12px] text-slate-700 line-clamp-2 leading-snug">
-                              {item.feedback}
+                            <div className="line-clamp-2 mt-0.5 leading-snug" title={item.advisorFeedback}>
+                              {item.advisorFeedback}
                             </div>
-                            <button
-                              type="button"
-                              data-id={item.id}
-                              onClick={() => setFeedbackTarget(item)}
-                              className="btn-edit-feedback text-[12px] font-bold text-blue-600 hover:underline cursor-pointer"
-                            >
-                              Sửa lý do
-                            </button>
                           </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
                         )}
-                      </td>
-                    )}
+                        {item.reviewFeedback && (
+                          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-800">
+                            <div className="font-bold text-[11px] text-slate-600 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> Nhận xét GVNX:
+                            </div>
+                            <div className="line-clamp-2 mt-0.5 leading-snug" title={item.reviewFeedback}>
+                              {item.reviewFeedback}
+                            </div>
+                          </div>
+                        )}
+                        {!item.advisorFeedback && !item.reviewFeedback && (
+                          <span className="text-slate-400 text-[12px] italic">Chưa có nhận xét</span>
+                        )}
+                      </div>
+                    </td>
 
-                    {/* LỊCH SỬ NỘP */}
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <div className="text-center">
+                    {/* THAO TÁC */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        {/* Nút Xem Lịch Sử */}
                         <button
                           type="button"
-                          data-id={item.id}
-                          onClick={() => setHistoryTarget(item)}
-                          title={`Xem chi tiết lịch sử nộp đề cương của ${item.name}`}
-                          className="btn-history h-8 px-3 rounded-lg border border-slate-200 text-slate-700 hover:border-[#1565C0] hover:text-[#1565C0] hover:bg-blue-50/50 text-[12px] font-bold transition cursor-pointer"
+                          onClick={() => setHistoryItem(item)}
+                          title={`Xem chi tiết lịch sử nộp đề cương của ${item.studentName}`}
+                          className="btn-history h-8 px-2.5 rounded-lg border border-slate-200 text-slate-700 hover:border-[#1565C0] hover:text-[#1565C0] hover:bg-blue-50/50 text-[11.5px] font-bold transition cursor-pointer flex items-center gap-1"
                         >
-                          Nộp lần {histCount || 1}
+                          <History className="w-3.5 h-3.5" />
+                          <span>Lịch sử</span>
                         </button>
+
+                        {/* Thao tác cho GVNX (Thẩm định đề cương) */}
+                        {activeRole === 'reviewer' && (
+                          <>
+                            {isPending ? (
+                              canReviewerAction ? (
+                                <div className="inline-flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleClickApprove(item)}
+                                    title={
+                                      isRead
+                                        ? 'Phê duyệt đề cương'
+                                        : 'Vui lòng xem qua đề cương để mở khóa phê duyệt'
+                                    }
+                                    className="btn-approve h-8 px-3 rounded-lg bg-[#10B981] hover:bg-[#059669] text-white text-[12px] font-bold transition cursor-pointer shadow-xs active:scale-95"
+                                  >
+                                    Duyệt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleClickReject(item)}
+                                    title={
+                                      isRead
+                                        ? 'Từ chối / Yêu cầu chỉnh sửa đề cương'
+                                        : 'Vui lòng xem qua đề cương để mở khóa từ chối'
+                                    }
+                                    className="btn-reject h-8 px-2.5 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-[12px] font-bold transition cursor-pointer shadow-2xs active:scale-95"
+                                  >
+                                    Yêu cầu sửa
+                                  </button>
+                                </div>
+                              ) : (
+                                <span
+                                  className="text-[11px] text-slate-400 italic px-2"
+                                  title={
+                                    !deadlineInfo.canReview
+                                      ? deadlineInfo.label
+                                      : 'Chưa đủ điều kiện thẩm định'
+                                  }
+                                >
+                                  {deadlineInfo.status === 'CLOSED'
+                                    ? 'Đã hết hạn thẩm định'
+                                    : 'Không thể thao tác'}
+                                </span>
+                              )
+                            ) : null}
+                          </>
+                        )}
+
+                        {/* Thao tác cho GVHD (Gửi nhận xét góp ý) */}
+                        {activeRole === 'guide' && (
+                          <>
+                            {!isMainSupervisor ? (
+                              <span
+                                className="px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200"
+                                title="Giảng viên đồng hướng dẫn chỉ có quyền xem đề cương."
+                              >
+                                Đồng GVHD (Chỉ xem)
+                              </span>
+                            ) : canSupervisorAction ? (
+                              <button
+                                type="button"
+                                onClick={() => setFeedbackItem(item)}
+                                className="h-8 px-3 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[12px] font-bold transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>{item.advisorFeedback ? 'Sửa góp ý' : 'Góp ý'}</span>
+                              </button>
+                            ) : (
+                              <span
+                                className="text-[11px] text-slate-400 italic px-2"
+                                title={deadlineInfo.label}
+                              >
+                                Đã khóa góp ý
+                              </span>
+                            )}
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -702,81 +597,81 @@ export default function OutlineReviewPage() {
         </table>
       </div>
 
-      {/* Pagination Bar (15 phần tử / trang) */}
-      <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between flex-wrap gap-3 bg-slate-50/60 shrink-0">
-        <p className="text-[12.5px] text-slate-500" id="paginationInfo">
-          {filtered.length === 0 ? (
-            <>
-              Hiển thị <b className="text-slate-800">0</b> đề cương
-            </>
-          ) : (
-            <>
-              Hiển thị{' '}
-              <b className="text-slate-800">
-                {startIdx + 1}–{endIdx}
-              </b>{' '}
-              trên <b className="text-slate-800">{filtered.length}</b> đề cương
-            </>
-          )}
-        </p>
+      {/* 4. Footer Phân trang */}
+      {filtered.length > 0 && (
+        <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between flex-wrap gap-3 bg-slate-50/60 shrink-0">
+          <p className="text-[12.5px] text-slate-500" id="paginationInfo">
+            Hiển thị{' '}
+            <b className="text-slate-800">
+              {(currentPage - 1) * 15 + 1}–{Math.min(currentPage * 15, filtered.length)}
+            </b>{' '}
+            trên <b className="text-slate-800">{filtered.length}</b> đề cương
+          </p>
 
-        {filtered.length > 0 && (
           <div className="flex items-center gap-1.5" id="paginationControls">
             <button
               type="button"
-              disabled={safePage <= 1}
-              onClick={() => handlePageChange(Math.max(1, safePage - 1))}
+              disabled={currentPage <= 1}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               className="btn-prev px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               Trước
             </button>
             <span className="px-3 py-1 text-slate-700 font-bold text-[12px]">
-              {safePage} / {totalPages}
+              {currentPage} / {totalPages}
             </span>
             <button
               type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => handlePageChange(Math.min(totalPages, safePage + 1))}
+              disabled={currentPage >= totalPages}
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
               className="btn-next px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-[12px] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               Sau
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {/* Modals Popup */}
       <OutlineClassroomPreviewModal
-        item={previewTarget}
-        isAlreadyRead={previewTarget ? readOutlineIds.includes(previewTarget.id) : false}
+        key={`preview-${previewItem?.publicId ?? 'closed'}`}
+        item={previewItem}
+        isAlreadyRead={previewItem ? readOutlineIds.includes(previewItem.publicId) : false}
         onUnlockRead={handleUnlockRead}
-        onClose={() => setPreviewTarget(null)}
+        onClose={() => setPreviewItem(null)}
       />
 
       <ApproveOutlineModal
-        item={approveTarget}
-        onClose={() => setApproveTarget(null)}
+        key={`approve-${approveItem?.publicId ?? 'closed'}`}
+        item={approveItem}
+        onClose={() => setApproveItem(null)}
         onConfirm={handleConfirmApprove}
+        isPending={isReviewing}
       />
 
       <RejectOutlineModal
-        item={rejectTarget}
-        onClose={() => setRejectTarget(null)}
+        key={`reject-${rejectItem?.publicId ?? 'closed'}`}
+        item={rejectItem}
+        deadlineStatus={deadlineInfo.rawStatus}
+        onClose={() => setRejectItem(null)}
         onConfirm={handleConfirmReject}
+        isPending={isReviewing}
       />
 
       <OutlineFeedbackModal
-        key={feedbackTarget?.id ?? 'closed'}
-        item={feedbackTarget}
-        initialValue={getInitialFeedbackValue(feedbackTarget)}
-        onClose={() => setFeedbackTarget(null)}
+        key={`feedback-${feedbackItem?.publicId ?? 'closed'}`}
+        item={feedbackItem}
+        initialValue={feedbackItem?.advisorFeedback || ''}
+        onClose={() => setFeedbackItem(null)}
         onSave={handleSaveFeedback}
+        isPending={isSubmittingFeedback}
       />
 
       <OutlineHistoryModal
-        item={historyTarget}
-        showReasonColumn={tabStatus !== 'pending'}
-        onClose={() => setHistoryTarget(null)}
-        onPreviewFile={(target: any) => setPreviewTarget(target)}
+        key={`history-${historyItem?.publicId ?? 'closed'}`}
+        item={historyItem}
+        onClose={() => setHistoryItem(null)}
+        onPreviewFile={(target) => setPreviewItem(target)}
       />
     </div>
   )

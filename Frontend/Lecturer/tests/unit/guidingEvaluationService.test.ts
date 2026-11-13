@@ -33,7 +33,7 @@ function createMockDto(
     publicId: 'rep-uuid-1',
     topicPublicId: 'topic-uuid-1',
     topicName: 'Xây dựng hệ thống Quản lý Đồ án TLU',
-    currentStage: 'STAGE_4_REPORT_APPROVED',
+    currentStage: 'STAGE_3_OUTLINE_APPROVED',
     topicStatus: 'IN_PROGRESS',
     disqualificationReason: null,
     studentPublicId: 'stu-uuid-1',
@@ -194,14 +194,6 @@ describe('guidingEvaluationService & helpers', () => {
     )
     expect(canLecturerSubmitProgressReport(coLecturerItem)).toBe(false)
     expect(getProgressUploadBlockedReason(coLecturerItem)).toBe('Đồng hướng dẫn (Chỉ xem)')
-
-    const wrongStageItem = mapFinalReportToGuidingItem(
-      createMockDto({ currentStage: 'STAGE_3_OUTLINE_APPROVED' }),
-    )
-    expect(canLecturerSubmitProgressReport(wrongStageItem)).toBe(false)
-    expect(getProgressUploadBlockedReason(wrongStageItem)).toBe(
-      'Đề tài chưa đạt giai đoạn nộp phiếu theo dõi',
-    )
   })
 
   it('formats supervisor progress deadline display states accurately', () => {

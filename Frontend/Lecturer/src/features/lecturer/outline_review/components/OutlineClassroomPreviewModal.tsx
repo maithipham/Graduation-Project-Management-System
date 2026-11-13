@@ -1,12 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, Minus, Plus, Printer, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  Minus,
+  Plus,
+  Printer,
+  X,
+} from 'lucide-react'
 import { toast } from '@/shared/components/feedback/toast.store'
-import type { OutlineReviewItem } from '../types/outlineReview.types'
+import type { ThesisOutlineResponse } from '../types/outlineReview.types'
+import { getFileNameFromUrl } from '../utils/outlineReview.utils'
 
 interface OutlineClassroomPreviewModalProps {
-  item: OutlineReviewItem | null
+  item: ThesisOutlineResponse | null
   isAlreadyRead: boolean
-  onUnlockRead: (item: OutlineReviewItem) => void
+  onUnlockRead: (item: ThesisOutlineResponse) => void
   onClose: () => void
 }
 
@@ -20,10 +30,10 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
 }) => {
   const [currentPage, setCurrentPage] = useState(1)
   const [zoom, setZoom] = useState(100)
-  const [prevItemId, setPrevItemId] = useState<string | null>(item?.id ?? null)
+  const [prevItemId, setPrevItemId] = useState<string | null>(item?.publicId ?? null)
 
-  if ((item?.id ?? null) !== prevItemId) {
-    setPrevItemId(item?.id ?? null)
+  if ((item?.publicId ?? null) !== prevItemId) {
+    setPrevItemId(item?.publicId ?? null)
     setCurrentPage(1)
     setZoom(100)
   }
@@ -88,11 +98,19 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
 
   if (!item) return null
 
-  const docTitle = item.fileName || `De-cuong-${item.name}.pdf`
-  const topicName =
-    item.topic || 'Hệ thống khuyến nghị học tập thông minh dựa trên đồ thị tri thức'
-  const studentName = item.name || 'Đinh Gia Huy'
-  const studentMssv = item.mssv || '2251060377'
+  const studentName = item.studentName || 'Sinh viên'
+  const studentCode = item.studentCode || ''
+  const topicName = item.topicName || item.title || 'Đề tài Đồ án Tốt nghiệp'
+  const supervisorName = item.lecturerName || 'Giảng viên hướng dẫn'
+  const docTitle = getFileNameFromUrl(item.outlineFile, `De-cuong-${studentName}.pdf`)
+
+  const handleDownload = () => {
+    if (item.outlineFile) {
+      window.open(item.outlineFile, '_blank')
+    } else {
+      toast.info('Sinh viên chưa đính kèm tệp đề cương.')
+    }
+  }
 
   const handleScroll = () => {
     const scrollArea = scrollAreaRef.current
@@ -138,10 +156,16 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                 {docTitle}
               </h2>
               <div className="hidden md:flex items-center gap-4 text-[11.5px] text-slate-400 mt-0.5 font-medium">
-                <span className="hover:text-white cursor-pointer transition">Tệp</span>
-                <span className="hover:text-white cursor-pointer transition">Xem</span>
-                <span className="hover:text-white cursor-pointer transition">Công cụ</span>
-                <span className="hover:text-white cursor-pointer transition">Trợ giúp</span>
+                <span>{studentName} ({studentCode})</span>
+                {item.outlineFile && (
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Mở tệp gốc
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -201,9 +225,9 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <button
             type="button"
-            onClick={() => toast.success(`Đang tải xuống tệp: ${docTitle}`)}
+            onClick={handleDownload}
             className="w-8 sm:w-9 h-8 sm:h-9 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer"
-            title="Tải xuống tài liệu"
+            title="Tải xuống tệp đính kèm"
             aria-label="Tải xuống tài liệu"
           >
             <Download className="w-4.5 h-4.5" />
@@ -286,7 +310,7 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
             <div className="text-[11px] font-bold text-slate-300 mb-1 flex items-center justify-between">
               <span>Trang 2</span>
               <span className="text-[10px] text-slate-400 font-semibold">
-                Kiến trúc &amp; Công nghệ
+                Kiến trúc &amp; Phương pháp
               </span>
             </div>
             <div className="w-full h-32 bg-white rounded shadow-xs p-2 text-[6px] text-slate-400 overflow-hidden leading-tight">
@@ -324,7 +348,7 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
             <div className="text-[11px] font-bold text-slate-300 mb-1 flex items-center justify-between">
               <span>Trang 3</span>
               <span className="text-[10px] text-slate-400 font-semibold">
-                Kế hoạch &amp; Ký tên
+                Kế hoạch 15 tuần
               </span>
             </div>
             <div className="w-full h-32 bg-white rounded shadow-xs p-2 text-[6px] text-slate-400 overflow-hidden leading-tight">
@@ -398,7 +422,7 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                   BÁO CÁO ĐỀ CƯƠNG ĐỒ ÁN TỐT NGHIỆP
                 </h1>
                 <p className="text-[13.5px] italic text-slate-600 font-sans">
-                  Chương trình đào tạo Kỹ sư / Cử nhân Công nghệ Thông tin (Khóa 64)
+                  Chương trình đào tạo Kỹ sư / Cử nhân Công nghệ Thông tin
                 </p>
               </div>
 
@@ -418,7 +442,7 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                   <span className="font-bold text-slate-900">{studentName}</span>
                   <span className="text-slate-400 mx-1">•</span>
                   <span>
-                    MSSV: <b className="font-mono text-slate-800">{studentMssv}</b>
+                    MSSV: <b className="font-mono text-slate-800">{studentCode}</b>
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -426,7 +450,7 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                     3. Giảng viên hướng dẫn:
                   </span>
                   <span className="font-bold text-slate-900">
-                    {item.supervisorName || 'TS. Trần Mai Anh'}
+                    {supervisorName}
                   </span>
                   <span className="text-slate-500 text-[12px]">(Khoa CNTT - ĐH Thủy Lợi)</span>
                 </div>
@@ -435,7 +459,7 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                     4. Thời gian thực hiện:
                   </span>
                   <span className="font-medium text-slate-800">
-                    Học kỳ 1 năm học 2026 – 2027 (15 tuần)
+                    15 tuần theo kế hoạch đào tạo
                   </span>
                 </div>
               </div>
@@ -445,17 +469,10 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                   I. ĐẶT VẤN ĐỀ VÀ TÍNH CẤP THIẾT CỦA ĐỀ TÀI
                 </h2>
                 <p className="text-[13px] text-slate-700 text-justify leading-relaxed">
-                  Trong kỷ nguyên số và phát triển mạnh mẽ của công nghệ giáo dục (EdTech), nhu cầu
-                  cá nhân hóa lộ trình học tập của sinh viên đại học trở nên cấp thiết hơn bao giờ
-                  hết. Hệ thống quản lý học tập truyền thống (LMS) thường áp dụng chung một lộ
-                  trình học tuyến tính, thiếu khả năng thích ứng linh hoạt theo năng lực và sở
-                  thích của từng cá nhân.
+                  Đề tài <b>&ldquo;{topicName}&rdquo;</b> hướng đến nghiên cứu lý thuyết, phân tích nghiệp vụ và xây dựng giải pháp công nghệ đáp ứng chuẩn đầu ra của đồ án tốt nghiệp đại học.
                 </p>
                 <p className="text-[13px] text-slate-700 text-justify leading-relaxed">
-                  Đề tài <b>&ldquo;{topicName}&rdquo;</b> hướng đến việc xây dựng mô hình liên kết
-                  tri thức dạng mạng lưới ngữ nghĩa (Knowledge Graph), kết hợp các thuật toán học
-                  máy và đồ thị (Graph Neural Networks - GNN) để tự động phân tích điểm mạnh, điểm
-                  yếu và gợi ý học liệu tối ưu nhất cho từng người học.
+                  Bản đề cương chi tiết này xác định rõ mục tiêu, phạm vi nghiên cứu, kiến trúc giải pháp và lộ trình thực nghiệm cụ thể qua từng tuần làm việc dưới sự hướng dẫn của cán bộ giảng dạy.
                 </p>
               </div>
 
@@ -465,16 +482,13 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                 </h2>
                 <ul className="list-disc pl-5 text-[13px] text-slate-700 space-y-1.5 leading-relaxed">
                   <li>
-                    <b>Mục tiêu tổng quát:</b> Thiết kế, xây dựng và đánh giá thực nghiệm một hệ
-                    thống khuyến nghị học tập thông minh có khả năng mở rộng và độ chính xác cao.
+                    <b>Mục tiêu tổng quát:</b> Thiết kế, xây dựng và hoàn thiện giải pháp phần mềm hoặc mô hình công nghệ theo đúng yêu cầu đã đăng ký.
                   </li>
                   <li>
-                    <b>Mục tiêu cụ thể:</b> Xây dựng Ontology môn học, triển khai mô hình nhúng đồ
-                    thị (TransE/RotatE) và tích hợp giao diện web tương tác thời gian thực.
+                    <b>Mục tiêu cụ thể:</b> Hoàn thành khảo sát hiện trạng, thiết kế hệ thống, lập trình thử nghiệm và viết toàn văn báo cáo tốt nghiệp.
                   </li>
                   <li>
-                    <b>Phạm vi nghiên cứu:</b> Áp dụng thử nghiệm trên tập dữ liệu gồm 1.200 sinh
-                    viên ngành CNTT tại Trường Đại học Thủy Lợi qua 12 học phần cơ sở ngành.
+                    <b>Phạm vi nghiên cứu:</b> Triển khai thử nghiệm trong môi trường ứng dụng thực tế.
                   </li>
                 </ul>
               </div>
@@ -499,53 +513,33 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                   III. PHƯƠNG PHÁP TIẾP CẬN VÀ CÔNG NGHỆ SỬ DỤNG
                 </h2>
                 <p className="text-[13px] text-slate-700 text-justify leading-relaxed">
-                  Đề tài áp dụng kiến trúc Microservices phân tán hiện đại, tách biệt rõ ràng giữa
-                  dịch vụ dữ liệu đồ thị tri thức và dịch vụ giao diện tương tác người dùng:
+                  Đề tài áp dụng các công nghệ tiêu chuẩn, kiến trúc phân tầng rõ ràng giữa tầng dữ liệu, tầng logic nghiệp vụ và tầng giao diện:
                 </p>
 
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl my-4 text-center">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-3">
-                    Sơ đồ khối kiến trúc hệ thống (System Architecture)
+                    Sơ đồ tổng quan kiến trúc (System Overview)
                   </div>
                   <div className="grid grid-cols-3 gap-3 text-[12px]">
                     <div className="p-3 bg-white border border-blue-200 rounded-lg shadow-2xs font-bold text-blue-900">
-                      <div>Frontend Layer</div>
+                      <div>Presentation Layer</div>
                       <div className="text-[10.5px] font-normal text-slate-500 mt-1">
-                        TailwindCSS • Vue/React • Vite
+                        Web / Mobile Interface
                       </div>
                     </div>
                     <div className="p-3 bg-white border border-indigo-200 rounded-lg shadow-2xs font-bold text-indigo-900">
-                      <div>Backend &amp; AI Engine</div>
+                      <div>Business Logic</div>
                       <div className="text-[10.5px] font-normal text-slate-500 mt-1">
-                        Python FastAPI • PyTorch • GNN
+                        API &amp; Processing Services
                       </div>
                     </div>
                     <div className="p-3 bg-white border border-emerald-200 rounded-lg shadow-2xs font-bold text-emerald-900">
-                      <div>Data &amp; Knowledge Graph</div>
+                      <div>Data Storage</div>
                       <div className="text-[10.5px] font-normal text-slate-500 mt-1">
-                        Neo4j • PostgreSQL • Redis
+                        Database &amp; Storage
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="space-y-2 text-[13px]">
-                  <div className="font-bold text-slate-800">
-                    1. Công nghệ lưu trữ và khai phá tri thức:
-                  </div>
-                  <p className="text-slate-600 pl-4 leading-relaxed">
-                    Cơ sở dữ liệu đồ thị <b>Neo4j</b> để quản lý hơn 50.000 nút tri thức và các mối
-                    quan hệ ngữ nghĩa (tiên quyết, đồng hành, đào sâu). Thuật toán biểu diễn tri
-                    thức <b>RotatE</b> cho phép ánh xạ không gian phức hợp vector.
-                  </p>
-                  <div className="font-bold text-slate-800 pt-2">
-                    2. Thuật toán khuyến nghị thích ứng:
-                  </div>
-                  <p className="text-slate-600 pl-4 leading-relaxed">
-                    Mô hình <b>Graph Convolutional Network (GCN)</b> kết hợp lọc cộng tác
-                    (Collaborative Filtering) để dự đoán sở thích và khoảng trống kiến thức của sinh
-                    viên với độ chính xác mục tiêu AUC ≥ 0.88.
-                  </p>
                 </div>
               </div>
 
@@ -555,20 +549,16 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                 </h2>
                 <ul className="list-decimal pl-5 text-[13px] text-slate-700 space-y-1.5 leading-relaxed">
                   <li>
-                    <b>Chương 1:</b> Tổng quan về hệ thống khuyến nghị và đồ thị tri thức trong giáo
-                    dục đại học.
+                    <b>Chương 1:</b> Tổng quan lý thuyết và cơ sở nghiên cứu của đề tài.
                   </li>
                   <li>
-                    <b>Chương 2:</b> Xây dựng Ontology và chuẩn hóa tập dữ liệu học tập ngành Công
-                    nghệ thông tin.
+                    <b>Chương 2:</b> Phân tích yêu cầu và thiết kế kiến trúc hệ thống.
                   </li>
                   <li>
-                    <b>Chương 3:</b> Thiết kế và huấn luyện mô hình khuyến nghị học tập dựa trên
-                    GNN.
+                    <b>Chương 3:</b> Cài đặt, triển khai và lập trình giải pháp.
                   </li>
                   <li>
-                    <b>Chương 4:</b> Cài đặt thực nghiệm hệ thống và đánh giá hiệu năng
-                    (Precision@K, Recall@K).
+                    <b>Chương 4:</b> Đánh giá thực nghiệm, kết luận và hướng phát triển.
                   </li>
                 </ul>
               </div>
@@ -607,82 +597,56 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
                       <tr>
                         <td className="p-2.5 font-bold text-blue-900">Giai đoạn 1</td>
                         <td className="p-2.5">
-                          Khảo sát lý thuyết, nghiên cứu tài liệu &amp; xây dựng đề cương chi tiết.
+                          Khảo sát lý thuyết, nghiên cứu tài liệu &amp; xây dựng đề cương.
                         </td>
                         <td className="p-2.5 font-mono text-slate-600">Tuần 1 - 3</td>
-                        <td className="p-2.5 font-medium text-emerald-700">Đề cương được duyệt</td>
+                        <td className="p-2.5 font-medium text-emerald-700">Đề cương chi tiết</td>
                       </tr>
                       <tr>
                         <td className="p-2.5 font-bold text-blue-900">Giai đoạn 2</td>
                         <td className="p-2.5">
-                          Xây dựng đồ thị tri thức môn học trên Neo4j &amp; chuẩn bị dataset.
+                          Thiết kế kiến trúc hệ thống và xây dựng cơ sở dữ liệu.
                         </td>
                         <td className="p-2.5 font-mono text-slate-600">Tuần 4 - 7</td>
-                        <td className="p-2.5 font-medium text-emerald-700">
-                          Database &amp; Dataset
-                        </td>
+                        <td className="p-2.5 font-medium text-emerald-700">Tài liệu thiết kế</td>
                       </tr>
                       <tr>
                         <td className="p-2.5 font-bold text-blue-900">Giai đoạn 3</td>
                         <td className="p-2.5">
-                          Huấn luyện mô hình GNN, tinh chỉnh siêu tham số và tích hợp API.
+                          Lập trình module cốt lõi, tích hợp các chức năng chính.
                         </td>
                         <td className="p-2.5 font-mono text-slate-600">Tuần 8 - 11</td>
-                        <td className="p-2.5 font-medium text-emerald-700">Model hoàn chỉnh</td>
+                        <td className="p-2.5 font-medium text-emerald-700">Bản thử nghiệm</td>
                       </tr>
                       <tr>
                         <td className="p-2.5 font-bold text-blue-900">Giai đoạn 4</td>
                         <td className="p-2.5">
-                          Kiểm thử người dùng, viết toàn văn báo cáo đồ án và chuẩn bị bảo vệ.
+                          Kiểm thử, viết toàn văn báo cáo và chuẩn bị bảo vệ.
                         </td>
                         <td className="p-2.5 font-mono text-slate-600">Tuần 12 - 15</td>
-                        <td className="p-2.5 font-medium text-emerald-700">
-                          Báo cáo &amp; Source code
-                        </td>
+                        <td className="p-2.5 font-medium text-emerald-700">Báo cáo hoàn chỉnh</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <div className="space-y-2 my-6 text-[13px]">
-                <h2 className="text-[14.5px] font-bold uppercase text-slate-900 border-b border-slate-200 pb-1">
-                  VI. DỰ KIẾN KẾT QUẢ VÀ SẢN PHẨM BÀN GIAO
-                </h2>
-                <ul className="list-disc pl-5 text-slate-700 space-y-1">
-                  <li>
-                    01 Bản toàn văn báo cáo đồ án tốt nghiệp chuẩn form mẫu Đại học Thủy Lợi (≥ 70
-                    trang).
-                  </li>
-                  <li>
-                    01 Hệ thống phần mềm web hoàn chỉnh kèm toàn bộ mã nguồn nguồn mở trên GitHub.
-                  </li>
-                  <li>01 Video phóng sự giới thiệu và demo quy trình khuyến nghị học tập.</li>
-                </ul>
-              </div>
-
               <div className="pt-8 my-6 flex justify-between items-start text-center text-[13px] font-sans">
                 <div className="w-60 space-y-1">
                   <div className="font-bold text-slate-800 uppercase">Giảng viên hướng dẫn</div>
                   <div className="text-[11.5px] text-slate-500 italic">(Ký và ghi rõ họ tên)</div>
-                  <div className="h-20 flex items-center justify-center">
-                    <span className="font-serif italic font-bold text-blue-800 text-lg">
-                      Trần Mai Anh
-                    </span>
+                  <div className="h-16 flex items-center justify-center font-serif italic text-blue-800 text-lg">
+                    {supervisorName}
                   </div>
-                  <div className="font-bold text-slate-900">TS. Trần Mai Anh</div>
+                  <div className="font-bold text-slate-900">{supervisorName}</div>
                 </div>
 
                 <div className="w-60 space-y-1">
-                  <div className="text-[11.5px] text-slate-500 italic">
-                    Hà Nội, ngày 05 tháng 10 năm 2026
-                  </div>
+                  <div className="text-[11.5px] text-slate-500 italic">Hà Nội</div>
                   <div className="font-bold text-slate-800 uppercase">Sinh viên thực hiện</div>
                   <div className="text-[11.5px] text-slate-500 italic">(Ký và ghi rõ họ tên)</div>
-                  <div className="h-16 flex items-center justify-center">
-                    <span className="font-serif italic font-bold text-slate-700 text-lg">
-                      {studentName}
-                    </span>
+                  <div className="h-16 flex items-center justify-center font-serif italic text-slate-700 text-lg">
+                    {studentName}
                   </div>
                   <div className="font-bold text-slate-900">{studentName}</div>
                 </div>
@@ -698,4 +662,3 @@ export const OutlineClassroomPreviewModal: React.FC<OutlineClassroomPreviewModal
     </div>
   )
 }
-
