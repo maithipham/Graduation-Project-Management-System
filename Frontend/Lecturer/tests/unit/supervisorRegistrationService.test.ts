@@ -86,6 +86,7 @@ describe('supervisorRegistrationService', () => {
       pending: 3,
       approved: 2,
       rejected: 1,
+      assigned: 0,
       all: 6,
     })
     expect(result.items).toEqual([
@@ -104,7 +105,7 @@ describe('supervisorRegistrationService', () => {
     ])
   })
 
-  it('getRequests: tab approved lọc TEACHER_APPROVED và HOD_APPROVED; tab rejected lọc REJECTED và HOD_REJECTED; tab all không lọc', async () => {
+  it('getRequests: tab approved lọc TEACHER_APPROVED, HOD_APPROVED và HOD_REJECTED; tab rejected lọc REJECTED; tab assigned lọc ASSIGNED_BY_HOD; tab all không lọc', async () => {
     reply = {
       code: 1000,
       data: {
@@ -131,9 +132,10 @@ describe('supervisorRegistrationService', () => {
     expect(sentUrl(requests[0])).toBe(
       '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
     )
-    expect(approvedResult.items.map((item) => [item.id, item.apiStatus])).toEqual([
-      ['reg-ta', 'TEACHER_APPROVED'],
-      ['reg-ha', 'HOD_APPROVED'],
+    expect(approvedResult.items.map((item) => [item.id, item.apiStatus, item.status])).toEqual([
+      ['reg-ta', 'TEACHER_APPROVED', 'approved'],
+      ['reg-ha', 'HOD_APPROVED', 'approved'],
+      ['reg-hr', 'HOD_REJECTED', 'approved'],
     ])
 
     const rejectedResult = await supervisorRegistrationService.getRequests({
@@ -141,18 +143,28 @@ describe('supervisorRegistrationService', () => {
       status: 'rejected',
     })
     expect(sentUrl(requests[1])).toBe(
-      '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
+      '/api/teacher/advisor-registrations?semesterPublicId=sem-1&status=REJECTED',
     )
     expect(rejectedResult.items.map((item) => [item.id, item.apiStatus, item.status])).toEqual([
       ['reg-rj', 'REJECTED', 'rejected'],
-      ['reg-hr', 'HOD_REJECTED', 'rejected'],
+    ])
+
+    const assignedResult = await supervisorRegistrationService.getRequests({
+      semesterPublicId: 'sem-1',
+      status: 'assigned',
+    })
+    expect(sentUrl(requests[2])).toBe(
+      '/api/teacher/advisor-registrations?semesterPublicId=sem-1&status=ASSIGNED_BY_HOD',
+    )
+    expect(assignedResult.items.map((item) => [item.id, item.apiStatus, item.status])).toEqual([
+      ['reg-as', 'ASSIGNED_BY_HOD', 'assigned'],
     ])
 
     const allResult = await supervisorRegistrationService.getRequests({
       semesterPublicId: 'sem-1',
       status: '',
     })
-    expect(sentUrl(requests[2])).toBe(
+    expect(sentUrl(requests[3])).toBe(
       '/api/teacher/advisor-registrations?semesterPublicId=sem-1',
     )
     expect(allResult.items).toHaveLength(6)

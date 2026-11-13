@@ -91,6 +91,8 @@ function getStatusLabel(request: SupervisorRequestItem): string {
           return 'Đã duyệt'
         case 'rejected':
           return 'Đã từ chối'
+        case 'assigned':
+          return 'TBM phân công'
         default:
           return 'Không xác định'
       }
@@ -105,6 +107,8 @@ function getStatusClass(status: SupervisorRequestItem['status']): string {
       return 'bg-emerald-100 text-emerald-700'
     case 'rejected':
       return 'bg-red-100 text-red-700'
+    case 'assigned':
+      return 'bg-indigo-100 text-indigo-700'
     default:
       return 'bg-slate-100 text-slate-600'
   }
@@ -272,6 +276,7 @@ export default function SupervisorRequestsPage() {
     { key: 'pending' as const, label: 'Chưa duyệt', count: counts.pending },
     { key: 'approved' as const, label: 'Đã duyệt', count: counts.approved },
     { key: 'rejected' as const, label: 'Đã từ chối', count: counts.rejected },
+    { key: 'assigned' as const, label: 'Được phân công', count: counts.assigned },
     { key: '' as const, label: 'Tất cả', count: counts.all },
   ]
 
@@ -377,9 +382,9 @@ export default function SupervisorRequestsPage() {
             </div>
           </div>
 
-          {/* Dòng 2: Tabs trạng thái */}
-          <div className="border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
-            <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-100/90 p-1">
+          {/* Dòng 2: Tabs trạng thái có hỗ trợ cuộn ngang khi tràn */}
+          <div className="border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 overflow-x-auto">
+            <div className="inline-flex min-w-max items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-100/90 p-1">
               {tabs.map((tab) => {
                 const active = tabStatus === tab.key
 
@@ -388,7 +393,7 @@ export default function SupervisorRequestsPage() {
                     key={tab.key || 'all'}
                     type="button"
                     onClick={() => setTabStatus(tab.key)}
-                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all cursor-pointer ${
+                    className={`flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all cursor-pointer ${
                       active
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'text-slate-700 hover:bg-white hover:text-blue-700'
@@ -402,7 +407,9 @@ export default function SupervisorRequestsPage() {
                           ? 'bg-white text-blue-700'
                           : tab.key === 'pending' && tab.count > 0
                             ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-200/80 text-slate-700'
+                            : tab.key === 'assigned' && tab.count > 0
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'bg-slate-200/80 text-slate-700'
                       }`}
                     >
                       {tab.count}

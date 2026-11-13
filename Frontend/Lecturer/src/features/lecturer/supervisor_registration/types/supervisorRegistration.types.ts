@@ -1,7 +1,11 @@
 // ==================== STATUS ====================
 
 // Status hiển thị trên giao diện
-export type SupervisorApprovalStatus = 'pending' | 'approved' | 'rejected'
+export type SupervisorApprovalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'assigned'
 
 export type SupervisorTabStatus = SupervisorApprovalStatus | ''
 
@@ -99,6 +103,7 @@ export interface SupervisorRequestCounts {
   pending: number
   approved: number
   rejected: number
+  assigned: number
   all: number
 }
 
