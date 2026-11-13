@@ -5,9 +5,11 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { referenceDataQueryOptions } from '@/shared/api'
+import { apiClient, API_ENDPOINTS, referenceDataQueryOptions } from '@/shared/api'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { semesterService } from '@/shared/services/semester.service'
+import type { ApiResponse } from '@/shared/types'
+import type { SemesterResponse } from '@/shared/types/semester.types'
 import {
   computeTopicDeadlineStatus,
   topicProposalService,
@@ -43,11 +45,17 @@ export function useTopicProposalSemesters() {
   })
 }
 
-/** Học kỳ hiện tại */
+/** Học kỳ hiện tại (bỏ qua toast lỗi để có fallback mượt mà) */
 export function useTopicProposalCurrentSemester() {
   return useQuery({
     queryKey: TOPIC_TITLE_QUERY_KEYS.currentSemester,
-    queryFn: () => semesterService.getCurrentSemester(),
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<SemesterResponse>>(
+        API_ENDPOINTS.semester.current,
+        { skipErrorToast: true },
+      )
+      return response.data.data
+    },
     ...referenceDataQueryOptions,
     retry: false,
   })
@@ -102,14 +110,22 @@ export function useTopicProposals() {
   // 1. Học kỳ
   const semestersQuery = useTopicProposalSemesters()
   const currentSemesterQuery = useTopicProposalCurrentSemester()
-  const semesters = semestersQuery.data ?? []
+
+  // Ghép thêm học kỳ hiện tại nếu chưa nằm trong trang học kỳ đầu tiên
+  const semesters = useMemo(() => {
+    const list = semestersQuery.data ?? []
+    const cur = currentSemesterQuery.data
+    return cur && !list.some((item) => item.publicId === cur.publicId)
+      ? [cur, ...list]
+      : list
+  }, [semestersQuery.data, currentSemesterQuery.data])
 
   const [selectedSemesterState, setSelectedSemesterState] = useState<string>('')
+  // Đợi kiểm tra học kỳ hiện tại xong mới fallback sang học kỳ đầu tiên để chọn đúng kỳ có hạn
   const selectedSemesterId =
     selectedSemesterState ||
     currentSemesterQuery.data?.publicId ||
-    semesters[0]?.publicId ||
-    ''
+    (currentSemesterQuery.isPending ? '' : (semesters[0]?.publicId ?? ''))
 
   const selectedSemester =
     semesters.find((s) => s.publicId === selectedSemesterId) ??
@@ -126,7 +142,10 @@ export function useTopicProposals() {
   const requestsQuery = useTopicTitleRequests({
     semesterId: selectedSemesterId || undefined,
   })
-  const requests = requestsQuery.data ?? []
+  const requests = useMemo(
+    () => requestsQuery.data ?? [],
+    [requestsQuery.data],
+  )
 
   // 4. Bộ lọc & tìm kiếm
   const [tabStatus, setTabStatus] = useState<TopicProposalTabStatus>('PENDING')

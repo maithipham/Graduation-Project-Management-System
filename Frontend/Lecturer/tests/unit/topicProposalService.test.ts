@@ -179,6 +179,33 @@ describe('topicProposalService', () => {
   })
 
   describe('getOutlineDeadline', () => {
+    it('tìm thấy mốc SV_CHINH_SUA_NOP_LAI_DE_CUONG trong giaoNhanDeadlines từ Backend thật', async () => {
+      const mockMilestone: DeadlineMilestone = {
+        code: 'SV_CHINH_SUA_NOP_LAI_DE_CUONG',
+        name: 'Hạn sinh viên chỉnh sửa & nộp lại đề cương',
+        startDate: '2026-11-01T00:00:00',
+        endDate: '2026-11-20T23:59:59',
+        status: 'IN_PROGRESS',
+      }
+
+      vi.mocked(apiClient.get).mockResolvedValueOnce({
+        data: {
+          code: 1000,
+          message: null,
+          data: {
+            giaoNhanDeadlines: [mockMilestone],
+          },
+        },
+      } as any)
+
+      const res = await topicProposalService.getOutlineDeadline('sem-1')
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/deadlines', {
+        params: { semesterId: 'sem-1' },
+        skipErrorToast: true,
+      })
+      expect(res).toEqual(mockMilestone)
+    })
+
     it('tìm thấy mốc SV_CHINH_SUA_NOP_LAI_DE_CUONG trong thucHienDeadlines', async () => {
       const mockMilestone: DeadlineMilestone = {
         code: 'SV_CHINH_SUA_NOP_LAI_DE_CUONG',

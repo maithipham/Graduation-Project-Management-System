@@ -27,6 +27,7 @@ export default function TopicProposalsPage() {
     selectedSemesterId,
     setSelectedSemesterId,
     deadlineInfo,
+    deadlineLoading,
     isLoading,
     tabStatus,
     setTabStatus,
@@ -87,7 +88,12 @@ export default function TopicProposalsPage() {
 
           {/* Banner thời hạn lấy động từ BE (SV_CHINH_SUA_NOP_LAI_DE_CUONG) */}
           <div className="flex items-center">
-            {deadlineInfo.status === 'NOT_CONFIGURED' && (
+            {deadlineLoading ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-medium animate-pulse">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                <span>Đang tải thời hạn...</span>
+              </div>
+            ) : deadlineInfo.status === 'NOT_CONFIGURED' ? (
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-medium"
                 title="Chưa cấu hình thời hạn nộp & duyệt tên đề tài cho học kỳ này"
@@ -95,17 +101,15 @@ export default function TopicProposalsPage() {
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <span>Thời hạn: Chưa có</span>
               </div>
-            )}
-            {deadlineInfo.status === 'OPEN' && (
+            ) : deadlineInfo.status === 'OPEN' ? (
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-semibold"
-                title={`Thời hạn duyệt mở đến ${formatDate(deadlineInfo.endDate, 'full')}`}
+                title={`Thời hạn nộp đề cương & duyệt mở đến ${formatDate(deadlineInfo.endDate, 'full')}`}
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Thời hạn: {deadlineInfo.label} (Đang mở)</span>
               </div>
-            )}
-            {deadlineInfo.status === 'EXTENDED' && (
+            ) : deadlineInfo.status === 'EXTENDED' ? (
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs font-semibold"
                 title="Đang trong thời gian gia hạn chấm của giảng viên"
@@ -113,8 +117,7 @@ export default function TopicProposalsPage() {
                 <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
                 <span>{deadlineInfo.label}</span>
               </div>
-            )}
-            {deadlineInfo.status === 'CLOSED' && (
+            ) : deadlineInfo.status === 'CLOSED' ? (
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-800 text-xs font-semibold"
                 title="Đã hết hạn duyệt tên đề tài. Vui lòng liên hệ Trưởng bộ môn để được gia hạn chấm"
@@ -122,8 +125,7 @@ export default function TopicProposalsPage() {
                 <Clock className="w-3.5 h-3.5 text-rose-600" />
                 <span>{deadlineInfo.label}</span>
               </div>
-            )}
-            {deadlineInfo.status === 'NOT_STARTED' && (
+            ) : (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-800 text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5 text-blue-600" />
                 <span>{deadlineInfo.label}</span>

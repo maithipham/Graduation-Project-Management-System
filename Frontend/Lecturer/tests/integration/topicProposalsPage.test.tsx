@@ -94,10 +94,10 @@ const MOCK_REQUESTS = [
 ]
 
 const MOCK_DEADLINE = {
-  thucHienDeadlines: [
+  giaoNhanDeadlines: [
     {
       code: 'SV_CHINH_SUA_NOP_LAI_DE_CUONG',
-      name: 'Hạn nộp & chỉnh sửa đề cương',
+      name: 'Hạn sinh viên chỉnh sửa & nộp lại đề cương',
       startDate: '2026-11-01T00:00:00',
       endDate: '2026-11-30T23:59:59',
       status: 'IN_PROGRESS',

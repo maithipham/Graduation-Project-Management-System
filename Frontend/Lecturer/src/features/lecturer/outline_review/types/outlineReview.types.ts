@@ -1,3 +1,8 @@
+export type {
+  DeadlineMilestone,
+  RawDeadlinesGroupedResponse,
+} from '@/features/lecturer/topic_proposal/types/topicProposal.types'
+
 export type OutlineStatus =
   | 'PENDING'
   | 'REQUEST_CHANGES'

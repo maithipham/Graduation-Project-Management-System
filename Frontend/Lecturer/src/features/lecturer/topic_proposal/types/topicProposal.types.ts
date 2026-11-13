@@ -53,8 +53,12 @@ export interface DeadlineMilestone {
 }
 
 export interface RawDeadlinesGroupedResponse {
+  giaoNhanDeadlines?: DeadlineMilestone[] | null
   thucHienDeadlines?: DeadlineMilestone[] | null
+  danhGiaDeadlines?: DeadlineMilestone[] | null
+  stage1?: DeadlineMilestone[] | null
   stage2?: DeadlineMilestone[] | null
+  stage3?: DeadlineMilestone[] | null
 }
 
 export type TopicProposalApprovalStatus = 'pending' | 'approved' | 'rejected'
