@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { LecturerDashboardPage } from '@/features/lecturer/dashboard/pages/LecturerDashboardPage'
+import LecturerDashboardPage from '@/features/lecturer/dashboard/pages/LecturerDashboardPage'
 
 describe('LecturerDashboardPage', () => {
   it('renders lecturer dashboard heading and stats correctly', () => {

@@ -1,36 +1,44 @@
-import { lazy, Suspense } from 'react'
-import { Navigate, useRoutes, type RouteObject } from 'react-router-dom'
-import { PublicLayout } from '@/shared/components/layout/PublicLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
+import { lazy } from 'react'
+import { useRoutes, type RouteObject } from 'react-router-dom'
+import { HomeRedirect, ProtectedRoute, RequireAuth } from '@/features/auth'
 import { NotFound } from '@/shared/components/feedback/NotFound'
 import { studentRoutes } from './student.routes'
+import { withSuspense } from './withSuspense'
 
-const LoginPage = lazy(() => import('@/feature/auth/pages/LoginPage'))
-
+const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
+const AuthenticatePage = lazy(() => import('@/features/auth/pages/AuthenticatePage'))
+const StudentOutlinePreviewPage = lazy(
+  () => import('@/features/outline_management/pages/StudentOutlinePreviewPage'),
+)
 
 const routes: RouteObject[] = [
   {
-    path: '/',
-    element: <Navigate to="/student" replace />,
+    path: 'login',
+    element: withSuspense(<LoginPage />),
   },
   {
-    element: <PublicLayout />,
+    // Google chuyển về đây sau khi chọn tài khoản (phải trùng VITE_GOOGLE_REDIRECT_URI)
+    path: 'authenticate',
+    element: withSuspense(<AuthenticatePage />),
+  },
+  {
+    // Mọi route bên trong cần đăng nhập và có role STUDENT
+    element: <RequireAuth />,
     children: [
+      // "/" → dashboard /student
+      { index: true, element: <HomeRedirect /> },
       {
-        path: 'login',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <LoginPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: '404',
-        element: <NotFound />,
+        element: <ProtectedRoute allowedRoles={['STUDENT']} />,
+        children: [
+          studentRoutes,
+          {
+            path: 'student/outline/preview',
+            element: withSuspense(<StudentOutlinePreviewPage />),
+          },
+        ],
       },
     ],
   },
-  studentRoutes,
   {
     path: '*',
     element: <NotFound />,

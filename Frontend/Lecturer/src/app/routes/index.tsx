@@ -1,40 +1,48 @@
-import { lazy, Suspense } from 'react'
-import { Navigate, useRoutes, type RouteObject } from 'react-router-dom'
+import { lazy } from 'react'
+import { useRoutes, type RouteObject } from 'react-router-dom'
+import { HomeRedirect, ProtectedRoute, RequireAuth } from '@/features/auth'
 import { PublicLayout } from '@/shared/components/layout/PublicLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
 import { NotFound } from '@/shared/components/feedback/NotFound'
 import { adminRoutes } from './admin.routes'
 import { departmentRoutes } from './department.routes'
 import { lecturerRoutes } from './lecturer.routes'
+import { withSuspense } from './withSuspense'
 
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
-
+const AuthenticatePage = lazy(() => import('@/features/auth/pages/AuthenticatePage'))
 
 const routes: RouteObject[] = [
   {
-    path: '/',
-    element: <Navigate to="/lecturer" replace />,
+    path: 'login',
+    element: withSuspense(<LoginPage />),
+  },
+  {
+    // Google chuyển về đây sau khi chọn tài khoản (phải trùng VITE_GOOGLE_REDIRECT_URI)
+    path: 'authenticate',
+    element: withSuspense(<AuthenticatePage />),
+  },
+  {
+    // Mọi route bên trong cần đăng nhập; mỗi portal cần thêm role tương ứng
+    element: <RequireAuth />,
+    children: [
+      { index: true, element: <HomeRedirect /> },
+      { element: <ProtectedRoute allowedRoles={['ADMIN']} />, children: [adminRoutes] },
+      {
+        element: <ProtectedRoute allowedRoles={['HEAD_OF_MAJOR']} />,
+        children: [departmentRoutes],
+      },
+      { element: <ProtectedRoute allowedRoles={['SUPERVISOR']} />, children: [lecturerRoutes] },
+    ],
   },
   {
     element: <PublicLayout />,
     children: [
-      {
-        path: 'login',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <LoginPage />
-          </Suspense>
-        ),
-      },
       {
         path: '404',
         element: <NotFound />,
       },
     ],
   },
-  adminRoutes,
-  departmentRoutes,
-  lecturerRoutes,
   {
     path: '*',
     element: <NotFound />,

@@ -1,25 +1,25 @@
 import { ErrorBoundary } from 'react-error-boundary'
 import { Navigate, Outlet } from 'react-router-dom'
-import { roleHomePaths, type UserRole } from '../types'
-import { useAuthStore } from '../store/authStore'
 import { ErrorFallback } from '@/shared/components/feedback/ErrorFallback'
+import type { UserRole } from '../types'
+import { useMyInfo } from '../hooks/useAuth'
+import { getHomePath } from '../utils/homePath'
 
 type ProtectedRouteProps = {
+  // Có ít nhất 1 role trong danh sách là được vào (giống @PreAuthorize("hasAnyRole(...)"))
   allowedRoles: UserRole[]
 }
 
 /**
- * Route Guard bảo vệ theo quyền người dùng (Kỹ thuật #14)
+ * Chặn route theo role. Đặt bên trong <RequireAuth /> nên lúc này đã có thông tin người dùng.
  */
 export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
-  const activeRole = useAuthStore((state) => state.activeRole)
+  const { data: user } = useMyInfo()
 
-  if (!activeRole) {
-    return <Navigate to="/login" replace />
-  }
+  if (!user) return <Navigate to="/login" replace />
 
-  if (!allowedRoles.includes(activeRole)) {
-    return <Navigate to={roleHomePaths[activeRole] || '/login'} replace />
+  if (!user.roles.some((role) => allowedRoles.includes(role))) {
+    return <Navigate to={getHomePath(user.roles) ?? '/login'} replace />
   }
 
   return (
@@ -27,4 +27,10 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
       <Outlet />
     </ErrorBoundary>
   )
+}
+
+/** Vào "/" → chuyển tới dashboard theo role */
+export function HomeRedirect() {
+  const { data: user } = useMyInfo()
+  return <Navigate to={(user && getHomePath(user.roles)) || '/login'} replace />
 }

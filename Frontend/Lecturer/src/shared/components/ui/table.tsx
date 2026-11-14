@@ -1,18 +1,21 @@
 import * as React from 'react'
 import { cn } from '@/shared/utils/cn'
 
-export const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn('w-full caption-bottom text-sm', className)}
-      {...props}
-    />
-  </div>
-))
+export interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  containerClassName?: string
+}
+
+export const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, containerClassName, ...props }, ref) => (
+    <div className={cn('relative w-full overflow-auto', containerClassName)}>
+      <table
+        ref={ref}
+        className={cn('w-full caption-bottom text-[13px]', className)}
+        {...props}
+      />
+    </div>
+  ),
+)
 Table.displayName = 'Table'
 
 export const TableHeader = React.forwardRef<
@@ -69,7 +72,7 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      'h-10 px-4 text-left align-middle font-semibold text-slate-700 [&:has([role=checkbox])]:pr-0',
+      'h-9 px-4 text-left align-middle text-xs font-semibold text-slate-700 [&:has([role=checkbox])]:pr-0',
       className,
     )}
     {...props}
@@ -83,7 +86,7 @@ export const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn('p-4 align-middle [&:has([role=checkbox])]:pr-0 text-slate-800', className)}
+    className={cn('px-4 py-2.5 align-middle [&:has([role=checkbox])]:pr-0 text-slate-800', className)}
     {...props}
   />
 ))

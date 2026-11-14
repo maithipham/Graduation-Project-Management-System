@@ -1,73 +1,124 @@
-import { lazy, Suspense } from 'react'
+import { lazy } from 'react'
+import { Navigate } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
-import { LecturerLayout } from '@/features/lecturer/layouts/LecturerLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
+import { LecturerLayout } from '@/features/lecturer'
+import { withSuspense } from './withSuspense'
 
-const LecturerDashboardPage = lazy(() => import('@/features/lecturer/dashboard/pages/LecturerDashboardPage'))
-const TopicManagePage = lazy(() => import('@/features/lecturer/topic-manage/pages/TopicManagePage'))
-const ReviewOutlinePage = lazy(() => import('@/features/lecturer/review-outline/pages/ReviewOutlinePage'))
-const ReportEvalPage = lazy(() => import('@/features/lecturer/report-eval/pages/ReportEvalPage'))
-const CouncilPage = lazy(() => import('@/features/lecturer/council/pages/CouncilPage'))
-const DepartmentPage = lazy(() => import('@/features/lecturer/department/pages/DepartmentPage'))
+// Page nạp bằng lazy() → mỗi page là một chunk riêng, chỉ tải khi vào URL đó
+const LecturerDashboardPage = lazy(
+  () => import('@/features/lecturer/dashboard/pages/LecturerDashboardPage'),
+)
+const SupervisorRequestsPage = lazy(
+  () =>
+    import(
+      '@/features/lecturer/supervisor_registration/pages/SupervisorRequestsPage'
+    ),
+)
+const TopicProposalsPage = lazy(
+  () => import('@/features/lecturer/topic_proposal/pages/TopicProposalsPage'),
+)
+const OutlineReviewPage = lazy(
+  () => import('@/features/lecturer/outline_review/pages/OutlineReviewPage'),
+)
+const ReportCheckPage = lazy(
+  () => import('@/features/lecturer/report_check/pages/ReportCheckPage'),
+)
+const GuidingEvaluationPage = lazy(
+  () =>
+    import(
+      '@/features/lecturer/guiding_evaluation/pages/GuidingEvaluationPage'
+    ),
+)
+const ThesisDefensePage = lazy(
+  () =>
+    import('@/features/lecturer/defense_management/pages/ThesisDefensePage'),
+)
+const DefenseCouncilPage = lazy(
+  () =>
+    import('@/features/lecturer/defense_management/pages/DefenseCouncilPage'),
+)
+const DefenseReviewPage = lazy(
+  () =>
+    import('@/features/lecturer/defense_management/pages/DefenseReviewPage'),
+)
+const LecturerTemplatesPage = lazy(
+  () =>
+    import(
+      '@/features/lecturer/template_management/pages/LecturerTemplatesPage'
+    ),
+)
+const LecturerProfilePage = lazy(
+  () =>
+    import(
+      '@/features/lecturer/profile_management/pages/LecturerProfilePage'
+    ),
+)
 
 export const lecturerRoutes: RouteObject = {
   path: 'lecturer',
-  element: <ProtectedRoute allowedRoles={['lecturer', 'department-head', 'secretary', 'council', 'admin']} />,
-
+  element: <LecturerLayout />,
   children: [
     {
-      element: <LecturerLayout />,
-      children: [
-        {
-          index: true,
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <LecturerDashboardPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'topic-manage',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <TopicManagePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'review-outline',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <ReviewOutlinePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'report-eval',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <ReportEvalPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'council',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <CouncilPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'department',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <DepartmentPage />
-            </Suspense>
-          ),
-        },
-      ],
+      index: true,
+      element: withSuspense(<LecturerDashboardPage />),
+    },
+    {
+      path: 'topic-assignment',
+      element: <Navigate to="/lecturer/supervisor-requests" replace />,
+    },
+    {
+      path: 'supervisor-requests',
+      element: withSuspense(<SupervisorRequestsPage />),
+    },
+    {
+      path: 'topic-proposals',
+      element: withSuspense(<TopicProposalsPage />),
+    },
+    {
+      path: 'outline-review',
+      element: withSuspense(<OutlineReviewPage />),
+    },
+    {
+      path: 'thesis-execution',
+      element: <Navigate to="/lecturer/report-check" replace />,
+    },
+    {
+      path: 'report-check',
+      element: withSuspense(<ReportCheckPage />),
+    },
+    {
+      path: 'guiding-evaluation',
+      element: withSuspense(<GuidingEvaluationPage />),
+    },
+    {
+      path: 'progress-tracking',
+      element: <Navigate to="/lecturer/guiding-evaluation" replace />,
+    },
+    {
+      path: 'guiding-scores',
+      element: <Navigate to="/lecturer/guiding-evaluation" replace />,
+    },
+    {
+      path: 'defense',
+      element: withSuspense(<ThesisDefensePage />),
+    },
+    {
+      path: 'defense/councils',
+      element: withSuspense(<DefenseCouncilPage />),
+    },
+    {
+      path: 'defense/reviews',
+      element: withSuspense(<DefenseReviewPage />),
+    },
+    {
+      path: 'templates',
+      element: withSuspense(<LecturerTemplatesPage />),
+    },
+    {
+      path: 'profile',
+      element: withSuspense(<LecturerProfilePage />),
     },
   ],
 }
+
+export default lecturerRoutes

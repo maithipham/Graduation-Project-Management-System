@@ -1,64 +1,62 @@
-import { lazy, Suspense } from 'react'
-import type { RouteObject } from 'react-router-dom'
-import { DepartmentLayout } from '@/features/department/layouts/DepartmentLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
+import { lazy } from 'react'
+import { Navigate, type RouteObject } from 'react-router-dom'
+import { DepartmentLayout } from '@/features/department'
+import { withSuspense } from './withSuspense'
 
-const DepartmentDashboardPage = lazy(() => import('@/features/department/pages/DepartmentDashboardPage'))
-const UserImportPage = lazy(() => import('@/features/department/pages/UserImportPage'))
-const SupervisorAssignmentPage = lazy(() => import('@/features/department/pages/SupervisorAssignmentPage'))
-const CouncilManagementPage = lazy(() => import('@/features/department/pages/CouncilManagementPage'))
-const RemindersPage = lazy(() => import('@/features/department/pages/RemindersPage'))
+const StudentManagementPage = lazy(
+  () => import('@/features/department/student_management/pages/StudentManagementPage'),
+)
+const LecturerManagementPage = lazy(
+  () => import('@/features/department/lecturer_management/pages/LecturerManagementPage'),
+)
+const SupervisorAssignmentPage = lazy(
+  () => import('@/features/department/lecturer_management/pages/SupervisorAssignmentPage'),
+)
+const ReviewerAssignmentPage = lazy(
+  () => import('@/features/department/lecturer_management/pages/ReviewerAssignmentPage'),
+)
+const ScheduleManagementPage = lazy(
+  () => import('@/features/department/schedule_management/pages/ScheduleManagementPage'),
+)
+const TemplateManagementPage = lazy(
+  () => import('@/features/department/template_management/pages/TemplateManagementPage'),
+)
+const DefenseCouncilPage = lazy(
+  () => import('@/features/department/council_management/pages/DefenseCouncilPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
-  element: <ProtectedRoute allowedRoles={['department-head', 'secretary', 'admin']} />,
+  element: <DepartmentLayout />,
   children: [
     {
-      element: <DepartmentLayout />,
-      children: [
-        {
-          index: true,
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <DepartmentDashboardPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'users-import',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <UserImportPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'assignments',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <SupervisorAssignmentPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'councils',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <CouncilManagementPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'reminders',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <RemindersPage />
-            </Suspense>
-          ),
-        },
-      ],
+      index: true,
+      element: (
+        <div className="p-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+          <h2 className="text-lg font-bold text-slate-800">
+            Khu vực nội dung (Content Area)
+          </h2>
+          <p className="text-slate-500 text-xs mt-1">
+            Đang hiển thị thử nghiệm khung <strong>Header</strong> và <strong>Sidebar</strong> của vai trò Trưởng Bộ Môn.
+          </p>
+        </div>
+      ),
     },
+    { path: 'student-management', element: withSuspense(<StudentManagementPage />) },
+    // 3 Trang quản lý giáo viên:
+    // 1. Giảng viên (Danh sách khả dụng để phân công GVHD)
+    { path: 'teachers', element: <Navigate to="/department/lecturer-management" replace /> },
+    { path: 'lecturer-management', element: withSuspense(<LecturerManagementPage />) },
+    // 2. Giáo viên Hướng dẫn (GVHD trong học kỳ, chỉ tiêu, sinh viên nhận)
+    { path: 'supervisors', element: withSuspense(<SupervisorAssignmentPage />) },
+    // 3. Giáo viên Nhận xét (GVPB đề cương, danh sách đề tài & phân công)
+    { path: 'reviewers', element: withSuspense(<ReviewerAssignmentPage />) },
+    // Kế hoạch & Tiến độ đồ án (Trưởng bộ môn cấu hình Deadline)
+    { path: 'schedule', element: withSuspense(<ScheduleManagementPage />) },
+    // Quản lý Hội đồng bảo vệ
+    { path: 'councils', element: withSuspense(<DefenseCouncilPage />) },
+    // Tài liệu & Biểu mẫu (giao diện demo, chưa nối API)
+    { path: 'documents-management', element: withSuspense(<TemplateManagementPage />) },
   ],
 }
 

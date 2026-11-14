@@ -1,0 +1,380 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import type {
+  LecturerNavBadges,
+  LecturerPortalState,
+} from '../types/lecturerPortal.types'
+import type { SupervisorRequestItem } from '@/features/lecturer/supervisor_registration/types/supervisorRegistration.types'
+import type { TopicProposalItem } from '@/features/lecturer/topic_proposal/types/topicProposal.types'
+import type { OutlineReviewItem } from '@/features/lecturer/outline_review/types/outlineReview.types'
+import type { ReportCheckItem } from '@/features/lecturer/report_check/types/reportCheck.types'
+import {
+  DEFAULT_TEACHER_PROFILE,
+  INITIAL_DEFENSE_COUNCILS,
+  INITIAL_DEFENSE_REVIEWS,
+  INITIAL_DOCUMENT_TEMPLATES,
+  INITIAL_GUIDING_EVALUATIONS,
+  INITIAL_OUTLINES,
+  INITIAL_REPORTS,
+  INITIAL_SUPERVISOR_REQUESTS,
+  INITIAL_TOPIC_PROPOSALS,
+} from '../services/lecturerMockData'
+
+const READ_OUTLINE_SESSION_KEY = 'tlu_read_outline_ids_v4'
+
+function getNowFormatted(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function loadSessionReadOutlineIds(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.sessionStorage.getItem(READ_OUTLINE_SESSION_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.map((id) => String(id))
+    }
+  } catch {
+    // Ignore storage access issues in restricted environments
+  }
+  return []
+}
+
+function saveSessionReadOutlineIds(ids: string[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(READ_OUTLINE_SESSION_KEY, JSON.stringify(ids))
+  } catch {
+    // Ignore storage access issues in restricted environments
+  }
+}
+
+export const useLecturerPortalStore = create<LecturerPortalState>()(
+  persist(
+    (set) => ({
+      academicYear: '2026-2027',
+      semester: 'HK2',
+      teacher: DEFAULT_TEACHER_PROFILE,
+      supervisorRequests: INITIAL_SUPERVISOR_REQUESTS,
+      topicProposals: INITIAL_TOPIC_PROPOSALS,
+      outlines: INITIAL_OUTLINES,
+      reports: INITIAL_REPORTS,
+      guidingEvaluations: INITIAL_GUIDING_EVALUATIONS,
+      defenseCouncils: INITIAL_DEFENSE_COUNCILS,
+      defenseReviews: INITIAL_DEFENSE_REVIEWS,
+      documentTemplates: INITIAL_DOCUMENT_TEMPLATES,
+      readOutlineIds: loadSessionReadOutlineIds(),
+
+      setAcademicFilter: (year, semester) =>
+        set((state) => ({
+          academicYear: year,
+          semester,
+          teacher: { ...state.teacher, year, semester },
+        })),
+
+      approveSupervisorRequest: (id) =>
+        set((state) => {
+          const target = state.supervisorRequests.find((r) => r.id === id)
+          if (!target || target.status === 'approved') return state
+          const now = getNowFormatted()
+          return {
+            supervisorRequests: state.supervisorRequests.map((r) =>
+              r.id === id ? { ...r, status: 'approved', approvedAt: now } : r,
+            ),
+            teacher: {
+              ...state.teacher,
+              currentLoad: state.teacher.currentLoad + 1,
+            },
+          }
+        }),
+
+      rejectSupervisorRequest: (id, reason) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            supervisorRequests: state.supervisorRequests.map((r) =>
+              r.id === id
+                ? {
+                    ...r,
+                    status: 'rejected',
+                    rejectedAt: now,
+                    rejectReason: reason?.trim() || r.rejectReason,
+                  }
+                : r,
+            ),
+          }
+        }),
+
+      approveTopicProposal: (id) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            topicProposals: state.topicProposals.map((p) =>
+              p.id === id ? { ...p, status: 'approved', approvedAt: now } : p,
+            ),
+          }
+        }),
+
+      rejectTopicProposal: (id, reason) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            topicProposals: state.topicProposals.map((p) =>
+              p.id === id
+                ? {
+                    ...p,
+                    status: 'rejected',
+                    rejectedAt: now,
+                    rejectReason: reason?.trim() || p.rejectReason,
+                  }
+                : p,
+            ),
+          }
+        }),
+
+      markOutlineAsRead: (id) =>
+        set((state) => {
+          if (state.readOutlineIds.includes(id)) return state
+          const next = [...state.readOutlineIds, id]
+          saveSessionReadOutlineIds(next)
+          return { readOutlineIds: next }
+        }),
+
+      approveOutline: (id) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            outlines: state.outlines.map((o) => {
+              if (o.id !== id) return o
+              return {
+                ...o,
+                status: 'approved',
+                isResubmitted: false,
+                approvedAt: now,
+                history: [
+                  {
+                    submitIndex: o.submitCount || 1,
+                    submittedDate: o.submittedDate || now,
+                    fileName: o.fileName || 'De-cuong.pdf',
+                    status: 'Đã duyệt',
+                    processedAt: now,
+                    note: 'Đề cương đã được phê duyệt.',
+                  },
+                  ...o.history,
+                ],
+              }
+            }),
+          }
+        }),
+
+      rejectOutline: (id, feedback) =>
+        set((state) => {
+          const now = getNowFormatted()
+          const trimmed = feedback.trim()
+          return {
+            outlines: state.outlines.map((o) => {
+              if (o.id !== id) return o
+              return {
+                ...o,
+                status: 'rejected',
+                isResubmitted: false,
+                feedback: trimmed,
+                rejectedAt: now,
+                history: [
+                  {
+                    submitIndex: o.submitCount || 1,
+                    submittedDate: o.submittedDate || now,
+                    fileName: o.fileName || 'De-cuong.pdf',
+                    status: 'Từ chối',
+                    processedAt: now,
+                    note: trimmed || 'Yêu cầu chỉnh sửa lại đề cương.',
+                  },
+                  ...o.history,
+                ],
+              }
+            }),
+          }
+        }),
+
+      updateOutlineFeedback: (id, feedback) =>
+        set((state) => {
+          const trimmed = feedback.trim()
+          return {
+            outlines: state.outlines.map((o) => {
+              if (o.id !== id) return o
+              let updatedFirstRej = false
+              const nextHistory = o.history.map((h) => {
+                if (!updatedFirstRej && (h.status === 'Từ chối' || h.status === 'Đã từ chối')) {
+                  updatedFirstRej = true
+                  return { ...h, note: trimmed }
+                }
+                return h
+              })
+              return {
+                ...o,
+                feedback: trimmed,
+                previousRejectReason:
+                  o.previousRejectReason !== undefined ? trimmed : o.previousRejectReason,
+                history: nextHistory,
+              }
+            }),
+          }
+        }),
+
+      resetOutlines: () =>
+        set(() => {
+          saveSessionReadOutlineIds([])
+          return { outlines: INITIAL_OUTLINES, readOutlineIds: [] }
+        }),
+
+      approveReport: (id, comment) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            reports: state.reports.map((r) =>
+              r.id === id
+                ? {
+                    ...r,
+                    status: 'approved',
+                    approvedAt: now,
+                    comment: comment?.trim() || r.comment,
+                  }
+                : r,
+            ),
+          }
+        }),
+
+      rejectReport: (id, comment) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            reports: state.reports.map((r) =>
+              r.id === id
+                ? {
+                    ...r,
+                    status: 'rejected',
+                    rejectedAt: now,
+                    comment: comment?.trim() || 'Báo cáo chưa đạt yêu cầu, cần hoàn thiện lại.',
+                  }
+                : r,
+            ),
+          }
+        }),
+
+      submitPlagiarismResult: (id, fileName, rate) =>
+        set((state) => ({
+          reports: state.reports.map((r) =>
+            r.id === id
+              ? {
+                  ...r,
+                  plagiarismFile: fileName || `Ket-qua-trung-lap-${r.mssv}.pdf`,
+                  plagiarismRate: rate,
+                }
+              : r,
+          ),
+        })),
+
+      markReportDownloaded: (id) =>
+        set((state) => ({
+          reports: state.reports.map((r) =>
+            r.id === id ? { ...r, hasDownloaded: true } : r,
+          ),
+        })),
+
+      submitEvaluationTrackingFile: (id, fileName) =>
+        set((state) => {
+          const now = getNowFormatted()
+          return {
+            guidingEvaluations: state.guidingEvaluations.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    fileName:
+                      fileName.trim() || `Phieu_tiendo_${item.mssv}.pdf`,
+                    submittedAt: now,
+                  }
+                : item,
+            ),
+          }
+        }),
+
+      saveEvaluationRubric: (id, score, rubricScores, isDraft = false) =>
+        set((state) => ({
+          guidingEvaluations: state.guidingEvaluations.map((item) => {
+            if (item.id !== id) return item
+            if (isDraft) {
+              return {
+                ...item,
+                rubricScores,
+                score: item.score !== null ? score : item.score,
+              }
+            }
+            return {
+              ...item,
+              score,
+              rubricScores,
+            }
+          }),
+        })),
+
+      updateDefenseReviewScore: (id, score) =>
+        set((state) => ({
+          defenseReviews: state.defenseReviews.map((rev) =>
+            rev.id === id ? { ...rev, score } : rev,
+          ),
+        })),
+
+      approveDefenseReview: (id) =>
+        set((state) => ({
+          defenseReviews: state.defenseReviews.map((rev) =>
+            rev.id === id ? { ...rev, status: 'approved' } : rev,
+          ),
+        })),
+
+      rejectDefenseReview: (id) =>
+        set((state) => ({
+          defenseReviews: state.defenseReviews.map((rev) =>
+            rev.id === id ? { ...rev, status: 'rejected' } : rev,
+          ),
+        })),
+
+      updateTeacherProfile: (profile) =>
+        set((state) => ({
+          teacher: { ...state.teacher, ...profile },
+        })),
+    }),
+    {
+      name: 'gv_thesis_portal_react_v1',
+      partialize: (state) => ({
+        academicYear: state.academicYear,
+        semester: state.semester,
+        teacher: state.teacher,
+        supervisorRequests: state.supervisorRequests,
+        topicProposals: state.topicProposals,
+        outlines: state.outlines,
+        reports: state.reports,
+        guidingEvaluations: state.guidingEvaluations,
+        defenseCouncils: state.defenseCouncils,
+        defenseReviews: state.defenseReviews,
+      }),
+    },
+  ),
+)
+
+export function computeLecturerBadges(state: {
+  supervisorRequests: SupervisorRequestItem[]
+  topicProposals: TopicProposalItem[]
+  outlines: OutlineReviewItem[]
+  reports: ReportCheckItem[]
+}): LecturerNavBadges {
+  return {
+    supervisorRequests: state.supervisorRequests.filter((r) => r.status === 'pending').length,
+    topicProposals: state.topicProposals.filter((p) => p.status === 'pending').length,
+    outlines: state.outlines.filter((o) => o.status === 'pending').length,
+    reports: state.reports.filter((r) => r.status === 'pending').length,
+  }
+}
+

@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./tests/setup.ts'],
       clearMocks: true,
     },
+    // Student chạy cổng 5174, Lecturer chạy 5173 — chạy song song được
+    server: { port: 5174, strictPort: true },
+    preview: { port: 5174, strictPort: true },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

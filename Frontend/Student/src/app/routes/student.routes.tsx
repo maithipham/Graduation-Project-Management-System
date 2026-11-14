@@ -1,92 +1,80 @@
-import { lazy, Suspense } from 'react'
+import { lazy } from 'react'
 import type { RouteObject } from 'react-router-dom'
-import { StudentLayout } from '@/feature/student/layouts/StudentLayout'
-import { LoadingFallback } from '@/shared/components/feedback/LoadingFallback'
-import { ProtectedRoute } from '@/feature/auth/components/ProtectedRoute'
+import { StudentLayout } from '@/shared'
+import { withSuspense } from './withSuspense'
 
+// Lazy load các trang tính năng của Sinh viên từ các module ngang hàng với auth
+const StudentRegistrationPage = lazy(
+  () => import('@/features/registration_management/pages/StudentRegistrationPage'),
+)
+const StudentLecturersPage = lazy(
+  () => import('@/features/lecturer_list/pages/StudentLecturersPage'),
+)
+const StudentOutlinePage = lazy(
+  () => import('@/features/outline_management/pages/StudentOutlinePage'),
+)
+const StudentReportsPage = lazy(
+  () => import('@/features/reports_management/pages/StudentReportsPage'),
+)
+const StudentSchedulePage = lazy(
+  () => import('@/features/schedule_management/pages/StudentSchedulePage'),
+)
+const StudentResultsPage = lazy(
+  () => import('@/features/score_management/pages/StudentResultsPage'),
+)
+const StudentDocumentsPage = lazy(
+  () => import('@/features/template_management/pages/StudentDocumentsPage'),
+)
+const StudentProfilePage = lazy(
+  () => import('@/features/profile_management/pages/StudentProfilePage'),
+)
 
-const StudentOverviewPage = lazy(() => import('@/feature/student/overview/pages/StudentOverviewPage'))
-const StudentRegistrationPage = lazy(() => import('@/feature/student/registration/pages/StudentRegistrationPage'))
-const StudentLecturerListPage = lazy(() => import('@/feature/student/lecturer-list/pages/StudentLecturerListPage'))
-const StudentOutlinePage = lazy(() => import('@/feature/student/outline/pages/StudentOutlinePage'))
-const StudentReportPage = lazy(() => import('@/feature/student/report/pages/StudentReportPage'))
-const StudentSchedulePage = lazy(() => import('@/feature/student/schedule/pages/StudentSchedulePage'))
-const StudentResultsPage = lazy(() => import('@/feature/student/results/pages/StudentResultsPage'))
-const StudentDocumentsPage = lazy(() => import('@/feature/student/documents/pages/StudentDocumentsPage'))
-
-
+// Đã nằm trong <RequireAuth /> + <ProtectedRoute allowedRoles={['STUDENT']} /> ở routes/index.tsx
 export const studentRoutes: RouteObject = {
   path: 'student',
-  element: <ProtectedRoute allowedRoles={['student']} />,
+  element: <StudentLayout />,
   children: [
     {
-      element: <StudentLayout />,
-      children: [
-        {
-          index: true,
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentOverviewPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'registration',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentRegistrationPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'lecturer-list',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentLecturerListPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'outline',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentOutlinePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'report',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentReportPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'schedule',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentSchedulePage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'results',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentResultsPage />
-            </Suspense>
-          ),
-        },
-        {
-          path: 'documents',
-          element: (
-            <Suspense fallback={<LoadingFallback />}>
-              <StudentDocumentsPage />
-            </Suspense>
-          ),
-        },
-      ],
+      index: true,
+      element: withSuspense(<StudentRegistrationPage />),
+    },
+    {
+      path: 'registration',
+      element: withSuspense(<StudentRegistrationPage />),
+    },
+    {
+      path: 'lecturers',
+      element: withSuspense(<StudentLecturersPage />),
+    },
+    {
+      path: 'outline',
+      element: withSuspense(<StudentOutlinePage />),
+    },
+    {
+      path: 'reports',
+      element: withSuspense(<StudentReportsPage />),
+    },
+    {
+      path: 'schedule',
+      element: withSuspense(<StudentSchedulePage />),
+    },
+    {
+      path: 'results',
+      element: withSuspense(<StudentResultsPage />),
+    },
+    {
+      path: 'documents',
+      element: withSuspense(<StudentDocumentsPage />),
+    },
+    {
+      path: 'files',
+      element: withSuspense(<StudentDocumentsPage />),
+    },
+    {
+      path: 'profile',
+      element: withSuspense(<StudentProfilePage />),
     },
   ],
 }
+
+export default studentRoutes

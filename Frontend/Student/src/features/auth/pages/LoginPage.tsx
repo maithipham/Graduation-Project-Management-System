@@ -1,96 +1,179 @@
-import { useNavigate } from 'react-router-dom'
-import { roleHomePaths } from '../types'
-import { useAuthStore } from '../store/authStore'
-import { GraduationCap, ArrowRight, ShieldCheck, LogIn } from 'lucide-react'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from '@/shared/components/ui/card'
-import { Badge } from '@/shared/components/ui/badge'
+import { useState, useEffect } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
+import { useMyInfo } from '../hooks/useAuth'
+import { buildGoogleAuthUrl } from '../utils/googleOAuth'
+import { getHomePath } from '../utils/homePath'
+import type { LoginLocationState } from '../utils/loginState'
 
 export default function LoginPage() {
+  const location = useLocation()
   const navigate = useNavigate()
-  const setActiveRole = useAuthStore((state) => state.setActiveRole)
-  const setUser = useAuthStore((state) => state.setUser)
-  const setToken = useAuthStore((state) => state.setToken)
+  const queryClient = useQueryClient()
+  const loginState = location.state as LoginLocationState
+  const loginError = loginState?.error
+  const signedOut = loginState?.signedOut === true
+  // Chỉ đọc cache (không gọi API): vừa đăng nhập xong mà quay lại /login thì về luôn trang chủ.
+  // Vừa đăng xuất thì bỏ qua cache cũ (sắp bị xóa), không đưa ngược vào dashboard
+  const { data: user } = useMyInfo({ enabled: false })
+  const homePath = user && !signedOut ? getHomePath(user.roles) : null
 
-  function loginAsStudent() {
-    setActiveRole('student')
-    setUser({
-      id: 'sv-2024-001',
-      name: 'Nguyễn Văn An',
-      email: 'an.nv@sinhvien.edu.vn',
-      role: 'student',
-      code: 'SV2024001',
-    })
-    setToken('demo-student-token')
-    navigate(roleHomePaths.student, { replace: true })
+  useEffect(() => {
+    if (!signedOut) return
+    // Layout cũ đã gỡ (SSE đã đóng, không còn query nào đang hiển thị) → giờ mới xóa cache, kể cả thông tin đăng nhập
+    queryClient.clear()
+    navigate(location.pathname, { replace: true, state: null })
+  }, [signedOut, queryClient, navigate, location.pathname])
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    // Thu nhỏ đồng thời ảnh và khối đăng nhập, giữ nguyên bố cục hai cột
+    const fitLoginPage = () => {
+      const viewport = window.visualViewport
+      const width = viewport ? viewport.width : window.innerWidth
+      const height = viewport ? viewport.height : window.innerHeight
+      const nextScale = Math.min(width / 1680, height / 768, 1)
+      setScale(nextScale)
+    }
+
+    fitLoginPage()
+    window.addEventListener('resize', fitLoginPage)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', fitLoginPage)
+    }
+
+    return () => {
+      window.removeEventListener('resize', fitLoginPage)
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', fitLoginPage)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    // Bấm "Back" từ trang Google: trình duyệt có thể khôi phục trang cũ từ cache → mở lại nút đăng nhập
+    const resetLoading = (event: PageTransitionEvent) => {
+      if (event.persisted) setIsLoading(false)
+    }
+    window.addEventListener('pageshow', resetLoading)
+    return () => window.removeEventListener('pageshow', resetLoading)
+  }, [])
+
+  const handleGoogleLogin = () => {
+    if (isLoading) return
+    setIsLoading(true)
+    // Rời app sang trang chọn tài khoản Google; Google xong sẽ quay về /authenticate?code&state
+    window.location.assign(buildGoogleAuthUrl())
   }
 
+  if (homePath) return <Navigate to={homePath} replace />
+
   return (
-    <div className="flex min-h-[85vh] items-center justify-center p-4">
-      <Card className="w-full max-w-lg border-slate-200 bg-white/95 shadow-xl backdrop-blur-sm">
-        <CardHeader className="space-y-2 text-center pb-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-8 ring-blue-50/50 mb-2">
-            <GraduationCap className="h-8 w-8" />
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">
-            Cổng Thông Tin Sinh Viên
-          </CardTitle>
-          <CardDescription className="text-sm text-slate-500">
-            Hệ thống Quản lý Đồ án Tốt nghiệp - Phân hệ Sinh viên
-          </CardDescription>
-        </CardHeader>
+    <div className="relative w-full min-h-screen min-h-[100dvh] overflow-hidden font-sans text-[#202428] bg-white select-none">
+      <main
+        className="login-page fixed top-1/2 left-1/2 flex w-[1680px] h-[768px] px-5 py-4 origin-center"
+        style={{
+          transform: `translate(-50%, -50%) scale(${scale})`,
+        }}
+      >
+        {/* Cột trái: Hình ảnh khuôn viên trường Đại học Thủy Lợi */}
+        <section
+          className="relative w-[810px] shrink-0 overflow-hidden rounded-[32px]"
+          aria-label="Đại học Thủy Lợi"
+        >
+          <img
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            src="/login.jpg"
+            alt="Khuôn viên Đại học Thủy Lợi"
+          />
+        </section>
 
-        <CardContent className="space-y-4">
-          <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 text-xs text-blue-800">
-            <p className="font-semibold mb-1 flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
-              Đăng nhập tài khoản sinh viên
+        {/* Cột phải: Form đăng nhập Google */}
+        <section
+          className="flex-1 flex items-center justify-center p-8"
+          aria-labelledby="login-title"
+        >
+          <div className="w-full max-w-[480px] text-center -translate-y-3 bg-white border border-[#e2e8f0] rounded-[10px] shadow-[0_10px_35px_rgba(0,0,0,0.08)] px-8 py-6 sm:px-9 sm:py-7">
+            <img
+              className="block w-[200px] max-w-full h-auto mx-auto mb-3.5"
+              src="/logo.webp"
+              alt="Đại học Thủy Lợi"
+            />
+            <h2
+              id="login-title"
+              className="m-0 mb-1.5 text-[28px] sm:text-[30px] font-bold leading-tight whitespace-nowrap text-[#1e293b]"
+            >
+              HỆ THỐNG QUẢN LÝ ĐỒ ÁN
+            </h2>
+            <p className="m-0 mb-5 text-[#676b70] text-base leading-normal">
+              Đăng nhập dành cho sinh viên
             </p>
-            <p className="text-blue-600/90 leading-relaxed">
-              Truy cập để đăng ký người hướng dẫn, đề xuất tên đề tài, nộp đề cương, nộp báo cáo tiến độ và theo dõi kết quả đánh giá của hội đồng.
-            </p>
-          </div>
 
-          <button
-            type="button"
-            onClick={loginAsStudent}
-            className="group relative flex w-full items-center justify-between rounded-xl border-2 border-blue-300 bg-blue-50/60 p-4 text-left transition-all duration-200 hover:border-blue-600 hover:bg-blue-100/70 hover:shadow-md cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-transform group-hover:scale-105">
-                <LogIn className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-900 group-hover:text-blue-700">
-                    Vào Cổng Sinh Viên (SV site)
-                  </span>
-                  <Badge variant="outline" className="border-blue-300 text-blue-700 text-[10px] py-0 px-1.5">
-                    Học tập
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Đăng nhập với vai trò Sinh viên (SV2024001)
-                </p>
-              </div>
+            {/* Nút đăng nhập Google */}
+            <button
+              className="w-full h-[50px] flex items-center justify-between gap-3 px-5 border border-[#e1e7ef] rounded-[8px] bg-white text-[#171b20] font-sans text-base font-semibold cursor-pointer transition-colors duration-150 hover:bg-[#f8faff] hover:border-[#c3cedd] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#225bb9] focus-visible:outline-offset-4 shadow-sm disabled:opacity-75 disabled:cursor-wait"
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              <svg
+                className="w-5 h-5 shrink-0"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+
+              <span className="truncate">
+                {isLoading ? 'Đang chuyển tới Google...' : 'Đăng nhập với Google'}
+              </span>
+
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 shrink-0 text-[#225bb9] animate-spin" />
+              ) : (
+                <div className="w-4 h-4 shrink-0" aria-hidden="true" />
+              )}
+            </button>
+
+            {loginError && (
+              <p role="alert" className="m-0 mt-3 text-sm font-semibold text-[#DC2626]">
+                {loginError}
+              </p>
+            )}
+
+            {/* Chân card hỗ trợ */}
+            <div className="mt-5 pt-5 border-t border-[#f1f5f9]">
+              <p className="m-0 mb-1.5 text-[#6b7077] text-sm leading-normal">
+                Cần hỗ trợ truy cập?
+              </p>
+              <a
+                className="inline-flex items-center gap-2 text-[#1456b9] text-sm font-medium no-underline hover:underline focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#225bb9] focus-visible:outline-offset-4"
+                href="mailto:vpkcntt@tlu.edu.vn"
+              >
+                <span>Liên hệ quản trị hệ thống</span>
+              </a>
             </div>
-            <ArrowRight className="h-5 w-5 text-blue-600 transition-transform duration-200 group-hover:translate-x-1" />
-          </button>
-        </CardContent>
-
-        <CardFooter className="flex flex-col items-center border-t border-slate-100 pt-4 pb-4">
-          <p className="text-xs text-slate-400 text-center">
-            Sinh viên gặp vấn đề về tài khoản vui lòng liên hệ Văn phòng Khoa
-          </p>
-        </CardFooter>
-      </Card>
+          </div>
+        </section>
+      </main>
     </div>
   )
 }
-

@@ -1,11 +1,14 @@
 import axios from 'axios'
 import { setupInterceptors } from './interceptors'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+// Export để chỗ không đi qua axios (EventSource của SSE) dùng chung địa chỉ backend
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 export const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 30000,
+  // Gửi kèm cookie HttpOnly (access/refresh token) khi gọi sang BE khác origin
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },

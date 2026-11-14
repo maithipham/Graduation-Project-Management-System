@@ -1,0 +1,7 @@
+// Public API của role: department
+export * from './layouts'
+export * from './student_management'
+export * from './lecturer_management'
+export * from './schedule_management'
+export * from './template_management'
+export * from './council_management'

@@ -1,7 +1,7 @@
 export * from './types'
-export * from './store/authStore'
 export * from './hooks'
-export * from './components/ProtectedRoute'
-export * from './components/CanAccess'
-export * from './components/RoleSwitcher'
-export { default as LoginPage } from './pages/LoginPage'
+export * from './utils/homePath'
+export * from './utils/loginState'
+export * from './components'
+// Không export page ở đây: page được nạp bằng lazy() trong app/routes để tách bundle
+export * from './services'

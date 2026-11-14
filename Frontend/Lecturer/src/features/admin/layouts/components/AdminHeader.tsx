@@ -1,44 +1,227 @@
-import React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
-import { RoleSwitcher } from '@/features/auth/components/RoleSwitcher'
-import { useAuthStore } from '@/features/auth/store/authStore'
+import React, { Fragment, useState, useRef, useEffect, useMemo } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+  Menu,
+  PanelLeft,
+  ChevronRight,
+  ChevronDown,
+  Settings,
+  LogOut,
+} from 'lucide-react'
+import { roleLabels, useLogout, useMyInfo } from '@/features/auth'
+import { NotificationBell } from '@/features/notification'
+import { getInitials, getNavBreadcrumbs } from '@/shared/utils'
+import { adminNavItems } from './adminNav.config'
 
-export const AdminHeader: React.FC = () => {
+interface AdminHeaderProps {
+  onToggleSidebar?: () => void
+  onMobileToggle?: () => void
+}
+
+export const AdminHeader: React.FC<AdminHeaderProps> = ({
+  onToggleSidebar,
+  onMobileToggle,
+}) => {
   const navigate = useNavigate()
-  const user = useAuthStore((state) => state.user)
-  const clearAuth = useAuthStore((state) => state.clearAuth)
+  const location = useLocation()
+  const { data: user } = useMyInfo()
+  const logout = useLogout()
 
-  function handleLogout() {
-    clearAuth()
-    navigate('/login')
-  }
+  // Dropdown states
+  const [profileOpen, setProfileOpen] = useState(false)
+
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  // Đóng dropdown khi click bên ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (profileRef.current && !profileRef.current.contains(target)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
+  const baseCrumbs = getNavBreadcrumbs(adminNavItems, location.pathname)
+  const isFacultyDetail =
+    location.pathname.startsWith('/admin/faculties') &&
+    new URLSearchParams(location.search).has('facultyId')
+
+  const crumbs: { label: string; to?: string }[] = useMemo(() => {
+    if (isFacultyDetail) {
+      return [
+        { label: 'Khoa', to: '/admin/faculties' },
+        { label: 'Chuyên ngành' },
+      ]
+    }
+    if (baseCrumbs.length === 0) {
+      return [{ label: 'Tổng quan' }]
+    }
+    return baseCrumbs.map((label) => ({ label }))
+  }, [baseCrumbs, isFacultyDetail])
+
+  const rawName = user?.name?.trim() ?? ''
+  const displayName =
+    !rawName || rawName.toLowerCase().replace(/\s+/g, '') === 'admin'
+      ? 'Admin'
+      : rawName
+  const displayTitle = roleLabels.ADMIN
 
   return (
-    <header className="admin-topbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '0.9rem', color: '#7e22ce', fontWeight: 600 }}>
-          Cổng Quản Trị Hệ Thống Toàn Trường
-        </span>
+    <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
+      {/* ========================================================
+          1. BÊN TRÁI: TOGGLE SIDEBAR & BREADCRUMB
+          ======================================================== */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Nút Hamburger cho màn hình Mobile */}
+        <button
+          type="button"
+          onClick={onMobileToggle}
+          className="lg:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          aria-label="Mở menu"
+        >
+          <Menu size={20} />
+        </button>
+
+        {/* Nút Toggle Sidebar Desktop */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="hidden lg:flex p-2 text-slate-500 hover:text-[#1565C0] hover:bg-blue-50/80 rounded-lg transition-colors cursor-pointer"
+          title="Thu gọn / Mở rộng Sidebar"
+          aria-label="Thu gọn / Mở rộng Sidebar"
+        >
+          <PanelLeft size={19} />
+        </button>
+
+        {/* Breadcrumb Navigation */}
+        <nav
+          className="flex items-center text-xs sm:text-sm font-medium overflow-hidden ml-1"
+          aria-label="Breadcrumb"
+        >
+          {crumbs.map((crumb, index) => {
+            const isLast = index === crumbs.length - 1
+            return (
+              <Fragment key={crumb.label}>
+                {index > 0 && (
+                  <ChevronRight size={14} className="mx-1.5 text-slate-300 shrink-0" />
+                )}
+                {crumb.to && !isLast ? (
+                  <Link
+                    to={crumb.to}
+                    className="text-slate-400 hover:text-slate-700 transition-colors whitespace-nowrap truncate max-w-[100px] sm:max-w-none"
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span
+                    className={
+                      isLast
+                        ? 'text-[#1565C0] font-semibold truncate max-w-[140px] sm:max-w-[260px]'
+                        : 'text-slate-400 whitespace-nowrap truncate max-w-[100px] sm:max-w-none'
+                    }
+                  >
+                    {crumb.label}
+                  </span>
+                )}
+              </Fragment>
+            )
+          })}
+        </nav>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <RoleSwitcher />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#0f172a' }}>
-            {user?.name || 'Quản trị viên Hệ thống'}
-          </span>
+      {/* ========================================================
+          2. BÊN PHẢI: THÔNG BÁO & USER PROFILE
+          ======================================================== */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Chuông thông báo: số chưa đọc, danh sách, nhận thông báo mới qua SSE */}
+        <NotificationBell />
+
+        {/* Đường phân cách */}
+        <div className="h-6 w-px bg-slate-200 mx-0.5" />
+
+        {/* User Profile Pill & Dropdown */}
+        <div className="relative" ref={profileRef}>
           <button
             type="button"
-            onClick={handleLogout}
-            className="btn"
-            style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#ef4444' }}
-            title="Đăng xuất"
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-xl hover:bg-slate-100 transition-colors text-left cursor-pointer group"
+            aria-expanded={profileOpen}
+            aria-haspopup="true"
           >
-            <LogOut size={14} style={{ marginRight: 4 }} /> Thoát
+            {/* Avatar chữ cái đại diện */}
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#1565C0] to-[#1E88E5] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+              {getInitials(displayName)}
+            </div>
+
+            {/* Thông tin tên & Chức danh (ẩn trên màn hình quá nhỏ) */}
+            <div className="hidden sm:flex flex-col min-w-0">
+              <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[130px]">
+                {displayName}
+              </span>
+              <span className="text-[10.5px] text-slate-500 font-medium leading-tight truncate max-w-[130px]">
+                {displayTitle}
+              </span>
+            </div>
+
+            <ChevronDown
+              size={14}
+              className={`text-slate-400 group-hover:text-slate-600 transition-transform duration-200 shrink-0 ${
+                profileOpen ? 'rotate-180' : ''
+              }`}
+            />
           </button>
+
+          {/* Dropdown Menu Profile */}
+          {profileOpen && (
+            <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              {/* Header của Profile Dropdown */}
+              <div className="px-4 py-3 border-b border-slate-100">
+                <p className="text-xs font-bold text-slate-900 truncate">
+                  {displayName}
+                </p>
+                <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-[#1565C0] text-[10.5px] font-semibold px-2 py-0.5 rounded-md border border-blue-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1565C0]" />
+                  {displayTitle}
+                </div>
+              </div>
+
+              {/* Danh sách hành động (Admin không có hồ sơ cá nhân) */}
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false)
+                    navigate('/admin')
+                  }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <Settings size={15} className="text-slate-400" />
+                  Cấu hình hệ thống
+                </button>
+              </div>
+
+              {/* Nút Đăng xuất */}
+              <div className="pt-1 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <LogOut size={15} className="text-red-500" />
+                  {logout.isPending ? 'Đang đăng xuất...' : 'Đăng xuất'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
   )
 }
+
+export default AdminHeader
