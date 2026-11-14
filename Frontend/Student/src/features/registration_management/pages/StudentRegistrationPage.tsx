@@ -325,18 +325,25 @@ export default function StudentRegistrationPage() {
     requests[0] ??
     null
 
+  const isAssignmentLocked = Boolean(
+    registrationOverview?.isAssignmentLocked,
+  )
+
   const hasAssignedMentor =
     Boolean(registrationOverview?.mentorName) ||
-    Boolean(assignedRegistration)
+    (isAssignmentLocked && Boolean(assignedRegistration))
 
   const isPending = Boolean(pendingRegistration)
   const isWaitingApproval = Boolean(waitingApprovalRegistration)
+  const isWaitingHODLock =
+    !isAssignmentLocked && Boolean(assignedRegistration)
 
   const isLatestRejected =
     latestInSemester?.status === 'REJECTED' &&
     !isPending &&
     !isWaitingApproval &&
-    !hasAssignedMentor
+    !hasAssignedMentor &&
+    !isWaitingHODLock
 
   const cardRegistration =
     pendingRegistration ??
@@ -427,6 +434,13 @@ export default function StudentRegistrationPage() {
     }
 
     if (hasAssignedMentor) {
+      return
+    }
+
+    if (isWaitingHODLock) {
+      setSubmitError(
+        'Đơn đăng ký của bạn đang chờ Trưởng bộ môn chốt danh sách.',
+      )
       return
     }
 
@@ -618,6 +632,7 @@ export default function StudentRegistrationPage() {
           countdownLabel={countdownLabel}
           deadlineStatus={deadlineStatus}
           hasAssignedMentor={hasAssignedMentor}
+          isAssignmentLocked={isAssignmentLocked}
           isLatestRejected={isLatestRejected}
           isCurrentSemester={isCurrentSemester}
           isDeadlineOpen={isDeadlineOpen}

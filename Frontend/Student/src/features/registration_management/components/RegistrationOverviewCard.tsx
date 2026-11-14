@@ -13,6 +13,7 @@ interface RegistrationOverviewCardProps {
   deadlineStatus: AdvisorRegistrationDeadlineStatus | null
   currentRegistration: AdvisorRegistrationResponse | null
   hasAssignedMentor: boolean
+  isAssignmentLocked?: boolean
   isLatestRejected: boolean
   isCurrentSemester: boolean
   isDeadlineOpen: boolean
@@ -52,6 +53,7 @@ export const RegistrationOverviewCard: React.FC<
   deadlineStatus,
   currentRegistration,
   hasAssignedMentor,
+  isAssignmentLocked = false,
   isLatestRejected,
   isCurrentSemester,
   isDeadlineOpen,
@@ -73,18 +75,25 @@ export const RegistrationOverviewCard: React.FC<
   const disabledButtonClass =
     'inline-flex items-center justify-center px-4 h-10 rounded-lg bg-slate-200 text-slate-500 text-[13px] font-semibold cursor-not-allowed shadow-none border border-slate-300 whitespace-nowrap'
 
-  // 1. Sinh viên đã có GVHD chính thức
-  if (
-    hasAssignedMentor ||
-    currentRegistration?.status === 'HOD_APPROVED' ||
-    currentRegistration?.status === 'ASSIGNED_BY_HOD'
-  ) {
+  // 1. Sinh viên đã có GVHD chính thức (TBM đã chốt danh sách hoặc đã có GVHD chính thức)
+  if (hasAssignedMentor) {
     isDisabled = true
     buttonText = 'Đã có GVHD'
     disabledReason = 'Đã được phân công GVHD chính thức'
     buttonTitle = 'Sinh viên đã được phân công giảng viên hướng dẫn.'
   }
-  // 2. Đơn mới nhất đã được GVHD duyệt, chờ TBM thẩm định
+  // 2. Đơn đã được duyệt hoặc chỉ định nhưng TBM chưa chốt danh sách
+  else if (
+    !isAssignmentLocked &&
+    (currentRegistration?.status === 'HOD_APPROVED' ||
+      currentRegistration?.status === 'ASSIGNED_BY_HOD')
+  ) {
+    isDisabled = true
+    buttonText = 'Đang chờ TBM chốt danh sách'
+    disabledReason = 'Đơn đã được duyệt, chờ Trưởng bộ môn chốt danh sách'
+    buttonTitle = 'Đơn đăng ký đang chờ Trưởng bộ môn chốt danh sách.'
+  }
+  // 3. Đơn mới nhất đã được GVHD duyệt, chờ TBM thẩm định
   else if (currentRegistration?.status === 'TEACHER_APPROVED') {
     isDisabled = true
     buttonText = 'Đang chờ TBM chốt danh sách'

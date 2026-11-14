@@ -64,5 +64,6 @@ export interface RegistrationOverviewResponse {
   deadlineEndDate: string | null
   deadlineActive: boolean | null
   deadlineStatus: AdvisorRegistrationDeadlineStatus | null
+  isAssignmentLocked?: boolean | null
 }
 

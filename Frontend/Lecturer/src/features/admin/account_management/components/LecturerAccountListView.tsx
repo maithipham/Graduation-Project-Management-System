@@ -347,9 +347,19 @@ export function LecturerAccountListView() {
                             type="button"
                             variant="ghost"
                             size="sm"
+                            disabled={teacher.isAssigned || teacher.assignmentStatus === 'Đã phân công'}
                             onClick={() => setDeletingTeacher(teacher)}
-                            className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
-                            title="Xóa giảng viên"
+                            className={cn(
+                              'h-8 w-8 p-0 transition-colors',
+                              (teacher.isAssigned || teacher.assignmentStatus === 'Đã phân công')
+                                ? 'text-slate-300 opacity-20 cursor-not-allowed hover:bg-transparent hover:text-slate-300 pointer-events-none'
+                                : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50',
+                            )}
+                            title={
+                              (teacher.isAssigned || teacher.assignmentStatus === 'Đã phân công')
+                                ? 'Giảng viên đã được phân công làm GVHD trong kỳ, không thể xóa'
+                                : 'Xóa giảng viên'
+                            }
                             aria-label="Xóa giảng viên"
                           >
                             <Trash2 className="h-4 w-4" />

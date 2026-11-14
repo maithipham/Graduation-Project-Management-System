@@ -95,19 +95,19 @@ export const teacherService = {
     if (body.maxStudentsPerTeacher !== undefined) {
       payload.maxStudentsPerTeacher = body.maxStudentsPerTeacher
     }
+
+    const cleanSemesterId = encodeURIComponent(semesterId)
+    // Backend AdvisorController nhận semesterId qua path variable hoặc query param @RequestParam("semesterId")
+    const urlWithParam = `/api/advisors/assign?semesterId=${cleanSemesterId}`
+    const pathUrl = TEACHER.advisors(semesterId)
+
     try {
-      const res = await apiClient.post<ApiResponse<null>>('/api/advisors/assign', payload)
+      const res = await apiClient.post<ApiResponse<null>>(urlWithParam, payload)
       return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
     } catch (err: any) {
       if (err?.response?.status === 404) {
         try {
-          const fallbackPayload: Record<string, any> = {
-            teacherIds: body.teacherIds,
-          }
-          if (body.maxStudentsPerTeacher !== undefined) {
-            fallbackPayload.maxStudentsPerTeacher = body.maxStudentsPerTeacher
-          }
-          const res = await apiClient.post<ApiResponse<null>>(TEACHER.advisors(semesterId), fallbackPayload)
+          const res = await apiClient.post<ApiResponse<null>>(pathUrl, payload)
           return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
         } catch (innerErr: any) {
           if (innerErr?.response?.status === 404) {

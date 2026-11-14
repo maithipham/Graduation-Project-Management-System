@@ -594,12 +594,6 @@ export default function StudentOutlinePage() {
               Lịch sử nộp đề cương
             </h2>
           </div>
-          {!isOutlineLoading && !isOutlineError && outlineData?.status && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500 font-medium">Trạng thái hiện tại:</span>
-              {renderOutlineStatusBadge(outlineData.status, outlineData.statusDescription)}
-            </div>
-          )}
         </div>
 
         {!isOutlineLoading &&
@@ -638,7 +632,8 @@ export default function StudentOutlinePage() {
                 <th className="py-3 px-5 font-semibold text-slate-700">Thời gian nộp</th>
                 <th className="py-3 px-5 font-semibold text-slate-700">Tên tệp</th>
                 <th className="py-3 px-5 font-semibold text-slate-700">Trạng thái</th>
-                <th className="py-3 px-5 font-semibold text-slate-700">Giáo viên nhận xét</th>
+                <th className="py-3 px-5 font-semibold text-slate-700">Thời gian xử lý của GVNX</th>
+                <th className="py-3 px-5 font-semibold text-slate-700">Nhận xét của GVNX</th>
                 <th className="py-3 px-5 font-semibold text-slate-700">Nhận xét của GVHD</th>
               </tr>
             </thead>
@@ -649,19 +644,20 @@ export default function StudentOutlinePage() {
                     <td className="py-3.5 px-5"><Skeleton className="h-4 w-28" /></td>
                     <td className="py-3.5 px-5"><Skeleton className="h-4 w-48" /></td>
                     <td className="py-3.5 px-5"><Skeleton className="h-5 w-24 rounded-full" /></td>
+                    <td className="py-3.5 px-5"><Skeleton className="h-4 w-28" /></td>
                     <td className="py-3.5 px-5"><Skeleton className="h-4 w-44" /></td>
                     <td className="py-3.5 px-5"><Skeleton className="h-4 w-40" /></td>
                   </tr>
                 ))
               ) : isOutlineError ? (
                 <tr>
-                  <td colSpan={5} className="py-8 px-5 text-center text-rose-600 text-xs font-medium">
+                  <td colSpan={6} className="py-8 px-5 text-center text-rose-600 text-xs font-medium">
                     Không tải được lịch sử nộp đề cương từ máy chủ. Vui lòng thử lại sau.
                   </td>
                 </tr>
               ) : outlineHistories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-10 px-5 text-center text-slate-400 text-xs">
+                  <td colSpan={6} className="py-10 px-5 text-center text-slate-400 text-xs">
                     <FileX size={32} className="text-slate-300 mx-auto mb-2" />
                     Chưa có lần nộp đề cương nào trong học kỳ này.
                   </td>
@@ -670,7 +666,6 @@ export default function StudentOutlinePage() {
                 outlineHistories.map((row, idx) => {
                   const canOpenFile = isSafeFileUrl(row.outlineHistoryFile)
                   const displayFileName = extractOutlineFileName(row.outlineHistoryFile)
-                  const reviewerDisplayName = row.reviewerName || outlineData?.reviewerName
                   const isLatestRow = hasExactOutlineFileMatch
                     ? row.outlineHistoryFile === outlineData?.outlineFile
                     : idx === 0
@@ -678,6 +673,13 @@ export default function StudentOutlinePage() {
                     isLatestRow && outlineData?.advisorFeedback
                       ? outlineData.advisorFeedback
                       : null
+
+                  const isRejected =
+                    row.status === 'REJECTED' || row.status === 'REQUEST_CHANGES'
+                  const reviewerFeedbackText =
+                    isRejected && row.reviewFeedback?.trim()
+                      ? row.reviewFeedback.trim()
+                      : '-'
 
                   return (
                     <tr key={row.publicId} className="hover:bg-slate-50/60 transition-colors">
@@ -720,17 +722,14 @@ export default function StudentOutlinePage() {
                         {renderOutlineStatusBadge(
                           row.status,
                           row.statusDescription,
-                          row.reviewedAt,
                         )}
                       </td>
+                      <td className="py-3.5 px-5 font-normal text-slate-900 whitespace-nowrap">
+                        {formatDate(row.reviewedAt, 'full') || '-'}
+                      </td>
                       <td className="py-3.5 px-5 font-normal text-slate-800 max-w-[280px]">
-                        {reviewerDisplayName && (
-                          <div className="font-semibold text-slate-900 mb-0.5">
-                            {reviewerDisplayName}
-                          </div>
-                        )}
                         <div className="text-slate-600 text-xs leading-relaxed wrap-break-word">
-                          {row.reviewFeedback || '—'}
+                          {reviewerFeedbackText}
                         </div>
                       </td>
                       <td className="py-3.5 px-5 font-normal text-slate-700 text-xs leading-relaxed max-w-[280px] wrap-break-word">
