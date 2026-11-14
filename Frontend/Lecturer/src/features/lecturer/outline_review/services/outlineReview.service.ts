@@ -148,20 +148,35 @@ export const outlineReviewService = {
   getOutlineDeadline: async (
     semesterId: string,
   ): Promise<DeadlineMilestone | null> => {
-    const response = await apiClient.get<ApiResponse<RawDeadlinesGroupedResponse>>(
-      API_ENDPOINTS.outline.deadlines,
-      { params: { semesterId }, skipErrorToast: true },
-    )
+    const response = await apiClient.get<
+      ApiResponse<RawDeadlinesGroupedResponse | DeadlineMilestone[]>
+    >(API_ENDPOINTS.outline.deadlines, {
+      params: { semesterId },
+      skipErrorToast: true,
+    })
     const grouped = response.data.data
-    const milestones = [
-      ...(grouped?.thucHienDeadlines ?? []),
-      ...(grouped?.stage2 ?? []),
-    ]
+    let milestones: DeadlineMilestone[] = []
+    if (Array.isArray(grouped)) {
+      milestones = grouped
+    } else if (grouped && typeof grouped === 'object') {
+      milestones = [
+        ...(grouped.giaoNhanDeadlines ?? []),
+        ...(grouped.thucHienDeadlines ?? []),
+        ...(grouped.danhGiaDeadlines ?? []),
+        ...(grouped.stage1 ?? []),
+        ...(grouped.stage2 ?? []),
+        ...(grouped.stage3 ?? []),
+      ]
+    }
     return (
       milestones.find(
         (m) =>
           (m.templateCode ?? m.code) === OUTLINE_DEADLINE_CODE,
-      ) ?? null
+      ) ??
+      milestones.find((m) => (m.templateCode ?? m.code) === 'NOP_DE_CUONG') ??
+      milestones.find((m) => (m.templateCode ?? m.code) === 'CHOT_TEN_DE_TAI') ??
+      milestones.find((m) => m.name?.toLowerCase().includes('đề cương')) ??
+      null
     )
   },
 
