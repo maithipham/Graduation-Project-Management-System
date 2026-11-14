@@ -1,0 +1,150 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { apiClient } from '@/shared/api'
+import { defenseCouncilApi } from '@/features/department/council_management/services/defenseCouncilApi'
+import {
+  generateCouncilCodes,
+  formatDefenseDateRange,
+  ROLE_CONFIG,
+} from '@/features/department/council_management/utils/councilFormatters'
+
+describe('Defense Council Unit Tests', () => {
+  describe('councilFormatters', () => {
+    it('generateCouncilCodes: tạo mã hội đồng tự động theo mã bộ môn và số lượng', () => {
+      const codes = generateCouncilCodes('KTPM', 3, 0)
+      expect(codes).toEqual(['KTPM01', 'KTPM02', 'KTPM03'])
+    })
+
+    it('generateCouncilCodes: tạo mã nối tiếp nếu đã có sẵn hội đồng', () => {
+      const codes = generateCouncilCodes('KTPM', 2, 3)
+      expect(codes).toEqual(['KTPM04', 'KTPM05'])
+    })
+
+    it('formatDefenseDateRange: định dạng ngày bắt đầu và kết thúc', () => {
+      const formatted = formatDefenseDateRange(
+        '2026-12-20T08:00:00',
+        '2026-12-22T17:00:00',
+      )
+      expect(formatted).toContain('20/12/2026')
+      expect(formatted).toContain('22/12/2026')
+    })
+
+    it('ROLE_CONFIG: có đủ 3 vai trò quy chuẩn', () => {
+      expect(ROLE_CONFIG.CHAIRPERSON.label).toBe('Chủ tịch')
+      expect(ROLE_CONFIG.SECRETARY.label).toBe('Thư ký')
+      expect(ROLE_CONFIG.COUNCIL_MEMBER.label).toBe('Ủy viên')
+    })
+  })
+
+  describe('defenseCouncilApi', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('getCouncils: gọi GET với semesterId và majorId và trả về data', async () => {
+      const mockResponse = {
+        code: 1000,
+        message: 'Success',
+        data: {
+          councils: [],
+          incompleteCouncilCount: 0,
+          waitingStudentCount: 0,
+        },
+      }
+      vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: mockResponse })
+
+      const result = await defenseCouncilApi.getCouncils({ semesterId: 1, majorId: 2 })
+      expect(apiClient.get).toHaveBeenCalledWith(
+        expect.stringContaining('/defense-councils'),
+        expect.objectContaining({ params: { semesterId: 1, majorId: 2 } }),
+      )
+      expect(result).toEqual(mockResponse.data)
+    })
+
+    it('createBatch: gọi POST /batch với đúng payload', async () => {
+      const mockCouncil = {
+        publicId: 'c-1',
+        code: 'KTPM01',
+        name: 'Hội đồng KTPM 01',
+        location: null,
+        defenseStartTime: '2026-12-20T08:00:00',
+        defenseEndTime: '2026-12-22T17:00:00',
+        status: 'DRAFT',
+        studentCount: 0,
+        memberCount: 0,
+        members: [],
+      }
+      vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+        data: { code: 1000, message: 'Success', data: [mockCouncil] },
+      })
+
+      const payload = {
+        semesterId: 1,
+        majorId: 1,
+        quantity: 1,
+        defenseStartTime: '2026-12-20T08:00:00',
+        defenseEndTime: '2026-12-22T17:00:00',
+      }
+      const result = await defenseCouncilApi.createBatch(payload)
+      expect(apiClient.post).toHaveBeenCalledWith(
+        expect.stringContaining('/batch'),
+        payload,
+      )
+      expect(result).toEqual([mockCouncil])
+    })
+
+    it('updateLocation: gọi PATCH /{councilPublicId} với location', async () => {
+      vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({
+        data: { code: 1000, message: 'Success', data: { location: 'P.301' } },
+      })
+
+      await defenseCouncilApi.updateLocation('c-uuid-1', { location: 'P.301' })
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        expect.stringContaining('/c-uuid-1'),
+        { location: 'P.301' },
+      )
+    })
+
+    it('updateMembers: gọi PUT /{councilPublicId}/members với members payload', async () => {
+      vi.spyOn(apiClient, 'put').mockResolvedValueOnce({
+        data: { code: 1000, message: 'Success', data: {} },
+      })
+
+      const membersPayload = {
+        members: [
+          { teacherId: 101, role: 'CHAIRPERSON' as const },
+          { teacherId: 102, role: 'SECRETARY' as const },
+        ],
+      }
+      await defenseCouncilApi.updateMembers('c-uuid-1', membersPayload)
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/c-uuid-1/members'),
+        membersPayload,
+      )
+    })
+
+    it('assignStudents: gọi POST /{councilPublicId}/assignments', async () => {
+      vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+        data: { code: 1000, message: 'Success', data: null },
+      })
+
+      await defenseCouncilApi.assignStudents('c-uuid-1', {
+        thesisTopicPublicIds: ['topic-1', 'topic-2'],
+      })
+      expect(apiClient.post).toHaveBeenCalledWith(
+        expect.stringContaining('/c-uuid-1/assignments'),
+        { thesisTopicPublicIds: ['topic-1', 'topic-2'] },
+      )
+    })
+
+    it('removeStudentAssignment: gọi DELETE /{councilPublicId}/assignments/{assignmentPublicId}', async () => {
+      vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({
+        data: { code: 1000, message: 'Success', data: null },
+      })
+
+      await defenseCouncilApi.removeStudentAssignment('c-uuid-1', 'as-uuid-1')
+      expect(apiClient.delete).toHaveBeenCalledWith(
+        expect.stringContaining('/c-uuid-1/assignments/as-uuid-1'),
+      )
+    })
+  })
+})

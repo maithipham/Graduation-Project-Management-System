@@ -47,7 +47,7 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
 
   // 5. Query danh sách Giảng viên nhận xét kèm số lượng đang nhận xét
   const {
-    data: lecturers = [],
+    data: rawLecturers = [],
     isLoading: isLecturersLoading,
     refetch: refetchLecturers,
   } = useQuery({
@@ -66,6 +66,39 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
     queryFn: () => commentingLecturerService.getStudents(semesterId, 'ALL'),
     enabled: Boolean(semesterId && semesterId !== 'all'),
   })
+
+  // Đồng bộ số lượng SV đang nhận xét giữa bảng sinh viên và danh sách giảng viên
+  const lecturers = useMemo(() => {
+    const countByLecturerId = new Map<number, number>()
+    const countByLecturerPublicId = new Map<string, number>()
+
+    for (const student of rawStudents) {
+      if (student.commentingLecturerId) {
+        countByLecturerId.set(
+          student.commentingLecturerId,
+          (countByLecturerId.get(student.commentingLecturerId) || 0) + 1,
+        )
+      }
+      if (student.commentingLecturerPublicId) {
+        countByLecturerPublicId.set(
+          student.commentingLecturerPublicId,
+          (countByLecturerPublicId.get(student.commentingLecturerPublicId) || 0) + 1,
+        )
+      }
+    }
+
+    return rawLecturers.map((l) => {
+      const realTimeCount =
+        countByLecturerId.get(l.id) ??
+        (l.publicId ? countByLecturerPublicId.get(l.publicId) : undefined)
+
+      return {
+        ...l,
+        commentingStudentCount:
+          realTimeCount !== undefined ? realTimeCount : l.commentingStudentCount,
+      }
+    })
+  }, [rawLecturers, rawStudents])
 
   // 7. Lọc danh sách sinh viên theo bộ lọc hiện tại
   const filteredStudents = useMemo(() => {

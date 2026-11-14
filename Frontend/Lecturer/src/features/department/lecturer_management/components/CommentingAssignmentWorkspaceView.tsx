@@ -360,10 +360,24 @@ export function CommentingAssignmentWorkspaceView({
                           {student.commentingLecturerName ? (
                             <Badge
                               variant="outline"
-                              className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium"
+                              className={cn(
+                                'text-xs font-medium',
+                                student.isConflict
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                              )}
                             >
-                              <Check className="w-3 h-3 mr-1" />
-                              {student.commentingLecturerName}
+                              {student.isConflict ? (
+                                <ShieldAlert className="w-3 h-3 mr-1 text-rose-600 shrink-0" />
+                              ) : (
+                                <Check className="w-3 h-3 mr-1 shrink-0" />
+                              )}
+                              <span>{student.commentingLecturerName}</span>
+                              {student.isConflict && (
+                                <span className="ml-1 text-[11px] font-semibold text-rose-600">
+                                  (Trùng GVHD)
+                                </span>
+                              )}
                             </Badge>
                           ) : (
                             <Badge

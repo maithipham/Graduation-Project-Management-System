@@ -21,6 +21,9 @@ const ScheduleManagementPage = lazy(
 const TemplateManagementPage = lazy(
   () => import('@/features/department/template_management/pages/TemplateManagementPage'),
 )
+const DefenseCouncilPage = lazy(
+  () => import('@/features/department/council_management/pages/DefenseCouncilPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
@@ -50,6 +53,8 @@ export const departmentRoutes: RouteObject = {
     { path: 'reviewers', element: withSuspense(<ReviewerAssignmentPage />) },
     // Kế hoạch & Tiến độ đồ án (Trưởng bộ môn cấu hình Deadline)
     { path: 'schedule', element: withSuspense(<ScheduleManagementPage />) },
+    // Quản lý Hội đồng bảo vệ
+    { path: 'councils', element: withSuspense(<DefenseCouncilPage />) },
     // Tài liệu & Biểu mẫu (giao diện demo, chưa nối API)
     { path: 'documents-management', element: withSuspense(<TemplateManagementPage />) },
   ],
