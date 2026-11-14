@@ -71,6 +71,9 @@ export function validateReviewForm(params: {
   if (params.plagiarismRate < 0 || params.plagiarismRate > 100) {
     return 'Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%.'
   }
+  if (params.decision === 'APPROVED' && params.plagiarismRate > 35) {
+    return 'Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt.'
+  }
   return validatePlagiarismFile(params.plagiarismFile)
 }
 

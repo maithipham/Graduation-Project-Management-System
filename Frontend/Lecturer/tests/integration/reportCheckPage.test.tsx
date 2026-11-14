@@ -265,9 +265,26 @@ describe('ReportCheckPage integration', () => {
     expect(await screen.findByText('Vui lòng nhập tỷ lệ đạo văn')).toBeInTheDocument()
     expect(screen.getByText('File tải lên không được để trống.')).toBeInTheDocument()
 
-    // Nhập tỷ lệ + chọn file hợp lệ rồi gửi
+    // Kiểm tra ràng buộc đạo văn > 35%: tự chuyển sang REQUEST_CHANGES, disable APPROVED, hiện cảnh báo đỏ
     const rateInput = screen.getByLabelText(/Tỷ lệ đạo văn/i)
+    await user.type(rateInput, '38.5')
+
+    expect(
+      await screen.findByText(
+        /Tỷ lệ đạo văn vượt quá 35% \(tối đa cho phép: 35\.0%\)\. Không thể phê duyệt Đạt\./i,
+      ),
+    ).toBeInTheDocument()
+
+    const approvedRadio = screen.getByRole('radio', { name: /Duyệt đạt/i })
+    expect(approvedRadio).toBeDisabled()
+    const requestChangesRadio = screen.getByRole('radio', { name: /Yêu cầu chỉnh sửa/i })
+    expect(requestChangesRadio).toBeChecked()
+
+    // Nhập lại tỷ lệ hợp lệ (11.5%) -> cảnh báo biến mất, APPROVED khả dụng trở lại
+    await user.clear(rateInput)
     await user.type(rateInput, '11.5')
+    expect(approvedRadio).not.toBeDisabled()
+    await user.click(approvedRadio)
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     const file = new File(['report'], 'turnitin.pdf', { type: 'application/pdf' })

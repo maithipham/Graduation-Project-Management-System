@@ -99,28 +99,36 @@ interface FinalReportReviewModalProps {
 }
 
 function createReviewSchema(allowedDecisions: FinalReportDecision[]) {
-  return z.object({
-    decision: z
-      .enum(['APPROVED', 'REQUEST_CHANGES', 'REJECTED'], {
-        error: 'Vui lòng chọn kết quả thẩm định báo cáo',
-      })
-      .refine((val) => allowedDecisions.includes(val), {
-        message: 'Quyết định không hợp lệ với trạng thái thời hạn hiện tại',
-      }),
-    plagiarismRate: z
-      .number({ error: 'Vui lòng nhập tỷ lệ đạo văn' })
-      .min(0, 'Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%')
-      .max(100, 'Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%'),
-    plagiarismFile: z
-      .custom<File | null>((val) => val === null || val instanceof File)
-      .superRefine((file, ctx) => {
-        const error = validatePlagiarismFile(file)
-        if (error) {
-          ctx.addIssue({ code: 'custom', message: error })
-        }
-      }),
-    feedback: z.string().trim().max(2000, 'Nhận xét tối đa 2000 ký tự'),
-  })
+  return z
+    .object({
+      decision: z
+        .enum(['APPROVED', 'REQUEST_CHANGES', 'REJECTED'], {
+          error: 'Vui lòng chọn kết quả thẩm định báo cáo',
+        })
+        .refine((val) => allowedDecisions.includes(val), {
+          message: 'Quyết định không hợp lệ với trạng thái thời hạn hiện tại',
+        }),
+      plagiarismRate: z
+        .number({ error: 'Vui lòng nhập tỷ lệ đạo văn' })
+        .min(0, 'Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%')
+        .max(100, 'Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%'),
+      plagiarismFile: z
+        .custom<File | null>((val) => val === null || val instanceof File)
+        .superRefine((file, ctx) => {
+          const error = validatePlagiarismFile(file)
+          if (error) {
+            ctx.addIssue({ code: 'custom', message: error })
+          }
+        }),
+      feedback: z.string().trim().max(2000, 'Nhận xét tối đa 2000 ký tự'),
+    })
+    .refine(
+      (data) => !(data.decision === 'APPROVED' && data.plagiarismRate > 35),
+      {
+        message: 'Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt',
+        path: ['plagiarismRate'],
+      },
+    )
 }
 
 type ReviewFormValues = z.infer<ReturnType<typeof createReviewSchema>>
@@ -140,10 +148,17 @@ const FinalReportReviewModalContent: React.FC<{
     item.deadlineStartDate,
   )
 
+  const isInitialRateOverLimit =
+    typeof item.plagiarismRate === 'number' && item.plagiarismRate > 35
+
   const defaultDecision =
-    initialDecision && allowedDecisions.includes(initialDecision)
+    initialDecision &&
+    allowedDecisions.includes(initialDecision) &&
+    !(initialDecision === 'APPROVED' && isInitialRateOverLimit)
       ? initialDecision
-      : (allowedDecisions[0] ?? 'APPROVED')
+      : isInitialRateOverLimit
+        ? (allowedDecisions.find((d) => d !== 'APPROVED') ?? 'REQUEST_CHANGES')
+        : (allowedDecisions[0] ?? 'APPROVED')
 
   const reviewSchema = createReviewSchema(allowedDecisions)
 
@@ -170,6 +185,21 @@ const FinalReportReviewModalContent: React.FC<{
 
   const selectedDecision = useWatch({ control, name: 'decision' })
   const selectedFile = useWatch({ control, name: 'plagiarismFile' })
+  const watchedPlagiarismRate = useWatch({ control, name: 'plagiarismRate' })
+
+  const isPlagiarismOverLimit =
+    typeof watchedPlagiarismRate === 'number' &&
+    !Number.isNaN(watchedPlagiarismRate) &&
+    watchedPlagiarismRate > 35
+
+  useEffect(() => {
+    if (isPlagiarismOverLimit && selectedDecision === 'APPROVED') {
+      const fallbackDecision = allowedDecisions.find((d) => d !== 'APPROVED')
+      if (fallbackDecision) {
+        setValue('decision', fallbackDecision, { shouldValidate: true })
+      }
+    }
+  }, [isPlagiarismOverLimit, selectedDecision, allowedDecisions, setValue])
 
   const onSubmit = async (values: ReviewFormValues) => {
     if (!item.publicId || !values.plagiarismFile) return
@@ -298,26 +328,39 @@ const FinalReportReviewModalContent: React.FC<{
                 {allowedDecisions.map((decision) => {
                   const meta = DECISION_META[decision]
                   const isChecked = selectedDecision === decision
+                  const isApprovedDisabled =
+                    decision === 'APPROVED' && isPlagiarismOverLimit
+                  const isDisabled = isSubmitting || isApprovedDisabled
+
                   return (
                     <label
                       key={decision}
                       className={cn(
-                        'flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition',
-                        isChecked
-                          ? meta.activeClass
-                          : 'border-slate-200 bg-white hover:border-slate-300',
+                        'flex items-start gap-2.5 p-3 rounded-xl border transition',
+                        isApprovedDisabled
+                          ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed'
+                          : isChecked
+                            ? meta.activeClass
+                            : 'border-slate-200 bg-white hover:border-slate-300 cursor-pointer',
                         isSubmitting && 'opacity-60 cursor-not-allowed',
                       )}
                     >
                       <input
                         type="radio"
                         value={decision}
-                        disabled={isSubmitting}
+                        disabled={isDisabled}
                         {...register('decision')}
                         className="mt-0.5 accent-[#1565C0]"
                       />
-                      <div className="min-w-0">
-                        <div className="font-bold text-[13px]">{meta.label}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-[13px] flex items-center justify-between gap-2 flex-wrap">
+                          <span>{meta.label}</span>
+                          {isApprovedDisabled && (
+                            <span className="text-[10.5px] font-normal text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                              Không khả dụng khi đạo văn &gt; 35%
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11.5px] opacity-85 mt-0.5">{meta.description}</div>
                       </div>
                     </label>
@@ -348,6 +391,19 @@ const FinalReportReviewModalContent: React.FC<{
                 {...register('plagiarismRate', { valueAsNumber: true })}
               />
             </FormField>
+
+            {isPlagiarismOverLimit && (
+              <div
+                role="alert"
+                className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-[12px] text-rose-700 font-medium flex items-start gap-2"
+              >
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>
+                  Tỷ lệ đạo văn vượt quá 35% (tối đa cho phép: 35.0%). Không thể phê duyệt Đạt.
+                  Vui lòng chọn &apos;Yêu cầu chỉnh sửa&apos; (khi đang mở nộp) hoặc &apos;Không đạt&apos; (khi gia hạn chấm).
+                </span>
+              </div>
+            )}
 
             {/* File kết quả kiểm tra trùng lặp */}
             <FormField
@@ -405,7 +461,11 @@ const FinalReportReviewModalContent: React.FC<{
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || allowedDecisions.length === 0}
+              disabled={
+                isSubmitting ||
+                allowedDecisions.length === 0 ||
+                (selectedDecision === 'APPROVED' && isPlagiarismOverLimit)
+              }
               className="bg-[#1565C0] hover:bg-[#0D47A1] text-white"
             >
               {isSubmitting ? 'Đang gửi...' : 'Xác nhận thẩm định'}

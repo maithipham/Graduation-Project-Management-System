@@ -39,12 +39,12 @@ Tài liệu hướng dẫn kết nối Frontend với Backend (`tlu_gpms_system`
                              ┌──────────────────────────────────────────┼──────────────────────────────────────────┐
                              ▼                                          ▼                                          ▼
                    [decision = APPROVED]                [decision = REQUEST_CHANGES]                   [decision = REJECTED]
-                   (Cả OPEN & EXTENDED)                    (CHỈ khi deadline OPEN)                    (CHỈ khi deadline EXTENDED)
-                             │                                          │                                          │
-                             ▼                                          ▼                                          ▼
-              topic.currentStage =                       Giữ STAGE_3_OUTLINE_APPROVED             topic.status = DISQUALIFIED
-            STAGE_4_REPORT_APPROVED                      SV sửa & nộp lại khi còn OPEN            (Dừng đồ án trong học kỳ)
-            (Đủ điều kiện ra Phản biện)
+             (plagiarismRate <= 35.0%, Cả OPEN & EXTENDED)   (plagiarismRate > 35% hoặc cần sửa nội dung,  (plagiarismRate > 35% hoặc không đạt,
+                              │                              CHỈ khi deadline OPEN)                     CHỈ khi deadline EXTENDED)
+                              ▼                                          │                                          │
+               topic.currentStage =                                      ▼                                          ▼
+             STAGE_4_REPORT_APPROVED                        Giữ STAGE_3_OUTLINE_APPROVED             topic.status = DISQUALIFIED
+             (Đủ điều kiện ra Phản biện)                    SV sửa & nộp lại khi còn OPEN            (Dừng đồ án trong học kỳ)
 ```
 
 ### Lưu ý nghiệp vụ quan trọng
@@ -58,8 +58,14 @@ Tài liệu hướng dẫn kết nối Frontend với Backend (`tlu_gpms_system`
   - **Trong thời gian mở nộp (`deadlineStatus === 'OPEN'`)**: GVHD chỉ được chọn **`APPROVED`** (Đạt) hoặc **`REQUEST_CHANGES`** (Yêu cầu chỉnh sửa để SV nộp lại). Nếu gửi `REJECTED` $\rightarrow$ `3098 - FINAL_REPORT_DECISION_INVALID_IN_SUBMISSION_PERIOD`.
   - **Trong thời gian gia hạn chấm (`deadlineStatus === 'EXTENDED'`)**: SV đã hết hạn nộp lại nên GVHD chỉ được chọn **`APPROVED`** (Đạt) hoặc **`REJECTED`** (Không đạt $\rightarrow$ `topicStatus = DISQUALIFIED`). Nếu gửi `REQUEST_CHANGES` $\rightarrow$ `3099 - FINAL_REPORT_DECISION_INVALID_IN_GRADING_PERIOD`.
   - **Quá `endDate` hoặc `COMPLETED` (`deadlineStatus === 'CLOSED'`)**: Chặn thẩm định (`3097 - FINAL_REPORT_GRADING_CLOSED`), GVHD cần liên hệ Trưởng bộ môn gia hạn chấm (`EXTENDED` + lùi `endDate`).
-- **Validate dữ liệu kiểm tra trùng lặp (bắt buộc)**:
+- **Validate dữ liệu kiểm tra trùng lặp & Quy tắc ngưỡng tối đa 35% (bắt buộc)**:
   - `plagiarismRate`: Bắt buộc nhập (`4000 - PLAGIARISM_RATE_REQUIRED`), giá trị số thực trong khoảng **`0` đến `100`** (`0 <= plagiarismRate <= 100`, ngoài khoảng báo `4000 - PLAGIARISM_RATE_INVALID`).
+  - **Quy tắc tỷ lệ đạo văn tối đa 35% khi duyệt ĐẠT (`decision === 'APPROVED'`)**:
+    - Báo cáo chỉ đủ điều kiện duyệt **ĐẠT (`APPROVED`)** khi **`plagiarismRate <= 35.0%`**.
+    - Nếu **`plagiarismRate > 35.0%`**: Backend **tuyệt đối chặn không cho chọn `APPROVED`**, trả về lỗi **`4000 - PLAGIARISM_RATE_EXCEEDED`** (*"Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt"*).
+    - Khi `plagiarismRate > 35.0%`:
+      - *Trong thời gian mở nộp (`deadlineStatus === 'OPEN'`)*: GVHD chọn **`REQUEST_CHANGES`** (Yêu cầu chỉnh sửa) để sinh viên chỉnh sửa giảm tỷ lệ trùng lặp và nộp lại báo cáo.
+      - *Trong thời gian gia hạn chấm (`deadlineStatus === 'EXTENDED'`)*: Do sinh viên không còn quyền nộp lại, GVHD chỉ được chọn **`REJECTED`** (Không đạt $\rightarrow$ sinh viên bị `DISQUALIFIED` dừng đồ án).
   - `plagiarismFile`: Bắt buộc tải file minh chứng kết quả quét (Turnitin/DoIT...). Chỉ nhận **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes).
   - `feedback`: Tùy chọn (`string`), nhưng nên khuyến khích GVHD nhập khi chọn `REQUEST_CHANGES` hoặc `REJECTED`.
 - **Thông báo real-time (SSE)**:
@@ -115,7 +121,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
   - `publicId` (`UUID`, **bắt buộc**): `item.publicId` của Báo cáo Final đang ở trạng thái `PENDING`.
 - **Content-Type**: `multipart/form-data`
 - **Form Data Params**:
-  - `plagiarismRate` (`Double`, **bắt buộc**): Tỷ lệ đạo văn (%), giá trị hợp lệ từ `0` đến `100` (ví dụ `12.5`).
+  - `plagiarismRate` (`Double`, **bắt buộc**): Tỷ lệ đạo văn (%), giá trị hợp lệ từ `0` đến `100` (ví dụ `12.5`). **Lưu ý**: Chỉ được chọn `decision: "APPROVED"` khi `plagiarismRate <= 35.0`. Nếu `plagiarismRate > 35.0`, bắt buộc chọn `"REQUEST_CHANGES"` (khi OPEN) hoặc `"REJECTED"` (khi EXTENDED).
   - `plagiarismFile` (`File`, **bắt buộc**): File kết quả kiểm tra trùng lặp (Turnitin/DoIT...). Chỉ nhận **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB**.
   - `decision` (`FinalReportStatus`, **bắt buộc**):
     - Khi `deadlineStatus === "OPEN"`: chỉ nhận `"APPROVED"` hoặc `"REQUEST_CHANGES"`.
@@ -242,6 +248,7 @@ export const formatReportDeadlineForReview = (
 | **400** | `4000` | `FINAL_REPORT_DECISION_NULL` | Vui lòng chọn kết quả thẩm định báo cáo |
 | **400** | `4000` | `PLAGIARISM_RATE_REQUIRED` | Vui lòng nhập tỷ lệ đạo văn |
 | **400** | `4000` | `PLAGIARISM_RATE_INVALID` | Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100% |
+| **400** | `4000` | `PLAGIARISM_RATE_EXCEEDED` | Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt |
 | **400** | `4000` | `REPORT_FILE_EMPTY` | File tải lên không được để trống |
 | **400** | `4000` | `REPORT_FILE_INVALID_FORMAT` | File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf |
 | **400** | `4000` | `REPORT_FILE_TOO_LARGE` | File tải lên phải nhỏ hơn 10MB |
@@ -296,6 +303,9 @@ export const validateReviewForm = (params: {
   }
   if (params.plagiarismRate < 0 || params.plagiarismRate > 100) {
     return 'Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%.';
+  }
+  if (params.decision === 'APPROVED' && params.plagiarismRate > 35) {
+    return 'Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt.';
   }
   const file = params.plagiarismFile;
   if (!file || file.size === 0 || !file.name.trim()) {
@@ -379,7 +389,11 @@ const canReviewFinalReport = (item: ThesisFinalReportResponse): boolean => {
 
 - **Nếu `item.canReview === false`**: Giảng viên đang xem là **GVHD đồng hướng dẫn** $\rightarrow$ Ẩn/khóa form thẩm định, hiển thị nhãn *"Đồng hướng dẫn (Chỉ xem)"*.
 - **Nếu `item.progressReport === null`** (và `item.canReview === true`, `item.status === 'PENDING'`): Khóa hoặc hiển thị cảnh báo nhắc GVHD chính **nộp Phiếu theo dõi tiến độ trước khi duyệt/từ chối báo cáo** (tránh lỗi `3093 - PROGRESS_REPORT_NOT_SUBMITTED`).
+- **Ràng buộc tỷ lệ đạo văn tối đa 35% trên Form thẩm định**:
+  - Khi GVHD nhập `plagiarismRate > 35` (ví dụ `38.5%`):
+    - **Disable lựa chọn "Duyệt đạt (`APPROVED`)"** (nếu đang được chọn thì tự động bỏ chọn hoặc chuyển sang `REQUEST_CHANGES` / `REJECTED`).
+    - Hiển thị cảnh báo màu đỏ bên dưới: *"Tỷ lệ đạo văn vượt quá 35% (tối đa cho phép: 35.0%). Không thể phê duyệt Đạt. Vui lòng chọn 'Yêu cầu chỉnh sửa' (khi đang mở nộp) hoặc 'Không đạt' (khi gia hạn chấm)."*
 - **Tùy chọn quyết định (`decision`) trong Modal/Form thẩm định**:
-  - `item.deadlineStatus === 'OPEN'` $\rightarrow$ Chỉ hiển thị 2 lựa chọn: **Duyệt đạt (`APPROVED`)** và **Yêu cầu chỉnh sửa (`REQUEST_CHANGES`)**.
-  - `item.deadlineStatus === 'EXTENDED'` $\rightarrow$ Chỉ hiển thị 2 lựa chọn: **Duyệt đạt (`APPROVED`)** và **Không đạt (`REJECTED`)**.
+  - `item.deadlineStatus === 'OPEN'` $\rightarrow$ Chỉ hiển thị 2 lựa chọn: **Duyệt đạt (`APPROVED`)** (chỉ click được khi `plagiarismRate <= 35%`) và **Yêu cầu chỉnh sửa (`REQUEST_CHANGES`)**.
+  - `item.deadlineStatus === 'EXTENDED'` $\rightarrow$ Chỉ hiển thị 2 lựa chọn: **Duyệt đạt (`APPROVED`)** (chỉ click được khi `plagiarismRate <= 35%`) và **Không đạt (`REJECTED`)**.
 

@@ -9,6 +9,7 @@ import {
   mapFinalReportToCheckItem,
   reportCheckService,
   validatePlagiarismFile,
+  validateReviewForm,
 } from '@/features/lecturer/report_check'
 import type { ThesisFinalReportResponse } from '@/features/lecturer/report_check'
 
@@ -174,6 +175,55 @@ describe('reportCheckService & helpers', () => {
 
     expect(
       validatePlagiarismFile(new File(['ok'], 'turnitin.docx')),
+    ).toBeNull()
+
+    const validDocx = new File(['ok'], 'turnitin.docx')
+    expect(
+      validateReviewForm({
+        decision: null,
+        plagiarismRate: 10,
+        plagiarismFile: validDocx,
+      }),
+    ).toBe('Vui lòng chọn kết quả thẩm định báo cáo.')
+
+    expect(
+      validateReviewForm({
+        decision: 'APPROVED',
+        plagiarismRate: null,
+        plagiarismFile: validDocx,
+      }),
+    ).toBe('Vui lòng nhập tỷ lệ đạo văn.')
+
+    expect(
+      validateReviewForm({
+        decision: 'APPROVED',
+        plagiarismRate: -1,
+        plagiarismFile: validDocx,
+      }),
+    ).toBe('Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%.')
+
+    expect(
+      validateReviewForm({
+        decision: 'APPROVED',
+        plagiarismRate: 36,
+        plagiarismFile: validDocx,
+      }),
+    ).toBe('Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt.')
+
+    expect(
+      validateReviewForm({
+        decision: 'REQUEST_CHANGES',
+        plagiarismRate: 36,
+        plagiarismFile: validDocx,
+      }),
+    ).toBeNull()
+
+    expect(
+      validateReviewForm({
+        decision: 'APPROVED',
+        plagiarismRate: 35,
+        plagiarismFile: validDocx,
+      }),
     ).toBeNull()
   })
 
