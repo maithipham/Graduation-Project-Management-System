@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/shared/utils'
 import { useOutlineDetail } from '../hooks/useOutlineReview'
+import { downloadOutlineFile } from '../services/outlineReview.service'
 import type {
   OutlineStatus,
   ThesisOutlineHistoryResponse,
@@ -570,6 +571,7 @@ export const OutlineHistoryModal: React.FC<OutlineHistoryModalProps> = ({
           reviewerName: item.reviewerName,
           reviewFeedback: item.reviewFeedback,
           reviewedAt: item.reviewedAt,
+          advisorFeedback: item.advisorFeedback,
         } as ThesisOutlineHistoryResponse,
       ]
 
@@ -609,19 +611,22 @@ export const OutlineHistoryModal: React.FC<OutlineHistoryModalProps> = ({
               ))}
             </div>
           ) : (
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="border border-slate-200 rounded-xl overflow-x-auto">
               <table className="w-full text-left text-[12.5px]">
                 <thead className="bg-slate-50 text-slate-600 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3 w-20">LẦN NỘP</th>
-                    <th className="px-4 py-3 w-40">THỜI GIAN NỘP</th>
-                    <th className="px-4 py-3 min-w-[200px]">FILE ĐỀ CƯƠNG</th>
-                    <th className="px-4 py-3 w-36">TRẠNG THÁI</th>
+                    <th className="px-4 py-3 w-36 whitespace-nowrap">THỜI GIAN NỘP</th>
+                    <th className="px-4 py-3 min-w-[180px]">FILE ĐỀ CƯƠNG</th>
+                    <th className="px-4 py-3 w-32 whitespace-nowrap">TRẠNG THÁI</th>
                     {showReasonColumn && (
-                      <th className="px-4 py-3 min-w-[240px]" id="thHistReason">
+                      <th className="px-4 py-3 min-w-[200px]" id="thHistReason">
                         Ý KIẾN ĐÁNH GIÁ (GVNX)
                       </th>
                     )}
+                    <th className="px-4 py-3 min-w-[200px]" id="thHistAdvisorFeedback">
+                      GÓP Ý CỦA GVHD
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="histModalTableBody" className="divide-y divide-slate-100 bg-white">
@@ -631,6 +636,15 @@ export const OutlineHistoryModal: React.FC<OutlineHistoryModalProps> = ({
                     const isRejected = h.status === 'REJECTED'
                     const fileName = getFileNameFromUrl(h.outlineHistoryFile)
                     const submitNumber = histories.length - i
+                    const hasExactOutlineFileMatch = histories.some(
+                      (row) => row.outlineHistoryFile === detailData?.outlineFile,
+                    )
+                    const isLatestRow = hasExactOutlineFileMatch
+                      ? h.outlineHistoryFile === detailData?.outlineFile
+                      : i === 0
+                    const rowAdvisorFeedback =
+                      h.advisorFeedback ||
+                      (isLatestRow ? detailData?.advisorFeedback : null)
 
                     return (
                       <tr
@@ -646,16 +660,15 @@ export const OutlineHistoryModal: React.FC<OutlineHistoryModalProps> = ({
                         <td className="px-4 py-3 font-medium">
                           {h.outlineHistoryFile ? (
                             <div className="flex items-center gap-2">
-                              <a
-                                href={h.outlineHistoryFile}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-bold text-[12px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
-                                title="Mở file trên trình duyệt"
+                              <button
+                                type="button"
+                                onClick={() => void downloadOutlineFile(h.outlineHistoryFile, fileName)}
+                                className="font-bold text-[12px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                title="Tải xuống đề cương"
                               >
                                 <Download className="w-3.5 h-3.5 text-blue-500" />
                                 {fileName}
-                              </a>
+                              </button>
                               {onPreviewFile && (
                                 <button
                                   type="button"
@@ -720,6 +733,22 @@ export const OutlineHistoryModal: React.FC<OutlineHistoryModalProps> = ({
                             )}
                           </td>
                         )}
+                        <td className="px-4 py-3 text-slate-700 leading-snug">
+                          {rowAdvisorFeedback ? (
+                            <div>
+                              <div className="text-xs text-slate-800">
+                                {rowAdvisorFeedback}
+                              </div>
+                              {(detailData?.lecturerName || item.lecturerName) && (
+                                <div className="text-[11px] text-slate-400 mt-0.5">
+                                  Bởi: {detailData?.lecturerName || item.lecturerName}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}

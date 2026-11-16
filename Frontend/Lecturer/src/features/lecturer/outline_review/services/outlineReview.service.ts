@@ -1,6 +1,6 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
-import { formatDate } from '@/shared/utils'
+import { formatDate, saveBlob } from '@/shared/utils'
 import type {
   DeadlineMilestone,
   RawDeadlinesGroupedResponse,
@@ -13,6 +13,10 @@ import type {
   OutlineReviewRequest,
   ThesisOutlineResponse,
 } from '../types/outlineReview.types'
+import {
+  getFileNameFromUrl,
+  isSafeOutlineFileUrl,
+} from '../utils/outlineReview.utils'
 
 const OUTLINE_DEADLINE_CODE = 'SV_CHINH_SUA_NOP_LAI_DE_CUONG'
 
@@ -202,4 +206,35 @@ export const outlineReviewService = {
       all: items.length,
     }
   },
+}
+
+/** Tải file đề cương về máy (Blob / forced attachment download) */
+export async function downloadOutlineFile(
+  fileUrl: string,
+  fallbackFilename: string,
+): Promise<void> {
+  if (!isSafeOutlineFileUrl(fileUrl)) return
+  try {
+    const res = await fetch(fileUrl)
+    if (!res.ok) throw new Error('Download failed')
+    const blob = await res.blob()
+    saveBlob({
+      blob,
+      filename: getFileNameFromUrl(fileUrl, fallbackFilename),
+    })
+  } catch {
+    // Nếu fetch trực tiếp bị CORS chặn -> thử tạo link với fl_attachment nếu là Cloudinary
+    let downloadUrl = fileUrl
+    if (fileUrl.includes('/upload/') && !fileUrl.includes('fl_attachment')) {
+      downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/')
+    }
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = getFileNameFromUrl(fileUrl, fallbackFilename)
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
 }

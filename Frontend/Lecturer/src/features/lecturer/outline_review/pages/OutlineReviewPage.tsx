@@ -11,6 +11,7 @@ import {
   User,
   UserCheck,
 } from 'lucide-react'
+import { Select } from '@/shared/components/ui'
 import { formatDate } from '@/shared/utils'
 import { OutlineClassroomPreviewModal } from '../components/OutlineClassroomPreviewModal'
 import {
@@ -36,6 +37,10 @@ export default function OutlineReviewPage() {
     semestersLoading,
     selectedSemesterId,
     setSelectedSemesterId,
+    selectedSemester,
+    academicYears,
+    termsOfYear,
+    handleAcademicYearChange,
     deadlineInfo,
     activeRole,
     setActiveRole,
@@ -64,6 +69,7 @@ export default function OutlineReviewPage() {
     setHistoryItem,
     handleOpenPreview,
     handleUnlockRead,
+    handleDownloadOutline,
     handleClickApprove,
     handleClickReject,
     handleConfirmApprove,
@@ -126,88 +132,127 @@ export default function OutlineReviewPage() {
           '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* 1. Cụm Tab Vai trò chính: GVHD / GVNX */}
+      {/* 1. Header: Bộ chọn Năm học & Học kỳ (đặt trước), Cụm Tab Vai trò chính: GVHD / GVNX */}
       <div className="shrink-0 border-b border-slate-200/80 px-5 py-2.5 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2.5" id="roleTabs">
-          <button
-            type="button"
-            data-role="guide"
-            onClick={() => {
-              setActiveRole('guide')
-              setCurrentPage(1)
-            }}
-            className={`role-tab px-4 py-2 rounded-xl text-[13.5px] transition flex items-center gap-2 cursor-pointer ${
-              activeRole === 'guide'
-                ? 'active font-bold bg-white text-[#1565C0] shadow-2xs border border-blue-200'
-                : 'font-semibold bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border border-transparent'
-            }`}
-          >
-            <UserCheck
-              className={`w-4 h-4 ${activeRole === 'guide' ? 'text-[#1565C0]' : 'text-slate-400'}`}
-            />
-            <span>Sinh viên đang hướng dẫn</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+        <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+          {/* Bộ chọn Năm học & Học kỳ */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                Năm học:
+              </span>
+              <Select
+                aria-label="Chọn năm học"
+                containerClassName="w-[140px]"
+                value={selectedSemester?.academicYear ?? ''}
+                onChange={(e) => handleAcademicYearChange(e.target.value)}
+                disabled={semestersLoading || academicYears.length === 0}
+                className="h-9 border-slate-200 text-xs font-semibold text-slate-800 bg-white rounded-xl shadow-2xs"
+              >
+                {academicYears.length === 0 ? (
+                  <option value="">Chưa có năm học</option>
+                ) : (
+                  academicYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year.replace('-', '–')}
+                    </option>
+                  ))
+                )}
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                Học kỳ:
+              </span>
+              <Select
+                aria-label="Chọn học kỳ"
+                containerClassName="w-[140px]"
+                value={selectedSemesterId}
+                onChange={(e) => {
+                  setSelectedSemesterId(e.target.value)
+                  setCurrentPage(1)
+                }}
+                disabled={
+                  semestersLoading ||
+                  (termsOfYear.length === 0 && semesters.length === 0)
+                }
+                className="h-9 border-slate-200 text-xs font-semibold text-slate-800 bg-white rounded-xl shadow-2xs"
+              >
+                {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
+                  (sem) => (
+                    <option key={sem.publicId} value={sem.publicId}>
+                      {sem.term || sem.name}
+                    </option>
+                  ),
+                )}
+              </Select>
+            </div>
+          </div>
+
+          {/* Vạch ngăn cách trực quan trên màn hình từ sm trở lên */}
+          <div className="hidden sm:block h-6 w-px bg-slate-200" />
+
+          {/* Cụm Tab Vai trò chính: GVHD / GVNX */}
+          <div className="flex items-center gap-2.5" id="roleTabs">
+            <button
+              type="button"
+              data-role="guide"
+              onClick={() => {
+                setActiveRole('guide')
+                setCurrentPage(1)
+              }}
+              className={`role-tab px-4 py-2 rounded-xl text-[13.5px] transition flex items-center gap-2 cursor-pointer ${
                 activeRole === 'guide'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-slate-200 text-slate-700'
+                  ? 'active font-bold bg-white text-[#1565C0] shadow-2xs border border-blue-200'
+                  : 'font-semibold bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border border-transparent'
               }`}
-              id="roleCountGuide"
             >
-              {badges.guideTotal}
-            </span>
-          </button>
+              <UserCheck
+                className={`w-4 h-4 ${activeRole === 'guide' ? 'text-[#1565C0]' : 'text-slate-400'}`}
+              />
+              <span>Sinh viên đang hướng dẫn</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  activeRole === 'guide'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-slate-200 text-slate-700'
+                }`}
+                id="roleCountGuide"
+              >
+                {badges.guideTotal}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            data-role="reviewer"
-            onClick={() => {
-              setActiveRole('reviewer')
-              setCurrentPage(1)
-            }}
-            className={`role-tab px-4 py-2 rounded-xl text-[13.5px] transition flex items-center gap-2 cursor-pointer ${
-              activeRole === 'reviewer'
-                ? 'active font-bold bg-white text-[#1565C0] shadow-2xs border border-blue-200'
-                : 'font-semibold bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border border-transparent'
-            }`}
-          >
-            <MessageSquare
-              className={`w-4 h-4 ${activeRole === 'reviewer' ? 'text-[#1565C0]' : 'text-slate-400'}`}
-            />
-            <span>Sinh viên được phân công nhận xét</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            <button
+              type="button"
+              data-role="reviewer"
+              onClick={() => {
+                setActiveRole('reviewer')
+                setCurrentPage(1)
+              }}
+              className={`role-tab px-4 py-2 rounded-xl text-[13.5px] transition flex items-center gap-2 cursor-pointer ${
                 activeRole === 'reviewer'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-slate-200 text-slate-700'
+                  ? 'active font-bold bg-white text-[#1565C0] shadow-2xs border border-blue-200'
+                  : 'font-semibold bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border border-transparent'
               }`}
-              id="roleCountReviewer"
             >
-              {badges.reviewerTotal}
-            </span>
-          </button>
-        </div>
-
-        {/* Học kỳ Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-            Học kỳ:
-          </span>
-          <select
-            value={selectedSemesterId}
-            onChange={(e) => {
-              setSelectedSemesterId(e.target.value)
-              setCurrentPage(1)
-            }}
-            disabled={semestersLoading}
-            className="text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] cursor-pointer shadow-2xs"
-          >
-            {semesters.map((sem) => (
-              <option key={sem.publicId} value={sem.publicId}>
-                {sem.name} {sem.academicYear ? `(${sem.academicYear})` : ''}
-              </option>
-            ))}
-          </select>
+              <MessageSquare
+                className={`w-4 h-4 ${activeRole === 'reviewer' ? 'text-[#1565C0]' : 'text-slate-400'}`}
+              />
+              <span>Sinh viên được phân công nhận xét</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  activeRole === 'reviewer'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-slate-200 text-slate-700'
+                }`}
+                id="roleCountReviewer"
+              >
+                {badges.reviewerTotal}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -314,14 +359,12 @@ export default function OutlineReviewPage() {
             <tr>
               <th className="px-5 py-3.5 w-14 text-slate-400 bg-slate-50 text-center">STT</th>
               <th className="px-5 py-3.5 min-w-[200px] bg-slate-50">SINH VIÊN</th>
-              <th className="px-5 py-3.5 min-w-[260px] bg-slate-50">ĐỀ TÀI</th>
+              <th className="px-5 py-3.5 min-w-[240px] bg-slate-50">ĐỀ TÀI</th>
               <th className="px-5 py-3.5 min-w-[220px] bg-slate-50">
-                FILE ĐỀ CƯƠNG &amp; THỜI GIAN NỘP
+                FILE ĐỀ CƯƠNG &amp; TRẠNG THÁI
               </th>
-              <th className="px-5 py-3.5 min-w-[150px] bg-slate-50">TRẠNG THÁI</th>
-              <th className="px-5 py-3.5 min-w-[200px] bg-slate-50">
-                {activeRole === 'reviewer' ? 'GÓP Ý GVHD & NHẬN XÉT GVNX' : 'NHẬN XÉT GVNX & GÓP Ý GVHD'}
-              </th>
+              <th className="px-5 py-3.5 min-w-[200px] bg-slate-50">NHẬN XÉT CỦA GVNX</th>
+              <th className="px-5 py-3.5 min-w-[200px] bg-slate-50">GÓP Ý CỦA GVHD</th>
               <th className="px-5 py-3.5 min-w-[180px] text-right bg-slate-50">THAO TÁC</th>
             </tr>
           </thead>
@@ -394,105 +437,97 @@ export default function OutlineReviewPage() {
                     </td>
 
                     {/* ĐỀ TÀI */}
-                    <td className="px-5 py-4 max-w-[280px]">
+                    <td className="px-5 py-4 max-w-[260px]">
                       <div
                         className="text-[13px] font-medium text-slate-800 line-clamp-2 leading-snug"
                         title={item.topicName || item.title || ''}
                       >
                         {item.topicName || item.title || '—'}
                       </div>
-                      <div className="mt-1">
-                        {item.currentStage === 'STAGE_2_TOPIC_CONFIRMED' ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Đã chốt tên GĐ 2
+                    </td>
+
+                    {/* FILE ĐỀ CƯƠNG & TRẠNG THÁI */}
+                    <td className="px-5 py-4 min-w-[220px]">
+                      <div className="space-y-1.5">
+                        <div>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${getOutlineStatusBadgeClass(
+                              item.status,
+                            )}`}
+                          >
+                            {item.statusDescription || getOutlineStatusLabel(item.status)}
                           </span>
+                        </div>
+                        {item.outlineFile ? (
+                          <div>
+                            <div className="file-name-cell-wrap inline-flex items-center gap-1.5 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPreview(item)}
+                                className="font-bold text-[12px] text-blue-600 hover:text-blue-800 hover:underline leading-snug cursor-pointer text-left flex items-center gap-1"
+                                title="Xem trước đề cương"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-blue-500" />
+                                <span className="truncate max-w-[150px]">{fileName}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadOutline(item)}
+                                className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                                title="Tải xuống đề cương"
+                                aria-label="Tải xuống đề cương"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              Nộp:{' '}
+                              <span className="font-semibold text-slate-700 font-mono">
+                                {formatDate(item.submittedAt, 'full')}
+                              </span>
+                            </div>
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            Chưa chốt tên GĐ 2
-                          </span>
+                          <div className="text-slate-400 italic text-[12px]">Chưa nộp file</div>
+                        )}
+                        {item.reviewedAt && (
+                          <div className="text-[10.5px] text-slate-400 font-mono">
+                            Duyệt: {formatDate(item.reviewedAt, 'full')}
+                          </div>
                         )}
                       </div>
                     </td>
 
-                    {/* FILE ĐỀ CƯƠNG & THỜI GIAN NỘP */}
-                    <td className="px-5 py-4 min-w-[220px]">
-                      {item.outlineFile ? (
-                        <div>
-                          <div className="file-name-cell-wrap inline-flex items-center gap-1.5 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPreview(item)}
-                              className="font-bold text-[12px] text-blue-600 hover:text-blue-800 hover:underline leading-snug cursor-pointer text-left flex items-center gap-1"
-                              title="Xem trước đề cương"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-blue-500" />
-                              <span className="truncate max-w-[150px]">{fileName}</span>
-                            </button>
-                            <a
-                              href={item.outlineFile}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Tải xuống tệp đính kèm"
-                              className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </a>
+                    {/* NHẬN XÉT CỦA GVNX */}
+                    <td className="px-5 py-4 max-w-[220px]">
+                      {item.reviewFeedback ? (
+                        <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-xs">
+                          <div className="font-bold text-[11px] text-slate-600 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 text-slate-500" /> Nhận xét GVNX:
                           </div>
-                          <div className="text-[11.5px] text-slate-600 mt-1">
-                            Nộp:{' '}
-                            <span className="font-semibold text-slate-800 font-mono">
-                              {formatDate(item.submittedAt, 'full')}
-                            </span>
+                          <div className="line-clamp-3 mt-0.5 leading-snug" title={item.reviewFeedback}>
+                            {item.reviewFeedback}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">Chưa nộp file</span>
+                        <span className="text-slate-400 text-[12px] italic">Chưa có nhận xét</span>
                       )}
                     </td>
 
-                    {/* TRẠNG THÁI */}
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-bold border ${getOutlineStatusBadgeClass(
-                          item.status,
-                        )}`}
-                      >
-                        {item.statusDescription || getOutlineStatusLabel(item.status)}
-                      </span>
-                      {item.reviewedAt && (
-                        <div className="text-[10.5px] text-slate-400 font-mono mt-1">
-                          Duyệt: {formatDate(item.reviewedAt, 'full')}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* GÓP Ý & NHẬN XÉT */}
+                    {/* GÓP Ý CỦA GVHD */}
                     <td className="px-5 py-4 max-w-[220px]">
-                      <div className="space-y-1.5 text-xs">
-                        {item.advisorFeedback && (
-                          <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-200/60 text-blue-950">
-                            <div className="font-bold text-[11px] text-blue-700 flex items-center gap-1">
-                              <MessageSquare className="w-3 h-3" /> Góp ý GVHD:
-                            </div>
-                            <div className="line-clamp-2 mt-0.5 leading-snug" title={item.advisorFeedback}>
-                              {item.advisorFeedback}
-                            </div>
+                      {item.advisorFeedback ? (
+                        <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-200/60 text-blue-950 text-xs">
+                          <div className="font-bold text-[11px] text-blue-700 flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3 text-blue-600" /> Góp ý GVHD:
                           </div>
-                        )}
-                        {item.reviewFeedback && (
-                          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-800">
-                            <div className="font-bold text-[11px] text-slate-600 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" /> Nhận xét GVNX:
-                            </div>
-                            <div className="line-clamp-2 mt-0.5 leading-snug" title={item.reviewFeedback}>
-                              {item.reviewFeedback}
-                            </div>
+                          <div className="line-clamp-3 mt-0.5 leading-snug" title={item.advisorFeedback}>
+                            {item.advisorFeedback}
                           </div>
-                        )}
-                        {!item.advisorFeedback && !item.reviewFeedback && (
-                          <span className="text-slate-400 text-[12px] italic">Chưa có nhận xét</span>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-[12px] italic">Chưa có góp ý</span>
+                      )}
                     </td>
 
                     {/* THAO TÁC */}

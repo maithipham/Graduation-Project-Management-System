@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/shared/api'
 import {
   computeOutlineDeadlineStatus,
+  downloadOutlineFile,
   outlineReviewService,
 } from '@/features/lecturer/outline_review/services/outlineReview.service'
 import type {
@@ -239,6 +240,35 @@ describe('outlineReviewService', () => {
         rejected: 1,
         all: 5,
       })
+    })
+  })
+
+  describe('downloadOutlineFile', () => {
+    it('bỏ qua nếu url không an toàn', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      await downloadOutlineFile('javascript:alert(1)', 'file.pdf')
+      expect(fetchSpy).not.toHaveBeenCalled()
+      fetchSpy.mockRestore()
+    })
+
+    it('tải file thành công bằng fetch và saveBlob', async () => {
+      const blob = new Blob(['test content'], { type: 'application/pdf' })
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(blob, { status: 200 }),
+      )
+      const saveBlobModule = await import('@/shared/utils')
+      const saveBlobSpy = vi.spyOn(saveBlobModule, 'saveBlob').mockImplementation(() => {})
+
+      await downloadOutlineFile('https://res.cloudinary.com/demo/raw/upload/de-cuong.pdf', 'de-cuong.pdf')
+
+      expect(fetchSpy).toHaveBeenCalledWith('https://res.cloudinary.com/demo/raw/upload/de-cuong.pdf')
+      expect(saveBlobSpy).toHaveBeenCalledWith({
+        blob,
+        filename: 'de-cuong.pdf',
+      })
+
+      fetchSpy.mockRestore()
+      saveBlobSpy.mockRestore()
     })
   })
 })

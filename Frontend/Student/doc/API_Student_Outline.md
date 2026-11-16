@@ -48,7 +48,9 @@ Tài liệu hướng dẫn kết nối Frontend (`Frontend/Student`) với Backe
   3. Mốc thời hạn `SV_CHINH_SUA_NOP_LAI_DE_CUONG` phải đang ở trạng thái **`OPEN`** (`startDate <= now <= endDate` và trạng thái mốc khác `EXTENDED` / `COMPLETED`).
      - Khi `deadlineStatus === "EXTENDED"` (TBM gia hạn chấm riêng cho giảng viên), sinh viên **không thể nộp/nộp lại đề cương** (`3085 - OUTLINE_SUBMISSION_DEADLINE_CLOSED`).
      - Ở lần nộp đầu tiên, Backend gán mốc `SV_CHINH_SUA_NOP_LAI_DE_CUONG` vào `ThesisOutline.deadline`. Khi nộp lại, Backend ưu tiên dùng `outline.deadline` (nếu chưa có mới lấy mốc của học kỳ).
-  4. Trạng thái đề cương hiện tại không phải `APPROVED` hoặc `REJECTED` (`3081 - OUTLINE_ALREADY_FINALIZED`). Nếu đang `PENDING` (nộp đè trước khi GV chấm) hoặc `REQUEST_CHANGES` (nộp bản sửa) và còn hạn mở (`OPEN`), sinh viên được nộp lại nhiều lần (mỗi lần tạo thêm 1 bản ghi lịch sử `PENDING`).
+  4. Trạng thái đề cương hiện tại không phải `APPROVED` hoặc `REJECTED` (`3081 - OUTLINE_ALREADY_FINALIZED`).
+     - Nếu đang `PENDING` (nộp đè trước khi GV chấm): Hệ thống **cập nhật đè trực tiếp vào bản ghi lịch sử `PENDING` hiện tại** (không tạo bản ghi lịch sử mới, giữ gọn lịch sử khi GV chưa bắt đầu chấm).
+     - Nếu nộp lại sau khi có yêu cầu chỉnh sửa (`REQUEST_CHANGES`): Hệ thống **tạo thêm 1 bản ghi lịch sử mới** với trạng thái `PENDING` để lưu vết từng đợt sửa đổi.
 - **Quy định Validate File tải lên** (áp dụng bắt buộc tại Backend trước khi upload lên Cloudinary):
   - File không được rỗng và phải có tên file gốc hợp lệ (`4000 - OUTLINE_FILE_EMPTY`).
   - Chỉ nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`** (không phân biệt hoa/thường; sai định dạng trả `4000 - OUTLINE_FILE_INVALID_FORMAT`).

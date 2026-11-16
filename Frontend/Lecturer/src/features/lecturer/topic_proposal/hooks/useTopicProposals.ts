@@ -131,6 +131,33 @@ export function useTopicProposals() {
     semesters.find((s) => s.publicId === selectedSemesterId) ??
     currentSemesterQuery.data
 
+  const academicYears = useMemo(
+    () => [
+      ...new Set(
+        semesters.map((item) => item.academicYear).filter(Boolean),
+      ),
+    ],
+    [semesters],
+  )
+
+  const termsOfYear = useMemo(
+    () =>
+      semesters.filter(
+        (item) => item.academicYear === selectedSemester?.academicYear,
+      ),
+    [semesters, selectedSemester?.academicYear],
+  )
+
+  const handleAcademicYearChange = (academicYear: string) => {
+    const latestOfYear = semesters.find(
+      (item) => item.academicYear === academicYear,
+    )
+    if (latestOfYear) {
+      setSelectedSemesterState(latestOfYear.publicId)
+      setCurrentPage(1)
+    }
+  }
+
   // 2. Deadline
   const deadlineQuery = useTopicTitleDeadline(selectedSemesterId || undefined)
   const deadlineInfo = useMemo(
@@ -223,6 +250,9 @@ export function useTopicProposals() {
     selectedSemesterId,
     setSelectedSemesterId: setSelectedSemesterState,
     selectedSemester,
+    academicYears,
+    termsOfYear,
+    handleAcademicYearChange,
     deadlineInfo,
     deadlineLoading: deadlineQuery.isLoading,
     isLoading: requestsQuery.isLoading,

@@ -38,6 +38,7 @@ export interface ThesisOutlineHistoryResponse {
   reviewerName?: string | null
   reviewFeedback?: string | null
   reviewedAt?: string | null
+  advisorFeedback?: string | null
 }
 
 export interface ThesisOutlineResponse {

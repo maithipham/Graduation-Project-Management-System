@@ -221,6 +221,7 @@ export default function StudentOutlinePage() {
       {
         file: payload.file,
         title: payload.title,
+        submissionNote: 'Soạn và nộp từ hệ thống trực tuyến',
       },
       {
         onSuccess: () => {
@@ -276,6 +277,21 @@ export default function StudentOutlinePage() {
 
   return (
     <div className="w-full max-w-full space-y-4">
+      {isDisqualified && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-3 shadow-xs"
+        >
+          <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-sm text-rose-900">Đề tài đã bị đình chỉ (DISQUALIFIED)</p>
+            <p className="text-rose-700">
+              Bạn đã bị dừng thực hiện đồ án trong học kỳ này.
+              {disqualificationReason ? ` Lý do: ${disqualificationReason}` : ''}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 1. Khối thông tin đề cương (Cùng 1 khối, thẳng hàng trên 1 line: Tên đề tài, Nội dung, Thời hạn nộp, Nút thao tác) */}
       <div className="rounded-xl border border-slate-200 bg-white px-4 sm:px-5 py-3.5 sm:py-4 shadow-xs">
@@ -674,12 +690,7 @@ export default function StudentOutlinePage() {
                       ? outlineData.advisorFeedback
                       : null
 
-                  const isRejected =
-                    row.status === 'REJECTED' || row.status === 'REQUEST_CHANGES'
-                  const reviewerFeedbackText =
-                    isRejected && row.reviewFeedback?.trim()
-                      ? row.reviewFeedback.trim()
-                      : '-'
+                  const reviewerFeedbackText = row.reviewFeedback?.trim() || '—'
 
                   return (
                     <tr key={row.publicId} className="hover:bg-slate-50/60 transition-colors">

@@ -44,3 +44,27 @@ export function getOutlineStatusBadgeClass(status?: OutlineStatus | null): strin
       return 'bg-slate-100 text-slate-500 border-slate-200'
   }
 }
+
+/** Kiểm tra đường dẫn URL file an toàn */
+export function isSafeOutlineFileUrl(url?: string | null): boolean {
+  if (!url) return false
+  const trimmed = url.trim()
+  return /^https?:\/\//i.test(trimmed) || trimmed.startsWith('/')
+}
+
+/** Kiểm tra xem đường dẫn file có phải là định dạng PDF không */
+export function isPdfOutlineFileUrl(url?: string | null): boolean {
+  if (!url) return false
+  const clean = url.split('?')[0].split('#')[0].toLowerCase()
+  return clean.endsWith('.pdf')
+}
+
+/** Lấy nhãn phần mở rộng file (PDF, DOCX, DOC...) */
+export function getOutlineFileExtensionLabel(url?: string | null): string {
+  if (!url) return 'PDF'
+  const clean = url.split('?')[0].split('#')[0]
+  const dotIdx = clean.lastIndexOf('.')
+  if (dotIdx === -1) return 'PDF'
+  const ext = clean.slice(dotIdx + 1).toUpperCase()
+  return ext || 'PDF'
+}

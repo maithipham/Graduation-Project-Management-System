@@ -56,6 +56,17 @@ const SEMESTERS = [
     status: 'Đang diễn ra',
     statusCode: 'ONGOING',
   },
+  {
+    id: '2',
+    publicId: 'sem-2',
+    name: 'Học kỳ 2 năm học 2025-2026',
+    academicYear: '2025-2026',
+    term: 'HK2',
+    startDate: '2026-01-20',
+    endDate: '2026-06-30',
+    status: 'Đã kết thúc',
+    statusCode: 'COMPLETED',
+  },
 ]
 
 const MOCK_REQUESTS = [
@@ -265,6 +276,36 @@ describe('TopicProposalsPage Integration', () => {
         sentUrl(r).includes('/topic/top-uuid-1/title-history'),
     )
     expect(historyReq).toBeDefined()
+  })
+
+  it('cho phép lọc riêng theo năm học và học kỳ', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('Nguyễn Văn An')).toBeInTheDocument()
+    })
+
+    const yearSelect = screen.getByRole('combobox', { name: 'Chọn năm học' })
+    const semSelect = screen.getByRole('combobox', { name: 'Chọn học kỳ' })
+
+    expect(yearSelect).toHaveValue('2026-2027')
+    expect(semSelect).toHaveValue('sem-1')
+
+    // Chuyển sang năm học 2025-2026 -> tự động chọn học kỳ thuộc năm đó
+    await user.selectOptions(yearSelect, '2025-2026')
+    expect(yearSelect).toHaveValue('2025-2026')
+    expect(semSelect).toHaveValue('sem-2')
+
+    await waitFor(() => {
+      const getReq = requests.find(
+        (r) =>
+          r.method?.toLowerCase() === 'get' &&
+          sentUrl(r).includes('/topic/title-request') &&
+          sentUrl(r).includes('semesterId=sem-2'),
+      )
+      expect(getReq).toBeDefined()
+    })
   })
 })
 

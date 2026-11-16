@@ -11,8 +11,10 @@ import { semesterService } from '@/shared/services/semester.service'
 import { isApiError } from '@/shared/types'
 import {
   computeOutlineDeadlineStatus,
+  downloadOutlineFile,
   outlineReviewService,
 } from '../services/outlineReview.service'
+import { getFileNameFromUrl } from '../utils/outlineReview.utils'
 import { useOutlineReviewStore } from '../store/outlineReview.store'
 import type {
   OutlineAdvisorFeedbackRequest,
@@ -174,17 +176,39 @@ export function useOutlineReview() {
   // 1. Học kỳ
   const semestersQuery = useOutlineSemesters()
   const currentSemesterQuery = useOutlineCurrentSemester()
-  const semesters = semestersQuery.data ?? []
+  const semesters = useMemo(() => {
+    const list = semestersQuery.data ?? []
+    const cur = currentSemesterQuery.data
+    return cur && !list.some((item) => item.publicId === cur.publicId)
+      ? [cur, ...list]
+      : list
+  }, [semestersQuery.data, currentSemesterQuery.data])
 
   const selectedSemesterId =
     storedSemesterId ||
     currentSemesterQuery.data?.publicId ||
-    semesters[0]?.publicId ||
-    ''
+    (currentSemesterQuery.isPending ? '' : (semesters[0]?.publicId ?? ''))
 
   const selectedSemester =
     semesters.find((s) => s.publicId === selectedSemesterId) ??
     currentSemesterQuery.data
+
+  const academicYears = useMemo(
+    () => [
+      ...new Set(
+        semesters.map((item) => item.academicYear).filter(Boolean),
+      ),
+    ],
+    [semesters],
+  )
+
+  const termsOfYear = useMemo(
+    () =>
+      semesters.filter(
+        (item) => item.academicYear === selectedSemester?.academicYear,
+      ),
+    [semesters, selectedSemester?.academicYear],
+  )
 
   // 2. Deadline
   const deadlineQuery = useOutlineDeadline(selectedSemesterId || undefined)
@@ -221,6 +245,21 @@ export function useOutlineReview() {
 
   // 5. Pagination
   const [currentPage, setCurrentPage] = useState(1)
+
+  const handleAcademicYearChange = (academicYear: string) => {
+    const latestOfYear = semesters.find(
+      (item) => item.academicYear === academicYear,
+    )
+    if (latestOfYear) {
+      setStoredSemesterId(latestOfYear.publicId)
+      setCurrentPage(1)
+    }
+  }
+
+  const handleSemesterChange = (semesterId: string) => {
+    setStoredSemesterId(semesterId)
+    setCurrentPage(1)
+  }
 
   // 6. Mutations
   const reviewMutation = useReviewOutlineMutation()
@@ -294,6 +333,18 @@ export function useOutlineReview() {
   // Actions
   const handleOpenPreview = (item: ThesisOutlineResponse) => {
     setPreviewItem(item)
+  }
+
+  const handleDownloadOutline = (item: ThesisOutlineResponse) => {
+    if (!item.outlineFile) {
+      toast.info('Sinh viên chưa đính kèm tệp đề cương.')
+      return
+    }
+    const fileName = getFileNameFromUrl(
+      item.outlineFile,
+      `De-cuong-${item.studentName || 'sinh-vien'}.pdf`,
+    )
+    void downloadOutlineFile(item.outlineFile, fileName)
   }
 
   const handleUnlockRead = (item: ThesisOutlineResponse) => {
@@ -380,6 +431,10 @@ export function useOutlineReview() {
     selectedSemesterId,
     setSelectedSemesterId: setStoredSemesterId,
     selectedSemester,
+    academicYears,
+    termsOfYear,
+    handleAcademicYearChange,
+    handleSemesterChange,
     deadlineInfo,
     deadlineLoading: deadlineQuery.isLoading,
     activeRole,
@@ -409,6 +464,7 @@ export function useOutlineReview() {
     setHistoryItem,
     handleOpenPreview,
     handleUnlockRead,
+    handleDownloadOutline,
     handleClickApprove,
     handleClickReject,
     handleConfirmApprove,

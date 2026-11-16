@@ -8,6 +8,7 @@ import {
   Search,
   XCircle,
 } from 'lucide-react'
+import { Select } from '@/shared/components/ui'
 import { formatDate } from '@/shared/utils'
 import {
   ApproveTopicModal,
@@ -26,6 +27,10 @@ export default function TopicProposalsPage() {
     semestersLoading,
     selectedSemesterId,
     setSelectedSemesterId,
+    selectedSemester,
+    academicYears,
+    termsOfYear,
+    handleAcademicYearChange,
     deadlineInfo,
     deadlineLoading,
     isLoading,
@@ -63,27 +68,60 @@ export default function TopicProposalsPage() {
     >
       {/* 1. HEADER: HỌC KỲ, THỜI HẠN, TABS VÀ TÌM KIẾM */}
       <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col gap-4 shrink-0 bg-white">
-        {/* Hàng trên: Bộ chọn học kỳ & Badge Thời hạn thực tế từ BE */}
+        {/* Hàng trên: Bộ chọn năm học, học kỳ & Badge Thời hạn thực tế từ BE */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-              Học kỳ:
-            </span>
-            <select
-              value={selectedSemesterId}
-              onChange={(e) => {
-                setSelectedSemesterId(e.target.value)
-                setCurrentPage(1)
-              }}
-              disabled={semestersLoading}
-              className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] cursor-pointer"
-            >
-              {semesters.map((sem) => (
-                <option key={sem.publicId} value={sem.publicId}>
-                  {sem.name} {sem.academicYear ? `(${sem.academicYear})` : ''}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                Năm học:
+              </span>
+              <Select
+                aria-label="Chọn năm học"
+                containerClassName="w-[140px]"
+                value={selectedSemester?.academicYear ?? ''}
+                onChange={(e) => handleAcademicYearChange(e.target.value)}
+                disabled={semestersLoading || academicYears.length === 0}
+                className="h-8.5 border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 rounded-xl"
+              >
+                {academicYears.length === 0 ? (
+                  <option value="">Chưa có năm học</option>
+                ) : (
+                  academicYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year.replace('-', '–')}
+                    </option>
+                  ))
+                )}
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                Học kỳ:
+              </span>
+              <Select
+                aria-label="Chọn học kỳ"
+                containerClassName="w-[140px]"
+                value={selectedSemesterId}
+                onChange={(e) => {
+                  setSelectedSemesterId(e.target.value)
+                  setCurrentPage(1)
+                }}
+                disabled={
+                  semestersLoading ||
+                  (termsOfYear.length === 0 && semesters.length === 0)
+                }
+                className="h-8.5 border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 rounded-xl"
+              >
+                {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
+                  (sem) => (
+                    <option key={sem.publicId} value={sem.publicId}>
+                      {sem.term || sem.name}
+                    </option>
+                  ),
+                )}
+              </Select>
+            </div>
           </div>
 
           {/* Banner thời hạn lấy động từ BE (SV_CHINH_SUA_NOP_LAI_DE_CUONG) */}

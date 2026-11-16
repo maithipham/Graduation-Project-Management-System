@@ -184,10 +184,26 @@ export default function GuidingEvaluationPage() {
     status: GuidingEvaluationTabStatus
     label: string
     count: number
+    badgeClass: string
   }> = [
-    { status: 'all', label: 'Tất cả', count: counts.all },
-    { status: 'incomplete', label: 'Chưa nộp phiếu', count: counts.incomplete },
-    { status: 'completed', label: 'Đã nộp phiếu', count: counts.completed },
+    {
+      status: 'all',
+      label: 'Tất cả',
+      count: counts.all,
+      badgeClass: 'bg-slate-100 text-slate-600',
+    },
+    {
+      status: 'incomplete',
+      label: 'Chưa nộp phiếu',
+      count: counts.incomplete,
+      badgeClass: 'bg-amber-100 text-amber-800',
+    },
+    {
+      status: 'completed',
+      label: 'Đã nộp phiếu',
+      count: counts.completed,
+      badgeClass: 'bg-emerald-100 text-emerald-800',
+    },
   ]
 
   const deadlineBadgeClass = deadlineInfo.isExpired
@@ -206,17 +222,116 @@ export default function GuidingEvaluationPage() {
 
   return (
     <div
-      className="flex-1 min-h-0 w-full flex flex-col overflow-hidden max-w-[1520px] mx-auto"
+      className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col select-none max-w-[1520px] mx-auto w-full"
       style={{
         fontFamily:
           '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Toolbar Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-3 shrink-0">
-        {/* 1. Tabs trạng thái */}
+      {/* 1. Header: Bộ lọc Năm học, Học kỳ, Tìm kiếm & Hạn nộp phiếu (để cùng 1 dòng, ở trên thanh tab) */}
+      <div className="shrink-0 border-b border-slate-200/80 px-5 py-2.5 bg-slate-50/70 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              Năm học:
+            </span>
+            <Select
+              aria-label="Chọn năm học"
+              containerClassName="w-[130px] sm:w-[140px]"
+              value={selectedSemester?.academicYear ?? ''}
+              onChange={(e) => handleAcademicYearChange(e.target.value)}
+              disabled={academicYears.length === 0}
+              className="h-9 border-slate-200 text-xs font-semibold text-slate-800 bg-white rounded-xl shadow-2xs"
+            >
+              {academicYears.length === 0 ? (
+                <option value="">Chưa có năm học</option>
+              ) : (
+                academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year.replace('-', '–')}
+                  </option>
+                ))
+              )}
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              Học kỳ:
+            </span>
+            <Select
+              aria-label="Chọn học kỳ"
+              containerClassName="w-[130px] sm:w-[140px]"
+              value={selectedSemesterPublicId}
+              onChange={(e) => setPickedSemesterPublicId(e.target.value)}
+              disabled={termsOfYear.length === 0 && semesters.length === 0}
+              className="h-9 border-slate-200 text-xs font-semibold text-slate-800 bg-white rounded-xl shadow-2xs"
+            >
+              {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
+                (item) => (
+                  <option key={item.publicId} value={item.publicId}>
+                    {item.term || item.name}
+                  </option>
+                ),
+              )}
+            </Select>
+          </div>
+
+          <div className="hidden sm:block h-6 w-px bg-slate-200 shrink-0" />
+
+          {/* Ô tìm kiếm */}
+          <div className="flex items-center gap-2 h-9 flex-1 min-w-[200px] max-w-[360px] xl:max-w-[460px] px-3 bg-white border border-slate-200 rounded-xl focus-within:border-[#1565C0] focus-within:ring-2 focus-within:ring-blue-100 transition shadow-2xs">
+            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Tìm sinh viên, mã SV hoặc đề tài..."
+              className="w-full bg-transparent outline-none text-[13px] text-slate-800 placeholder-slate-400"
+            />
+          </div>
+        </div>
+
+        {/* Box Hạn nộp phiếu theo dõi tiến độ */}
         <div
-          className="h-10 bg-[#E2E8F0] p-1 rounded-xl flex items-center gap-1 text-[13px] font-semibold shadow-2xs border border-slate-300/70 shrink-0"
+          className={cn(
+            'inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border text-[12px] font-semibold shrink-0 shadow-2xs whitespace-nowrap',
+            deadlineBadgeClass,
+          )}
+        >
+          <Clock className={cn('w-3.5 h-3.5 shrink-0', deadlineIconClass)} />
+          {isDeadlineLoading ? (
+            <Skeleton className="h-4 w-32 bg-amber-200/70" />
+          ) : (
+            <span>
+              Hạn nộp phiếu: <b className="font-bold">{deadlineInfo.text}</b>
+              {deadlineInfo.badgeText &&
+                deadlineSnapshot?.deadlineStatus === 'OPEN' && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10.5px] font-bold">
+                    {deadlineInfo.badgeText}
+                  </span>
+                )}
+              {deadlineInfo.badgeText &&
+                deadlineSnapshot?.deadlineStatus === 'EXTENDED' && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-blue-100 text-[#1565C0] text-[10.5px] font-bold">
+                    {deadlineInfo.badgeText}
+                  </span>
+                )}
+              {deadlineInfo.badgeText &&
+                deadlineSnapshot?.deadlineStatus === 'NOT_STARTED' && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10.5px] font-bold">
+                    {deadlineInfo.badgeText}
+                  </span>
+                )}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Thanh tab trạng thái (UI giống thanh tab bên màn hình đề cương) */}
+      <div className="shrink-0 border-b border-slate-200/80 px-5 flex items-center justify-between gap-4 bg-white">
+        <div
+          className="flex items-center gap-1 sm:gap-2 -mb-px shrink-0 overflow-x-auto"
           id="statusTabs"
         >
           {tabs.map((tab) => {
@@ -225,22 +340,18 @@ export default function GuidingEvaluationPage() {
               <button
                 key={tab.status}
                 type="button"
+                data-status={tab.status}
+                data-active={isActive ? 'true' : 'false'}
                 onClick={() => handleTabChange(tab.status)}
-                className={cn(
-                  'h-[32px] px-3.5 sm:px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap',
+                className={`tab-btn px-4 py-3 border-b-2 text-[13.5px] transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium',
-                )}
+                    ? 'active font-bold border-[#1565C0] text-[#1565C0]'
+                    : 'font-semibold border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                }`}
               >
                 <span>{tab.label}</span>
                 <span
-                  className={cn(
-                    'rounded-full text-[11px]',
-                    isActive
-                      ? 'px-2 py-0.5 font-bold bg-[#E3F2FD] text-[#1565C0]'
-                      : 'px-1.5 py-0.5 font-semibold text-slate-500',
-                  )}
+                  className={`tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold ${tab.badgeClass}`}
                 >
                   {tab.count}
                 </span>
@@ -248,93 +359,10 @@ export default function GuidingEvaluationPage() {
             )
           })}
         </div>
-
-        {/* 2. Bộ lọc năm học / học kỳ, tìm kiếm & Hạn nộp phiếu */}
-        <div className="flex items-center gap-2.5 flex-1 justify-end flex-wrap">
-          <Select
-            aria-label="Chọn năm học"
-            containerClassName="w-[130px]"
-            value={selectedSemester?.academicYear ?? ''}
-            onChange={(e) => handleAcademicYearChange(e.target.value)}
-            disabled={academicYears.length === 0}
-            className="h-10 border-slate-200/90 text-[13px] font-medium text-slate-700 bg-white rounded-xl"
-          >
-            {academicYears.map((year) => (
-              <option key={year} value={year}>
-                {year.replace('-', '–')}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            aria-label="Chọn học kỳ"
-            containerClassName="w-[130px]"
-            value={selectedSemesterPublicId}
-            onChange={(e) => setPickedSemesterPublicId(e.target.value)}
-            disabled={termsOfYear.length === 0 && semesters.length === 0}
-            className="h-10 border-slate-200/90 text-[13px] font-medium text-slate-700 bg-white rounded-xl"
-          >
-            {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
-              (item) => (
-                <option key={item.publicId} value={item.publicId}>
-                  {item.term || item.name}
-                </option>
-              ),
-            )}
-          </Select>
-
-          <div className="relative flex-1 min-w-[220px] sm:max-w-[280px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Tìm sinh viên, mã SV hoặc đề tài..."
-              className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200/90 bg-white text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
-            />
-          </div>
-
-          {/* Box Hạn nộp phiếu theo dõi tiến độ */}
-          <div
-            className={cn(
-              'inline-flex items-center gap-2 px-3.5 min-h-10 py-1.5 rounded-xl border text-[12px] font-semibold shrink-0 shadow-2xs whitespace-nowrap',
-              deadlineBadgeClass,
-            )}
-          >
-            <Clock className={cn('w-4 h-4 shrink-0', deadlineIconClass)} />
-            {isDeadlineLoading ? (
-              <Skeleton className="h-4 w-32 bg-amber-200/70" />
-            ) : (
-              <span>
-                Hạn nộp phiếu:{' '}
-                <b className="font-bold">{deadlineInfo.text}</b>
-                {deadlineInfo.badgeText &&
-                  deadlineSnapshot?.deadlineStatus === 'OPEN' && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10.5px] font-bold">
-                      {deadlineInfo.badgeText}
-                    </span>
-                  )}
-                {deadlineInfo.badgeText &&
-                  deadlineSnapshot?.deadlineStatus === 'EXTENDED' && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded bg-blue-100 text-[#1565C0] text-[10.5px] font-bold">
-                      {deadlineInfo.badgeText}
-                    </span>
-                  )}
-                {deadlineInfo.badgeText &&
-                  deadlineSnapshot?.deadlineStatus === 'NOT_STARTED' && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10.5px] font-bold">
-                      {deadlineInfo.badgeText}
-                    </span>
-                  )}
-              </span>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Main Card: Table */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 overflow-auto">
+      {/* 3. Table */}
+      <div className="flex-1 min-h-0 overflow-auto">
           <table className="w-full text-left text-[13px] border-collapse">
             <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600 text-[11.5px] font-bold uppercase tracking-wider border-b border-slate-200 shadow-2xs select-none">
               <tr>
@@ -695,7 +723,6 @@ export default function GuidingEvaluationPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Modals */}
       <UploadTrackingModal

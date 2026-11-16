@@ -20,6 +20,7 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [submissionNote, setSubmissionNote] = useState<string>('')
+  const [title, setTitle] = useState<string>(defaultTitle ?? '')
   const [fileError, setFileError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -29,6 +30,7 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
     if (open) {
       setSelectedFile(null)
       setSubmissionNote('')
+      setTitle(defaultTitle ?? '')
       setFileError(null)
     }
   }
@@ -149,6 +151,25 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
 
           <div>
             <label
+              htmlFor="outlineTitleInput"
+              className="block text-xs font-semibold text-slate-700 mb-1.5"
+            >
+              Tiêu đề đề cương <span className="text-slate-400 font-normal">(không bắt buộc, tối đa 500 ký tự)</span>
+            </label>
+            <input
+              id="outlineTitleInput"
+              type="text"
+              maxLength={500}
+              disabled={isSubmitting}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Để trống hệ thống sẽ tự lấy theo tên đề tài..."
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] disabled:bg-slate-50 disabled:text-slate-400"
+            />
+          </div>
+
+          <div>
+            <label
               htmlFor="outlineSubmissionNoteInput"
               className="block text-xs font-semibold text-slate-700 mb-1.5"
             >
@@ -182,7 +203,7 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
                   onSubmitFile({
                     file: selectedFile,
                     submissionNote: submissionNote.trim() || undefined,
-                    title: defaultTitle?.trim() || undefined,
+                    title: title.trim() || defaultTitle?.trim() || undefined,
                   })
                 }
               }}

@@ -318,5 +318,69 @@ describe('GuidingEvaluationPage integration', () => {
     })
     expect(screen.getByText('Chưa có')).toBeInTheDocument()
   })
+
+  it('renders filters (year, semester, search, deadline) above status tabs with outline review UI style', async () => {
+    const user = userEvent.setup()
+    handler = (config) => {
+      const url = sentUrl(config)
+      if (url === '/semester/current') {
+        return { data: { code: 1000, data: SEMESTERS[0] } }
+      }
+      if (url.startsWith('/semester')) {
+        return {
+          data: {
+            code: 1000,
+            data: { content: SEMESTERS, totalElements: 1, totalPages: 1, page: 0, size: 100 },
+          },
+        }
+      }
+      if (url.startsWith('/report/supervisor-list')) {
+        return { data: { code: 1000, data: SAMPLE_LIST } }
+      }
+      return { status: 404, data: { code: 404, message: 'Not found' } }
+    }
+
+    const { container } = renderPage()
+
+    expect(await screen.findByText('Nguyễn Văn An')).toBeInTheDocument()
+    expect(screen.getByText('Phạm Thị Dung')).toBeInTheDocument()
+
+    // 1. Check Row 1 filters: Year, Semester, Search, Deadline
+    expect(screen.getByLabelText('Chọn năm học')).toBeInTheDocument()
+    expect(screen.getByLabelText('Chọn học kỳ')).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText('Tìm sinh viên, mã SV hoặc đề tài...'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Hạn nộp phiếu:')).toBeInTheDocument()
+
+    // 2. Check Row 2 tabs UI (outline review style with border-b-2, tab-btn, badgeClass)
+    const tabsContainer = container.querySelector('#statusTabs')
+    expect(tabsContainer).toBeInTheDocument()
+
+    const allTab = screen.getByRole('button', { name: /Tất cả/ })
+    const incompleteTab = screen.getByRole('button', { name: /Chưa nộp phiếu/ })
+    const completedTab = screen.getByRole('button', { name: /Đã nộp phiếu/ })
+
+    expect(allTab).toHaveClass('tab-btn')
+    expect(allTab).toHaveClass('border-b-2')
+    expect(allTab).toHaveClass('active')
+
+    expect(incompleteTab).toHaveClass('tab-btn')
+    expect(completedTab).toHaveClass('tab-btn')
+
+    // Tab counts
+    expect(allTab).toHaveTextContent('2')
+    expect(incompleteTab).toHaveTextContent('1')
+    expect(completedTab).toHaveTextContent('1')
+
+    // 3. Tab switching behavior
+    await user.click(incompleteTab)
+    expect(screen.getByText('Nguyễn Văn An')).toBeInTheDocument()
+    expect(screen.queryByText('Phạm Thị Dung')).not.toBeInTheDocument()
+
+    await user.click(completedTab)
+    expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument()
+    expect(screen.getByText('Phạm Thị Dung')).toBeInTheDocument()
+  })
 })
 

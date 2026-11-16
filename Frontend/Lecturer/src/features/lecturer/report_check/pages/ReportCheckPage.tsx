@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
-  AlertTriangle,
   Check,
-  CheckCircle2,
   ChevronDown,
   Clock,
   Download,
   ExternalLink,
   Eye,
   FileCheck,
+  FileText,
   History,
   Inbox,
   Search,
@@ -27,6 +26,7 @@ import {
 } from '../hooks/useReportCheck'
 import {
   canReviewFinalReport,
+  extractReportFileName,
   getReviewBlockedReason,
   isSafeReportFileUrl,
 } from '../services/reportCheck.service'
@@ -179,6 +179,7 @@ export default function ReportCheckPage() {
     count: number
     id: string
     badgeId: string
+    badgeClass: string
   }> = [
     {
       status: 'pending',
@@ -186,6 +187,7 @@ export default function ReportCheckPage() {
       count: counts.pending,
       id: 'btnTabPending',
       badgeId: 'tabCountPending',
+      badgeClass: 'bg-amber-100 text-amber-800',
     },
     {
       status: 'rejected',
@@ -193,6 +195,7 @@ export default function ReportCheckPage() {
       count: counts.rejected,
       id: 'btnTabRejected',
       badgeId: 'tabCountRejected',
+      badgeClass: 'bg-rose-100 text-rose-800',
     },
     {
       status: 'not_submitted',
@@ -200,6 +203,7 @@ export default function ReportCheckPage() {
       count: counts.notSubmitted,
       id: 'btnTabNotSubmitted',
       badgeId: 'tabCountNotSubmitted',
+      badgeClass: 'bg-slate-100 text-slate-600',
     },
     {
       status: 'approved',
@@ -207,6 +211,7 @@ export default function ReportCheckPage() {
       count: counts.approved,
       id: 'btnTabApproved',
       badgeId: 'tabCountApproved',
+      badgeClass: 'bg-emerald-100 text-emerald-800',
     },
     {
       status: '',
@@ -214,6 +219,7 @@ export default function ReportCheckPage() {
       count: counts.all,
       id: 'btnTabAll',
       badgeId: 'tabCountAll',
+      badgeClass: 'bg-slate-100 text-slate-600',
     },
   ]
 
@@ -233,87 +239,65 @@ export default function ReportCheckPage() {
 
   return (
     <div
-      className="flex-1 min-h-0 w-full flex flex-col overflow-hidden"
+      className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col select-none"
       style={{
         fontFamily:
           '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Tabs, Bộ lọc Học kỳ, Tìm kiếm & Hạn thẩm định */}
-      <div className="flex items-center justify-between gap-3 shrink-0 flex-wrap mb-3">
-        {/* 1. Tabs trạng thái */}
-        <div
-          className="h-10 bg-[#E2E8F0] p-1 rounded-xl flex items-center gap-1 text-[13px] font-semibold shadow-2xs border border-slate-300/70 shrink-0 overflow-x-auto max-w-full"
-          id="statusTabs"
-        >
-          {tabs.map((tab) => {
-            const isActive = filterStatus === tab.status
-            return (
-              <button
-                key={tab.status}
-                type="button"
-                data-status={tab.status}
-                id={tab.id}
-                onClick={() => setFilterStatus(tab.status)}
-                className={cn(
-                  'tab-btn h-[32px] px-3 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap',
-                  isActive
-                    ? 'active bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium',
-                )}
-              >
-                <span>{tab.label}</span>
-                <span
-                  id={tab.badgeId}
-                  className={cn(
-                    'tab-badge rounded-full text-[11px] font-bold',
-                    isActive
-                      ? 'px-2 py-0.5 bg-[#E3F2FD] text-[#1565C0]'
-                      : 'px-1.5 py-0.5 text-slate-500 font-semibold',
-                  )}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+      {/* 1. Header: Bộ lọc Năm học, Học kỳ, Tìm kiếm & Hạn báo cáo (để cùng 1 dòng, ở trên thanh tab) */}
+      <div className="shrink-0 border-b border-slate-200/80 px-5 py-2.5 bg-slate-50/70 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              Năm học:
+            </span>
+            <Select
+              aria-label="Chọn năm học"
+              containerClassName="w-[130px] sm:w-[140px]"
+              value={selectedSemester?.academicYear ?? ''}
+              onChange={(e) => handleAcademicYearChange(e.target.value)}
+              disabled={academicYears.length === 0}
+              className="h-9 border-slate-200 text-xs font-semibold text-slate-800 bg-white rounded-xl shadow-2xs"
+            >
+              {academicYears.length === 0 ? (
+                <option value="">Chưa có năm học</option>
+              ) : (
+                academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year.replace('-', '–')}
+                  </option>
+                ))
+              )}
+            </Select>
+          </div>
 
-        {/* 2. Chọn năm học / học kỳ, ô tìm kiếm & hạn hoàn thành */}
-        <div className="flex items-center gap-2.5 flex-1 justify-end flex-wrap">
-          <Select
-            aria-label="Chọn năm học"
-            containerClassName="w-[130px]"
-            value={selectedSemester?.academicYear ?? ''}
-            onChange={(e) => handleAcademicYearChange(e.target.value)}
-            disabled={academicYears.length === 0}
-            className="h-10 border-slate-200/90 text-[13px] font-medium text-slate-700 bg-white rounded-xl"
-          >
-            {academicYears.map((year) => (
-              <option key={year} value={year}>
-                {year.replace('-', '–')}
-              </option>
-            ))}
-          </Select>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              Học kỳ:
+            </span>
+            <Select
+              aria-label="Chọn học kỳ"
+              containerClassName="w-[130px] sm:w-[140px]"
+              value={selectedSemesterPublicId}
+              onChange={(e) => setPickedSemesterPublicId(e.target.value)}
+              disabled={termsOfYear.length === 0 && semesters.length === 0}
+              className="h-9 border-slate-200 text-xs font-semibold text-slate-800 bg-white rounded-xl shadow-2xs"
+            >
+              {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
+                (item) => (
+                  <option key={item.publicId} value={item.publicId}>
+                    {item.term || item.name}
+                  </option>
+                ),
+              )}
+            </Select>
+          </div>
 
-          <Select
-            aria-label="Chọn học kỳ"
-            containerClassName="w-[130px]"
-            value={selectedSemesterPublicId}
-            onChange={(e) => setPickedSemesterPublicId(e.target.value)}
-            disabled={termsOfYear.length === 0 && semesters.length === 0}
-            className="h-10 border-slate-200/90 text-[13px] font-medium text-slate-700 bg-white rounded-xl"
-          >
-            {(selectedSemester?.academicYear ? termsOfYear : semesters).map(
-              (item) => (
-                <option key={item.publicId} value={item.publicId}>
-                  {item.term || item.name}
-                </option>
-              ),
-            )}
-          </Select>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 shrink-0" />
 
-          <div className="flex items-center gap-2 h-10 w-full sm:w-64 px-3.5 bg-white border border-slate-200/90 rounded-xl focus-within:border-[#1565C0] focus-within:ring-2 focus-within:ring-blue-100 transition shadow-2xs">
+          {/* Ô tìm kiếm */}
+          <div className="flex items-center gap-2 h-9 flex-1 min-w-[200px] max-w-[360px] xl:max-w-[460px] px-3 bg-white border border-slate-200 rounded-xl focus-within:border-[#1565C0] focus-within:ring-2 focus-within:ring-blue-100 transition shadow-2xs">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
@@ -324,42 +308,76 @@ export default function ReportCheckPage() {
               className="w-full bg-transparent outline-none text-[13px] text-slate-800 placeholder-slate-400"
             />
           </div>
+        </div>
 
-          {/* Hạn nộp / thẩm định */}
-          <div
-            className={cn(
-              'inline-flex items-center gap-1.5 min-h-10 px-3.5 py-1.5 rounded-xl border text-[12px] font-semibold shrink-0 shadow-2xs',
-              deadlineBadgeClass,
-            )}
-          >
-            <Clock className={cn('w-3.5 h-3.5 shrink-0', deadlineIconClass)} />
-            {isDeadlineLoading ? (
-              <Skeleton className="h-4 w-32 bg-amber-200/70" />
-            ) : (
-              <span>
-                Hạn báo cáo:{' '}
-                <b className="font-bold">{deadlineInfo.text}</b>
-                {deadlineInfo.badgeText &&
-                  deadlineSnapshot?.deadlineStatus === 'OPEN' && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10.5px] font-bold">
-                      {deadlineInfo.badgeText}
-                    </span>
-                  )}
-                {deadlineInfo.badgeText &&
-                  deadlineSnapshot?.deadlineStatus === 'NOT_STARTED' && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10.5px] font-bold">
-                      {deadlineInfo.badgeText}
-                    </span>
-                  )}
-              </span>
-            )}
-          </div>
+        {/* Hạn báo cáo */}
+        <div
+          className={cn(
+            'inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border text-[12px] font-semibold shrink-0 shadow-2xs',
+            deadlineBadgeClass,
+          )}
+        >
+          <Clock className={cn('w-3.5 h-3.5 shrink-0', deadlineIconClass)} />
+          {isDeadlineLoading ? (
+            <Skeleton className="h-4 w-32 bg-amber-200/70" />
+          ) : (
+            <span>
+              Hạn báo cáo:{' '}
+              <b className="font-bold">{deadlineInfo.text}</b>
+              {deadlineInfo.badgeText &&
+                deadlineSnapshot?.deadlineStatus === 'OPEN' && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10.5px] font-bold">
+                    {deadlineInfo.badgeText}
+                  </span>
+                )}
+              {deadlineInfo.badgeText &&
+                deadlineSnapshot?.deadlineStatus === 'NOT_STARTED' && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10.5px] font-bold">
+                    {deadlineInfo.badgeText}
+                  </span>
+                )}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Main Card: Table */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 overflow-auto" id="tableScrollContainer">
+      {/* 2. Thanh tab trạng thái (UI giống thanh tab bên màn hình đề cương) */}
+      <div className="shrink-0 border-b border-slate-200/80 px-5 flex items-center justify-between gap-4 bg-white">
+        <div
+          className="flex items-center gap-1 sm:gap-2 -mb-px shrink-0 overflow-x-auto"
+          id="statusTabs"
+        >
+          {tabs.map((tab) => {
+            const isActive = filterStatus === tab.status
+            return (
+              <button
+                key={tab.status}
+                type="button"
+                data-status={tab.status}
+                data-active={isActive ? 'true' : 'false'}
+                id={tab.id}
+                onClick={() => setFilterStatus(tab.status)}
+                className={`tab-btn px-4 py-3 border-b-2 text-[13.5px] transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'active font-bold border-[#1565C0] text-[#1565C0]'
+                    : 'font-semibold border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  id={tab.badgeId}
+                  className={`tab-badge px-2 py-0.5 rounded-full text-[11px] font-bold ${tab.badgeClass}`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 3. Table */}
+      <div className="flex-1 min-h-0 overflow-auto" id="tableScrollContainer">
           <table className="w-full text-left text-[13px] border-collapse">
             <thead
               id="tableHead"
@@ -369,8 +387,8 @@ export default function ReportCheckPage() {
                 <th className="py-3 px-4 w-12 text-center">STT</th>
                 <th className="py-3 px-4 min-w-[220px]">Sinh viên & Đề tài</th>
                 <th className="py-3 px-4 min-w-[220px]">File báo cáo đồ án</th>
-                <th className="py-3 px-4 min-w-[220px]">
-                  Trùng lặp & Phiếu tiến độ
+                <th className="py-3 px-4 min-w-[200px]">
+                  Phiếu theo dõi tiến độ
                 </th>
                 <th className="py-3 px-4 w-40 text-center">Trạng thái</th>
                 <th className="py-3 px-4 min-w-[180px] text-right">Thao tác</th>
@@ -468,10 +486,10 @@ export default function ReportCheckPage() {
                         </div>
                       </td>
 
-                      {/* File báo cáo đồ án */}
+                      {/* File báo cáo đồ án & Tỷ lệ trùng lặp */}
                       <td className="py-3.5 px-4">
                         {item.publicId && item.reportFileName ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
@@ -512,6 +530,50 @@ export default function ReportCheckPage() {
                                 <span>Lịch sử</span>
                               </button>
                             </div>
+
+                            {/* Tỷ lệ trùng lặp */}
+                            {item.plagiarismRate !== null &&
+                            item.plagiarismRate !== undefined ? (
+                              <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 rounded-full text-[11px] font-bold border',
+                                    item.plagiarismRate <= 20
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : item.plagiarismRate <= 35
+                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                        : 'bg-rose-50 text-rose-700 border-rose-200',
+                                  )}
+                                >
+                                  Trùng {item.plagiarismRate}%
+                                </span>
+                                {item.plagiarismFileUrl &&
+                                isSafeReportFileUrl(item.plagiarismFileUrl) ? (
+                                  <a
+                                    href={item.plagiarismFileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11.5px] text-[#1565C0] hover:underline truncate max-w-[140px] inline-flex items-center gap-1"
+                                    title={item.plagiarismFile}
+                                  >
+                                    <span className="truncate">
+                                      {item.plagiarismFile}
+                                    </span>
+                                    <ExternalLink className="w-3 h-3 shrink-0" />
+                                  </a>
+                                ) : (
+                                  item.plagiarismFile && (
+                                    <span className="text-[11.5px] text-slate-500 truncate max-w-[140px]">
+                                      {item.plagiarismFile}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            ) : item.publicId ? (
+                              <span className="text-[11px] text-slate-400 italic block pt-0.5">
+                                Chưa kiểm tra trùng lặp
+                              </span>
+                            ) : null}
                           </div>
                         ) : (
                           <span className="text-[12px] text-slate-400 italic">
@@ -520,82 +582,56 @@ export default function ReportCheckPage() {
                         )}
                       </td>
 
-                      {/* Kiểm tra trùng lặp & Phiếu theo dõi tiến độ */}
+                      {/* Phiếu theo dõi tiến độ */}
                       <td className="py-3.5 px-4">
-                        <div className="space-y-1.5">
-                          {item.plagiarismRate !== null &&
-                          item.plagiarismRate !== undefined ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span
-                                className={cn(
-                                  'px-2 py-0.5 rounded-full text-[11px] font-bold border',
-                                  item.plagiarismRate <= 20
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : item.plagiarismRate <= 35
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                      : 'bg-rose-50 text-rose-700 border-rose-200',
-                                )}
-                              >
-                                Trùng {item.plagiarismRate}%
-                              </span>
-                              {item.plagiarismFileUrl &&
-                              isSafeReportFileUrl(item.plagiarismFileUrl) ? (
-                                <a
-                                  href={item.plagiarismFileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[11.5px] text-[#1565C0] hover:underline truncate max-w-[140px] inline-flex items-center gap-1"
-                                  title={item.plagiarismFile}
-                                >
-                                  <span className="truncate">
-                                    {item.plagiarismFile}
-                                  </span>
-                                  <ExternalLink className="w-3 h-3 shrink-0" />
-                                </a>
-                              ) : (
-                                item.plagiarismFile && (
-                                  <span className="text-[11.5px] text-slate-500 truncate max-w-[140px]">
-                                    {item.plagiarismFile}
-                                  </span>
-                                )
-                              )}
-                            </div>
-                          ) : item.publicId ? (
-                            <span className="text-[11.5px] text-slate-400 italic block">
-                              Chưa kiểm tra trùng lặp
-                            </span>
-                          ) : (
-                            <span className="text-[12px] text-slate-400 italic block">
-                              —
-                            </span>
-                          )}
-
-                          {/* Trạng thái Phiếu theo dõi tiến độ */}
-                          {item.progressReport ? (
-                            <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
-                              <CheckCircle2 className="w-3 h-3 shrink-0" />
-                              <span>Đã có phiếu tiến độ</span>
+                        {item.progressReport ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
                               {isSafeReportFileUrl(
                                 item.progressReport.progressFile,
-                              ) && (
+                              ) ? (
                                 <a
                                   href={item.progressReport.progressFile}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[#1565C0] hover:underline ml-0.5 inline-flex items-center"
+                                  className="inline-flex items-center gap-1.5 text-[#1565C0] hover:text-[#0D47A1] font-bold text-[12.5px] group/prog cursor-pointer text-left"
                                   title="Xem phiếu theo dõi tiến độ"
                                 >
-                                  <ExternalLink className="w-3 h-3" />
+                                  <FileText className="w-3.5 h-3.5 text-slate-400 group-hover/prog:text-[#1565C0] shrink-0 transition-colors" />
+                                  <span className="line-clamp-1 group-hover/prog:underline max-w-[200px]">
+                                    {extractReportFileName(
+                                      item.progressReport.progressFile,
+                                      'Phiếu theo dõi tiến độ',
+                                    )}
+                                  </span>
+                                  <ExternalLink className="w-3 h-3 shrink-0 text-slate-400 group-hover/prog:text-[#1565C0]" />
                                 </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-700 font-medium">
+                                  <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="line-clamp-1 max-w-[200px]">
+                                    {extractReportFileName(
+                                      item.progressReport.progressFile,
+                                      'Phiếu theo dõi tiến độ',
+                                    )}
+                                  </span>
+                                </span>
                               )}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-[11px] text-amber-700 font-medium">
-                              <AlertTriangle className="w-3 h-3 shrink-0" />
-                              <span>Chưa nộp phiếu tiến độ</span>
-                            </div>
-                          )}
-                        </div>
+                            {item.progressReport.submittedAt && (
+                              <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                                <Clock className="w-3 h-3 shrink-0" />
+                                <span>
+                                  {formatDate(item.progressReport.submittedAt, 'full')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[13px] font-medium block">
+                            -
+                          </span>
+                        )}
                       </td>
 
                       {/* Trạng thái */}
@@ -799,7 +835,6 @@ export default function ReportCheckPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Các Modals */}
       <FinalReportReviewModal

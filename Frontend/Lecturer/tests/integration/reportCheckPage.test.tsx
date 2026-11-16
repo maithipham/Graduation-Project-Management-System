@@ -338,4 +338,68 @@ describe('ReportCheckPage integration', () => {
     })
     expect(screen.getByText('Chưa có')).toBeInTheDocument()
   })
+
+  it('hiển thị bộ lọc năm học, học kỳ, ô tìm kiếm và hạn báo cáo trên cùng 1 dòng phía trên thanh tab với UI giống màn hình đề cương', async () => {
+    handler = (config) => {
+      const url = sentUrl(config)
+      if (url === '/semester/current') {
+        return { data: { code: 1000, data: SEMESTERS[0] } }
+      }
+      if (url.startsWith('/semester')) {
+        return {
+          data: {
+            code: 1000,
+            data: { content: SEMESTERS, totalElements: 2, totalPages: 1, page: 0, size: 100 },
+          },
+        }
+      }
+      if (url.startsWith('/report/supervisor-list')) {
+        return { data: { code: 1000, data: SAMPLE_REPORTS } }
+      }
+      return { status: 404, data: { code: 404, message: 'Not found' } }
+    }
+
+    renderPage()
+
+    expect(await screen.findByText('Nguyễn Văn An')).toBeInTheDocument()
+
+    // 1. Dòng trên tab: Bộ lọc Năm học, Học kỳ, Tìm kiếm, Hạn báo cáo
+    expect(screen.getByRole('combobox', { name: 'Chọn năm học' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Chọn học kỳ' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Tìm mã SV, tên hoặc đề tài...')).toBeInTheDocument()
+    expect(screen.getByText(/Hạn báo cáo:/i)).toBeInTheDocument()
+
+    // 2. Thanh tab: Giữ nguyên nội dung các tab, áp dụng UI gạch dưới giống đề cương (border-b-2)
+    const tabPending = screen.getByRole('button', { name: /Chưa duyệt/i })
+    expect(tabPending).toBeInTheDocument()
+    expect(tabPending).toHaveClass('border-b-2')
+
+    const tabRejected = screen.getByRole('button', { name: /Yêu cầu sửa \/ Không đạt/i })
+    expect(tabRejected).toBeInTheDocument()
+    expect(tabRejected).toHaveClass('border-b-2')
+
+    const tabNotSubmitted = screen.getByRole('button', { name: /Chưa nộp/i })
+    expect(tabNotSubmitted).toBeInTheDocument()
+    expect(tabNotSubmitted).toHaveClass('border-b-2')
+
+    const tabApproved = screen.getByRole('button', { name: /Đã duyệt/i })
+    expect(tabApproved).toBeInTheDocument()
+    expect(tabApproved).toHaveClass('border-b-2')
+
+    const tabAll = screen.getByRole('button', { name: /Tất cả/i })
+    expect(tabAll).toBeInTheDocument()
+    expect(tabAll).toHaveClass('border-b-2')
+
+    // 3. Cột Báo cáo đồ án hiển thị tỷ lệ trùng lặp; cột Phiếu theo dõi tiến độ hiển thị file / '-'
+    expect(screen.getByRole('columnheader', { name: /Phiếu theo dõi tiến độ/i })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /Trùng lặp & Phiếu tiến độ/i })).not.toBeInTheDocument()
+
+    // Bỏ hiển thị "Đã có phiếu tiến độ", thay bằng hiển thị file phiếu
+    expect(screen.getByText('phieu_an.pdf')).toBeInTheDocument()
+    expect(screen.queryByText('Đã có phiếu tiến độ')).not.toBeInTheDocument()
+
+    // Chưa nộp phiếu hiển thị "-" thay vì "Chưa nộp phiếu tiến độ"
+    expect(screen.queryByText('Chưa nộp phiếu tiến độ')).not.toBeInTheDocument()
+    expect(screen.getByText('-')).toBeInTheDocument()
+  })
 })
