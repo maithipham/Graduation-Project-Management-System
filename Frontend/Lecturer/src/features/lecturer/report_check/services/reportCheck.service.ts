@@ -16,7 +16,7 @@ import type {
 } from '../types/reportCheck.types'
 
 export const PLAGIARISM_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // Nhỏ hơn 10 MB
-export const PLAGIARISM_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const
+export const PLAGIARISM_ALLOWED_EXTENSIONS = ['pdf'] as const // Bắt buộc PDF chuẩn
 const REPORT_DEADLINE_CODE = 'NOP_BAO_CAO_VA_PHIEU_THEO_DOI'
 
 interface RawDeadlineMilestone {
@@ -36,7 +36,7 @@ interface RawDeadlinesGroupedResponse {
 
 export function validatePlagiarismFile(file: File | null | undefined): string | null {
   if (!file || file.size === 0 || !file.name.trim()) {
-    return 'File tải lên không được để trống.'
+    return 'File báo cáo kiểm tra trùng lặp không được để trống.'
   }
   const dotIndex = file.name.lastIndexOf('.')
   const extension = dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : ''
@@ -45,7 +45,7 @@ export function validatePlagiarismFile(file: File | null | undefined): string | 
       extension as (typeof PLAGIARISM_ALLOWED_EXTENSIONS)[number],
     )
   ) {
-    return 'File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf.'
+    return 'File kiểm tra trùng lặp bắt buộc là định dạng .pdf (xuất từ Turnitin / KiểmTraTàiLiệu).'
   }
   if (file.size >= PLAGIARISM_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.'
@@ -75,6 +75,184 @@ export function validateReviewForm(params: {
     return 'Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt.'
   }
   return validatePlagiarismFile(params.plagiarismFile)
+}
+
+/**
+ * Ánh xạ thông báo lỗi thân thiện cho GVHD khi Backend ném mã lỗi đối chiếu PDF
+ * (Hỗ trợ cả mã chuỗi ErrorCode lẫn mã số + message Tiếng Việt từ Backend)
+ */
+export function mapPlagiarismReviewError(
+  errorCode: string | number,
+  backendMessage?: string,
+): string {
+  switch (errorCode) {
+    case 'PLAGIARISM_SCORE_MISMATCH':
+      return 'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập trên Form khác với kết quả ghi nhận trong file báo cáo PDF. Vui lòng kiểm tra lại tỷ lệ % đã gõ!'
+    case 'PLAGIARISM_REPORT_STUDENT_ID_MISMATCH':
+      return 'Cảnh báo nộp nhầm file! Báo cáo PDF có Mã sinh viên không khớp với sinh viên của đề tài đang duyệt. Vui lòng chọn đúng file của sinh viên này!'
+    case 'PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND':
+      return 'Không tìm thấy Mã sinh viên hợp lệ trong mục "Tên tài liệu" của file báo cáo PDF. Vui lòng kiểm tra file có quy chuẩn đặt tên Lop_MSV_HoTen!'
+    case 'PLAGIARISM_RATE_EXCEEDED':
+      return 'Tỷ lệ đạo văn trong file báo cáo vượt quá 35.0%. Không đủ điều kiện phê duyệt Đạt!'
+    case 'PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY':
+      return 'Phát hiện bất thường trong file PDF: Điểm trùng lặp ở phần thông tin không khớp với biểu đồ tròn kết quả!'
+    case 'PROGRESS_REPORT_NOT_SUBMITTED':
+    case 3093:
+      return 'Bạn chưa nộp Phiếu theo dõi tiến độ cho sinh viên này! Vui lòng nộp Phiếu theo dõi tiến độ trước khi thực hiện thẩm định báo cáo.'
+    case 'AI_SERVICE_TIMEOUT':
+      return 'Dịch vụ phân tích file scan gặp gián đoạn tạm thời. Vui lòng thử lại sau ít phút!'
+    default:
+      break
+  }
+
+  if (backendMessage) {
+    const lower = backendMessage.toLowerCase()
+    if (lower.includes('số liệu không khớp') || lower.includes('khác với kết quả trong file')) {
+      return 'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập trên Form khác với kết quả ghi nhận trong file báo cáo PDF. Vui lòng kiểm tra lại tỷ lệ % đã gõ!'
+    }
+    if (lower.includes('mã sinh viên không khớp') || lower.includes('nhầm tài liệu')) {
+      return 'Cảnh báo nộp nhầm file! Báo cáo PDF có Mã sinh viên không khớp với sinh viên của đề tài đang duyệt. Vui lòng chọn đúng file của sinh viên này!'
+    }
+    if (lower.includes('không tìm thấy mã sinh viên')) {
+      return 'Không tìm thấy Mã sinh viên hợp lệ trong mục "Tên tài liệu" của file báo cáo PDF. Vui lòng kiểm tra file có quy chuẩn đặt tên Lop_MSV_HoTen!'
+    }
+    if (lower.includes('bất thường trong file pdf') || lower.includes('biểu đồ kết quả')) {
+      return 'Phát hiện bất thường trong file PDF: Điểm trùng lặp ở phần thông tin không khớp với biểu đồ tròn kết quả!'
+    }
+    if (lower.includes('phiếu theo dõi tiến độ')) {
+      return 'Bạn chưa nộp Phiếu theo dõi tiến độ cho sinh viên này! Vui lòng nộp Phiếu theo dõi tiến độ trước khi thực hiện thẩm định báo cáo.'
+    }
+    if (lower.includes('ai timeout')) {
+      return 'Dịch vụ phân tích file scan gặp gián đoạn tạm thời. Vui lòng thử lại sau ít phút!'
+    }
+    return backendMessage
+  }
+
+  return 'Thẩm định báo cáo thất bại. Vui lòng thử lại!'
+}
+
+export interface ResolvedPlagiarismReviewError {
+  field: 'plagiarismRate' | 'plagiarismFile' | 'decision' | 'root'
+  message: string
+  isStudentMismatch: boolean
+  isMissingProgressReport: boolean
+}
+
+export function resolvePlagiarismReviewError(
+  errorCode: string | number,
+  backendMessage?: string,
+): ResolvedPlagiarismReviewError {
+  const message = mapPlagiarismReviewError(errorCode, backendMessage)
+  const lower = (backendMessage ?? message).toLowerCase()
+
+  // 1. Lỗi thiếu Phiếu theo dõi tiến độ (3093 - PROGRESS_REPORT_NOT_SUBMITTED)
+  if (
+    errorCode === 3093 ||
+    errorCode === 'PROGRESS_REPORT_NOT_SUBMITTED' ||
+    lower.includes('phiếu theo dõi tiến độ')
+  ) {
+    return {
+      field: 'root',
+      message,
+      isStudentMismatch: false,
+      isMissingProgressReport: true,
+    }
+  }
+
+  // 2. Lỗi nộp nhầm file của sinh viên khác (PLAGIARISM_REPORT_STUDENT_ID_MISMATCH)
+  if (
+    errorCode === 'PLAGIARISM_REPORT_STUDENT_ID_MISMATCH' ||
+    lower.includes('mã sinh viên không khớp') ||
+    lower.includes('nhầm tài liệu') ||
+    lower.includes('nộp nhầm file')
+  ) {
+    return {
+      field: 'plagiarismFile',
+      message,
+      isStudentMismatch: true,
+      isMissingProgressReport: false,
+    }
+  }
+
+  // 3. Lỗi lệch số liệu nhập với số liệu trong PDF (PLAGIARISM_SCORE_MISMATCH)
+  if (
+    errorCode === 'PLAGIARISM_SCORE_MISMATCH' ||
+    lower.includes('số liệu không khớp') ||
+    lower.includes('khác với kết quả')
+  ) {
+    return {
+      field: 'plagiarismRate',
+      message,
+      isStudentMismatch: false,
+      isMissingProgressReport: false,
+    }
+  }
+
+  // 4. Các lỗi thuộc về cấu trúc / nội dung file PDF báo cáo trùng lặp
+  if (
+    errorCode === 'PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND' ||
+    errorCode === 'PLAGIARISM_REPORT_DATA_NOT_FOUND' ||
+    errorCode === 'PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY' ||
+    errorCode === 'PLAGIARISM_REPORT_FILE_REQUIRED' ||
+    errorCode === 'PDF_FILE_EMPTY' ||
+    lower.includes('không tìm thấy mã sinh viên') ||
+    lower.includes('trang 1 của tài liệu') ||
+    lower.includes('bất thường trong file pdf') ||
+    lower.includes('biểu đồ') ||
+    lower.includes('file') ||
+    lower.includes('tệp') ||
+    lower.includes('pdf') ||
+    lower.includes('10mb')
+  ) {
+    return {
+      field: 'plagiarismFile',
+      message,
+      isStudentMismatch: false,
+      isMissingProgressReport: false,
+    }
+  }
+
+  // 5. Các lỗi thuộc về tỷ lệ đạo văn (PLAGIARISM_RATE_REQUIRED / INVALID / EXCEEDED)
+  if (
+    errorCode === 'PLAGIARISM_RATE_EXCEEDED' ||
+    errorCode === 'PLAGIARISM_RATE_REQUIRED' ||
+    errorCode === 'PLAGIARISM_RATE_INVALID' ||
+    lower.includes('đạo văn') ||
+    lower.includes('tỷ lệ') ||
+    lower.includes('vượt quá 35')
+  ) {
+    return {
+      field: 'plagiarismRate',
+      message,
+      isStudentMismatch: false,
+      isMissingProgressReport: false,
+    }
+  }
+
+  // 6. Các lỗi thuộc về quyết định thẩm định (decision)
+  if (
+    lower.includes('quyết định') ||
+    lower.includes('kết quả thẩm định') ||
+    lower.includes('trong thời gian nhận bài') ||
+    lower.includes('trong thời gian gia hạn chấm') ||
+    lower.includes('approved') ||
+    lower.includes('request_changes') ||
+    lower.includes('rejected')
+  ) {
+    return {
+      field: 'decision',
+      message,
+      isStudentMismatch: false,
+      isMissingProgressReport: false,
+    }
+  }
+
+  return {
+    field: 'root',
+    message,
+    isStudentMismatch: false,
+    isMissingProgressReport: false,
+  }
 }
 
 export function isSafeReportFileUrl(url?: string | null): boolean {

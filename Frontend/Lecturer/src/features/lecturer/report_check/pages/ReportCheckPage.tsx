@@ -751,9 +751,21 @@ export default function ReportCheckPage() {
                               <span>Thẩm định</span>
                             </Button>
                             {!isReviewable && blockedReason && (
-                              <span className="text-[10.5px] text-amber-700 font-medium whitespace-normal text-right max-w-[180px]">
-                                {blockedReason}
-                              </span>
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="text-[10.5px] text-amber-700 font-medium whitespace-normal text-right max-w-[180px]">
+                                  {blockedReason}
+                                </span>
+                                {item.progressReport === null &&
+                                  item.topicStatus === 'IN_PROGRESS' && (
+                                    <a
+                                      href="/lecturer/guiding-evaluation"
+                                      className="inline-flex items-center gap-1 text-[10.5px] text-[#1565C0] hover:underline font-semibold"
+                                    >
+                                      <span>Nộp Phiếu theo dõi tiến độ ngay</span>
+                                      <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                    </a>
+                                  )}
+                              </div>
                             )}
                           </div>
                         )}

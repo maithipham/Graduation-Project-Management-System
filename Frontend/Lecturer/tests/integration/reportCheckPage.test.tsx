@@ -263,7 +263,10 @@ describe('ReportCheckPage integration', () => {
     // Bấm gửi khi thiếu dữ liệu -> hiện lỗi validate zod dưới FormField
     await user.click(screen.getByRole('button', { name: 'Xác nhận thẩm định' }))
     expect(await screen.findByText('Vui lòng nhập tỷ lệ đạo văn')).toBeInTheDocument()
-    expect(screen.getByText('File tải lên không được để trống.')).toBeInTheDocument()
+    expect(
+      screen.getByText('File báo cáo kiểm tra trùng lặp không được để trống.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Lop_MSV_HoTen')).toBeInTheDocument()
 
     // Kiểm tra ràng buộc đạo văn > 35%: tự chuyển sang REQUEST_CHANGES, disable APPROVED, hiện cảnh báo đỏ
     const rateInput = screen.getByLabelText(/Tỷ lệ đạo văn/i)

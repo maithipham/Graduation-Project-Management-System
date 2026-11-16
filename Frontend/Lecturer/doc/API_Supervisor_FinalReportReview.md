@@ -36,6 +36,14 @@ Tài liệu hướng dẫn kết nối Frontend với Backend (`tlu_gpms_system`
                                                      PUT /report/{publicId}/review
                                            (plagiarismRate + plagiarismFile + decision + feedback?)
                                                                         │
+                                                                        ▼
+                                         [ Backend chạy Plagiarism Auto-Verification ]
+                                         - Trích xuất text & thông tin trang 1 file PDF
+                                         - Kiểm tra tính toàn vẹn nội bộ (header vs biểu đồ tròn)
+                                         - Đối chiếu 1-1 tỷ lệ GVHD nhập vs số liệu trong PDF
+                                         - Đối chiếu Mã sinh viên (Lop_MSV_HoTen vs topic.studentCode)
+                                         - Kiểm tra ngưỡng tối đa 35.0% khi duyệt APPROVED
+                                                                        │
                              ┌──────────────────────────────────────────┼──────────────────────────────────────────┐
                              ▼                                          ▼                                          ▼
                    [decision = APPROVED]                [decision = REQUEST_CHANGES]                   [decision = REJECTED]
@@ -66,8 +74,18 @@ Tài liệu hướng dẫn kết nối Frontend với Backend (`tlu_gpms_system`
     - Khi `plagiarismRate > 35.0%`:
       - *Trong thời gian mở nộp (`deadlineStatus === 'OPEN'`)*: GVHD chọn **`REQUEST_CHANGES`** (Yêu cầu chỉnh sửa) để sinh viên chỉnh sửa giảm tỷ lệ trùng lặp và nộp lại báo cáo.
       - *Trong thời gian gia hạn chấm (`deadlineStatus === 'EXTENDED'`)*: Do sinh viên không còn quyền nộp lại, GVHD chỉ được chọn **`REJECTED`** (Không đạt $\rightarrow$ sinh viên bị `DISQUALIFIED` dừng đồ án).
-  - `plagiarismFile`: Bắt buộc tải file minh chứng kết quả quét (Turnitin/DoIT...). Chỉ nhận **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes).
+  - `plagiarismFile`: Bắt buộc tải file minh chứng kết quả quét (Turnitin / KiểmTraTàiLiệu / DoIT...). File bắt buộc có định dạng **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes).
   - `feedback`: Tùy chọn (`string`), nhưng nên khuyến khích GVHD nhập khi chọn `REQUEST_CHANGES` hoặc `REJECTED`.
+- **Cơ chế Tự động Bóc tách & Đối chiếu File PDF Báo cáo Trùng lặp (Plagiarism Auto-Verification)**:
+  Nhằm đảm bảo tính trung thực, khách quan và loại trừ sai sót thao tác (GVHD gõ nhầm số liệu hoặc chọn nhầm file của sinh viên khác), Backend đã tích hợp module kiểm tra và đối chiếu tự động file PDF (`PlagiarismReportExtractorService`):
+  1. **Kiến trúc bóc tách 2 tầng (Hybrid Engine)**:
+     - *Tầng 1 (PDFBox + Regex):* Trích xuất text layer trang 1 của file PDF siêu tốc (mili-giây), nhận diện tiêu đề báo cáo chuẩn `BÁO CÁO KIỂM TRA TRÙNG LẶP`, đọc điểm trùng lặp và mã sinh viên.
+     - *Tầng 2 (Gemini Vision AI Fallback):* Tự động kích hoạt khi file PDF là dạng ảnh scan không có text layer.
+  2. **4 Ràng buộc đối chiếu khắt khe phía Backend**:
+     - 🛡️ **Kiểm tra tính toàn vẹn nội bộ file PDF:** So khớp điểm số ở mục thông tin và biểu đồ tròn kết quả trên trang 1. Nếu có sự sai lệch $\rightarrow$ chặn và báo lỗi `PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY` (Code 4000).
+     - 🛡️ **Đối chiếu 1-1 giữa số GVHD nhập và số liệu trong file:** Tỷ lệ `plagiarismRate` GVHD nhập trên Form phải khớp hoàn toàn với tỷ lệ trích xuất từ file PDF (sai số $< 0.01\%$). Nếu lệch $\rightarrow$ chặn và báo lỗi `PLAGIARISM_SCORE_MISMATCH` (Code 4000).
+     - 🛡️ **Kiểm tra ngưỡng tối đa 35%:** Tỷ lệ bóc tách từ file báo cáo không được vượt quá `35.0%` khi duyệt Đạt (`APPROVED`). Nếu vượt $\rightarrow$ báo lỗi `PLAGIARISM_RATE_EXCEEDED` (Code 4000).
+     - 🛡️ **Đối chiếu Mã sinh viên (chống nộp nhầm file của sinh viên khác):** Hệ thống trích xuất mã sinh viên từ mục *Tên tài liệu* trên trang 1 (quy chuẩn: `Lop_MSV_HoTen`, ví dụ `64KTPM3_2251172405_LuongThiThuyLien` $\rightarrow$ MSV `2251172405`) và đối chiếu với mã sinh viên của đề tài đang duyệt. Nếu không tìm thấy MSV $\rightarrow$ `PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND`; nếu MSV không khớp $\rightarrow$ `PLAGIARISM_REPORT_STUDENT_ID_MISMATCH` (Code 4000).
 - **Thông báo real-time (SSE)**:
   - Sau khi thẩm định (`APPROVED` / `REQUEST_CHANGES` / `REJECTED`), Backend gửi thông báo SSE cho sinh viên gồm **kết quả, tỷ lệ đạo văn (%) và nhận xét của GVHD**.
 
@@ -121,12 +139,23 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
   - `publicId` (`UUID`, **bắt buộc**): `item.publicId` của Báo cáo Final đang ở trạng thái `PENDING`.
 - **Content-Type**: `multipart/form-data`
 - **Form Data Params**:
-  - `plagiarismRate` (`Double`, **bắt buộc**): Tỷ lệ đạo văn (%), giá trị hợp lệ từ `0` đến `100` (ví dụ `12.5`). **Lưu ý**: Chỉ được chọn `decision: "APPROVED"` khi `plagiarismRate <= 35.0`. Nếu `plagiarismRate > 35.0`, bắt buộc chọn `"REQUEST_CHANGES"` (khi OPEN) hoặc `"REJECTED"` (khi EXTENDED).
-  - `plagiarismFile` (`File`, **bắt buộc**): File kết quả kiểm tra trùng lặp (Turnitin/DoIT...). Chỉ nhận **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB**.
+  - `plagiarismRate` (`Double`, **bắt buộc**): Tỷ lệ đạo văn (%), giá trị hợp lệ từ `0` đến `100` (ví dụ `12.5`).
+    > ⚠️ **Lưu ý nghiệp vụ**:
+    > - Chỉ được chọn `decision: "APPROVED"` khi `plagiarismRate <= 35.0`. Nếu `plagiarismRate > 35.0`, bắt buộc chọn `"REQUEST_CHANGES"` (khi OPEN) hoặc `"REJECTED"` (khi EXTENDED).
+    > - Con số GVHD nhập **phải khớp hoàn toàn** với con số ghi nhận trên file PDF tải lên (sai số cho phép $< 0.01\%$).
+  - `plagiarismFile` (`File`, **bắt buộc**): File PDF báo cáo kết quả kiểm tra trùng lặp (Turnitin / KiểmTraTàiLiệu / DoIT...).
+    > ⚠️ **Ràng buộc định dạng & Quy chuẩn đặt tên tài liệu**:
+    > - Bắt buộc file định dạng **`.pdf`** (Backend phân tích trang 1 bằng PDFBox & Gemini AI Vision), dung lượng **nhỏ hơn 10 MB**.
+    > - File báo cáo PDF cần tuân thủ quy chuẩn đặt tên tài liệu khi quét: **`Lop_MSV_HoTen`** (ví dụ: `64KTPM3_2251172405_LuongThiThuyLien.pdf`) để hệ thống tự động bóc tách và đối chiếu đúng Mã sinh viên của đề tài.
   - `decision` (`FinalReportStatus`, **bắt buộc**):
     - Khi `deadlineStatus === "OPEN"`: chỉ nhận `"APPROVED"` hoặc `"REQUEST_CHANGES"`.
     - Khi `deadlineStatus === "EXTENDED"`: chỉ nhận `"APPROVED"` hoặc `"REJECTED"`.
   - `feedback` (`string`, *không bắt buộc*): Ý kiến nhận xét của GVHD.
+- **Hành vi xử lý phía Backend khi gọi API**:
+  1. Kiểm tra quyền GVHD chính và điều kiện đã nộp Phiếu theo dõi tiến độ.
+  2. Bóc tách tự động trang 1 file PDF, so khớp 1-1 tỷ lệ trùng lặp và mã sinh viên.
+  3. Nếu dữ liệu hợp lệ: Upload file lên Cloudinary, cập nhật Báo cáo Final + Lịch sử nộp, cập nhật tiến trình đề tài (`APPROVED` $\rightarrow$ `STAGE_4_REPORT_APPROVED`; `REJECTED` $\rightarrow$ `DISQUALIFIED`), và bắn thông báo SSE cho sinh viên.
+  4. Nếu phát hiện sai sót (nhập sai số, nộp nhầm file SV khác, vượt 35%...): Dừng ngay lập tức, không upload Cloudinary và trả mã lỗi 4000 tương ứng.
 - **Response Success (HTTP 200)**:
 
 ```json
@@ -243,27 +272,36 @@ export const formatReportDeadlineForReview = (
 
 ## 5. Bảng mã lỗi Backend (ErrorCode)
 
-| HTTP Status | Mã ErrorCode | Tên mã lỗi | Thông báo Tiếng Việt từ Backend |
-|:---:|:---:|---|---|
-| **400** | `4000` | `FINAL_REPORT_DECISION_NULL` | Vui lòng chọn kết quả thẩm định báo cáo |
-| **400** | `4000` | `PLAGIARISM_RATE_REQUIRED` | Vui lòng nhập tỷ lệ đạo văn |
-| **400** | `4000` | `PLAGIARISM_RATE_INVALID` | Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100% |
-| **400** | `4000` | `PLAGIARISM_RATE_EXCEEDED` | Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt |
-| **400** | `4000` | `REPORT_FILE_EMPTY` | File tải lên không được để trống |
-| **400** | `4000` | `REPORT_FILE_INVALID_FORMAT` | File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf |
-| **400** | `4000` | `REPORT_FILE_TOO_LARGE` | File tải lên phải nhỏ hơn 10MB |
-| **400** | `4000` | `FINAL_REPORT_DECISION_INVALID_IN_SUBMISSION_PERIOD` | Trong thời gian nhận bài chỉ được chọn Đạt (APPROVED) hoặc Yêu cầu chỉnh sửa (REQUEST_CHANGES) |
-| **400** | `4000` | `FINAL_REPORT_DECISION_INVALID_IN_GRADING_PERIOD` | Trong thời gian gia hạn chấm chỉ được chọn Đạt (APPROVED) hoặc Không đạt (REJECTED) |
-| **400** | `4000` | `CLOUDINARY_SERVICE_FAIL` | Upload file thất bại |
-| **404** | `3089` | `THESIS_FINAL_REPORT_NOT_FOUND` | Không tìm thấy báo cáo Final của đề tài |
-| **404** | `3094` | `REPORT_DEADLINE_NOT_FOUND` | Chưa cấu hình thời hạn nộp báo cáo cho học kỳ này |
-| **403** | `3095` | `FINAL_REPORT_SUBMISSION_DEADLINE_CLOSED` | Thời hạn sinh viên nộp báo cáo chưa mở hoặc đã kết thúc *(khi chưa tới startDate)* |
-| **403** | `3097` | `FINAL_REPORT_GRADING_CLOSED` | Đã quá thời hạn GVHD thẩm định báo cáo, vui lòng liên hệ Trưởng bộ môn gia hạn |
-| **409** | `3092` | `FINAL_REPORT_NOT_PENDING` | Báo cáo không ở trạng thái chờ thẩm định |
-| **409** | `3093` | `PROGRESS_REPORT_NOT_SUBMITTED` | GVHD chưa nộp phiếu theo dõi tiến độ cho đề tài này |
-| **409** | `3057` | `TOPIC_NOT_IN_PROGRESS` | Đề tài không ở trạng thái đang thực hiện |
-| **403** | `2001` | `FORBIDDEN` | Giảng viên đồng hướng dẫn không có quyền thẩm định báo cáo / Không phải GVHD chính / Học kỳ đã kết thúc |
-| **401** | `2000` | `UNAUTHORIZED` | Phiên đăng nhập hết hạn |
+| HTTP Status | Mã ErrorCode | Tên mã lỗi | Thông báo Tiếng Việt từ Backend | Giải thích & Cách xử lý phía Frontend |
+|:---:|:---:|---|---|---|
+| **400** | `4000` | `FINAL_REPORT_DECISION_NULL` | Vui lòng chọn kết quả thẩm định báo cáo | Chưa chọn APPROVED / REQUEST_CHANGES / REJECTED |
+| **400** | `4000` | `PLAGIARISM_RATE_REQUIRED` | Vui lòng nhập tỷ lệ đạo văn | Chưa nhập tỷ lệ % trùng lặp |
+| **400** | `4000` | `PLAGIARISM_RATE_INVALID` | Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100% | Số âm hoặc lớn hơn 100% |
+| **400** | `4000` | `PLAGIARISM_RATE_EXCEEDED` | Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt | Tỷ lệ > 35.0% nhưng GVHD lại bấm APPROVED |
+| **400** | `4000` | `PLAGIARISM_REPORT_FILE_REQUIRED` | Vui lòng tải lên file PDF báo cáo kiểm tra trùng lặp! | Chưa chọn file báo cáo đạo văn |
+| **400** | `4000` | `PLAGIARISM_SCORE_MISMATCH` | Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập khác với kết quả trong file báo cáo PDF. Vui lòng kiểm tra lại tài liệu! | **Số GVHD gõ khác số đọc được trong PDF** $\rightarrow$ FE báo đỏ nhắc GVHD kiểm tra lại số liệu hoặc file |
+| **400** | `4000` | `PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND` | Không tìm thấy Mã sinh viên hợp lệ trong mục 'Tên tài liệu' của file báo cáo PDF (Quy chuẩn: Lop_MSV_HoTen)! | Tên tài liệu khi scan không chứa chuỗi 10 chữ số MSV |
+| **400** | `4000` | `PLAGIARISM_REPORT_STUDENT_ID_MISMATCH` | Cảnh báo nhầm tài liệu! File báo cáo PDF có mã sinh viên không khớp với sinh viên đang duyệt. | **Nộp nhầm file của sinh viên khác!** $\rightarrow$ FE popup cảnh báo chọn đúng file SV |
+| **400** | `4000` | `PLAGIARISM_REPORT_DATA_NOT_FOUND` | Không tìm thấy dữ liệu tỷ lệ trùng lặp hợp lệ trên trang 1 của tài liệu. Vui lòng kiểm tra lại đúng mẫu báo cáo PDF! | Trang 1 không đúng định dạng báo cáo kiểm tra trùng lặp chuẩn |
+| **400** | `4000` | `PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY` | Phát hiện bất thường trong file PDF: 'Điểm trùng lặp' ở phần thông tin không khớp với biểu đồ kết quả! | File PDF bị chỉnh sửa hoặc số liệu tiêu đề lệch biểu đồ tròn |
+| **400** | `4000` | `PDF_FILE_EMPTY` | File PDF rỗng! | File 0 byte hoặc không có trang nào |
+| **400** | `4000` | `AI_SERVICE_TIMEOUT` | Mạng rớt & AI timeout. Hãy thử lại | Dịch vụ AI Vision trích xuất ảnh scan gặp sự cố/timeout |
+| **400** | `4000` | `EXPECTED_STUDENT_ID_REQUIRED` | Mã sinh viên cần đối chiếu (expectedStudentId) không được để trống! | Thông tin sinh viên của đề tài bị thiếu mã SV |
+| **400** | `4000` | `REPORT_FILE_EMPTY` | File tải lên không được để trống | File rỗng |
+| **400** | `4000` | `REPORT_FILE_INVALID_FORMAT` | File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf | File sai đuôi hoặc không đọc được cấu trúc PDF |
+| **400** | `4000` | `REPORT_FILE_TOO_LARGE` | File tải lên phải nhỏ hơn 10MB | Dung lượng vượt quá 10MB |
+| **400** | `4000` | `FINAL_REPORT_DECISION_INVALID_IN_SUBMISSION_PERIOD` | Trong thời gian nhận bài chỉ được chọn Đạt (APPROVED) hoặc Yêu cầu chỉnh sửa (REQUEST_CHANGES) | Chọn REJECTED khi hạn đang OPEN |
+| **400** | `4000` | `FINAL_REPORT_DECISION_INVALID_IN_GRADING_PERIOD` | Trong thời gian gia hạn chấm chỉ được chọn Đạt (APPROVED) hoặc Không đạt (REJECTED) | Chọn REQUEST_CHANGES khi hạn đang EXTENDED |
+| **400** | `4000` | `CLOUDINARY_SERVICE_FAIL` | Upload file thất bại | Lỗi dịch vụ Cloudinary |
+| **404** | `3089` | `THESIS_FINAL_REPORT_NOT_FOUND` | Không tìm thấy báo cáo Final của đề tài | Báo cáo không tồn tại |
+| **404** | `3094` | `REPORT_DEADLINE_NOT_FOUND` | Chưa cấu hình thời hạn nộp báo cáo cho học kỳ này | Học kỳ chưa tạo mốc hạn |
+| **403** | `3095` | `FINAL_REPORT_SUBMISSION_DEADLINE_CLOSED` | Thời hạn sinh viên nộp báo cáo chưa mở hoặc đã kết thúc *(khi chưa tới startDate)* | Chưa tới ngày mở mốc |
+| **403** | `3097` | `FINAL_REPORT_GRADING_CLOSED` | Đã quá thời hạn GVHD thẩm định báo cáo, vui lòng liên hệ Trưởng bộ môn gia hạn | Mốc đã quá hạn hoặc COMPLETED |
+| **409** | `3092` | `FINAL_REPORT_NOT_PENDING` | Báo cáo không ở trạng thái chờ thẩm định | Báo cáo đã được APPROVED/REJECTED trước đó |
+| **409** | `3093` | `PROGRESS_REPORT_NOT_SUBMITTED` | GVHD chưa nộp phiếu theo dõi tiến độ cho đề tài này | **Chưa nộp phiếu tiến độ** $\rightarrow$ Chặn mọi quyết định |
+| **409** | `3057` | `TOPIC_NOT_IN_PROGRESS` | Đề tài không ở trạng thái đang thực hiện | Đề tài đã bị loại hoặc hoàn tất |
+| **403** | `2001` | `FORBIDDEN` | Giảng viên đồng hướng dẫn không có quyền thẩm định báo cáo / Không phải GVHD chính / Học kỳ đã kết thúc | Không có quyền thao tác ghi |
+| **401** | `2000` | `UNAUTHORIZED` | Phiên đăng nhập hết hạn | Cần đăng nhập lại |
 
 ---
 
@@ -288,7 +326,7 @@ export const API_ENDPOINTS = {
 import type { FinalReportStatus, ThesisFinalReportResponse } from './finalReport.types';
 
 export const PLAGIARISM_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // Nhỏ hơn 10 MB
-export const PLAGIARISM_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const;
+export const PLAGIARISM_ALLOWED_EXTENSIONS = ['pdf'] as const; // Bắt buộc PDF chuẩn
 
 export const validateReviewForm = (params: {
   plagiarismRate: number | null | undefined;
@@ -309,17 +347,39 @@ export const validateReviewForm = (params: {
   }
   const file = params.plagiarismFile;
   if (!file || file.size === 0 || !file.name.trim()) {
-    return 'File tải lên không được để trống.';
+    return 'File báo cáo kiểm tra trùng lặp không được để trống.';
   }
   const dotIndex = file.name.lastIndexOf('.');
   const extension = dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : '';
   if (!PLAGIARISM_ALLOWED_EXTENSIONS.includes(extension as (typeof PLAGIARISM_ALLOWED_EXTENSIONS)[number])) {
-    return 'File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf.';
+    return 'File kiểm tra trùng lặp bắt buộc là định dạng .pdf (xuất từ Turnitin / KiểmTraTàiLiệu).';
   }
   if (file.size >= PLAGIARISM_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.';
   }
   return null;
+};
+
+// Hàm ánh xạ thông báo lỗi thân thiện cho GVHD khi Backend ném mã lỗi đối chiếu PDF
+export const mapPlagiarismReviewError = (errorCode: string | number, backendMessage?: string): string => {
+  switch (errorCode) {
+    case 'PLAGIARISM_SCORE_MISMATCH':
+      return 'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập trên Form khác với kết quả ghi nhận trong file báo cáo PDF. Vui lòng kiểm tra lại tỷ lệ % đã gõ!';
+    case 'PLAGIARISM_REPORT_STUDENT_ID_MISMATCH':
+      return 'Cảnh báo nộp nhầm file! Báo cáo PDF có Mã sinh viên không khớp với sinh viên của đề tài đang duyệt. Vui lòng chọn đúng file của sinh viên này!';
+    case 'PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND':
+      return 'Không tìm thấy Mã sinh viên hợp lệ trong mục "Tên tài liệu" của file báo cáo PDF. Vui lòng kiểm tra file có quy chuẩn đặt tên Lop_MSV_HoTen!';
+    case 'PLAGIARISM_RATE_EXCEEDED':
+      return 'Tỷ lệ đạo văn trong file báo cáo vượt quá 35.0%. Không đủ điều kiện phê duyệt Đạt!';
+    case 'PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY':
+      return 'Phát hiện bất thường trong file PDF: Điểm trùng lặp ở phần thông tin không khớp với biểu đồ tròn kết quả!';
+    case 'PROGRESS_REPORT_NOT_SUBMITTED':
+      return 'Bạn chưa nộp Phiếu theo dõi tiến độ cho sinh viên này! Vui lòng nộp Phiếu theo dõi tiến độ trước khi thực hiện thẩm định báo cáo.';
+    case 'AI_SERVICE_TIMEOUT':
+      return 'Dịch vụ phân tích file scan gặp gián đoạn tạm thời. Vui lòng thử lại sau ít phút!';
+    default:
+      return backendMessage || 'Thẩm định báo cáo thất bại. Vui lòng thử lại!';
+  }
 };
 
 // 1. Lấy danh sách báo cáo của sinh viên hướng dẫn theo học kỳ và trạng thái
@@ -396,4 +456,13 @@ const canReviewFinalReport = (item: ThesisFinalReportResponse): boolean => {
 - **Tùy chọn quyết định (`decision`) trong Modal/Form thẩm định**:
   - `item.deadlineStatus === 'OPEN'` $\rightarrow$ Chỉ hiển thị 2 lựa chọn: **Duyệt đạt (`APPROVED`)** (chỉ click được khi `plagiarismRate <= 35%`) và **Yêu cầu chỉnh sửa (`REQUEST_CHANGES`)**.
   - `item.deadlineStatus === 'EXTENDED'` $\rightarrow$ Chỉ hiển thị 2 lựa chọn: **Duyệt đạt (`APPROVED`)** (chỉ click được khi `plagiarismRate <= 35%`) và **Không đạt (`REJECTED`)**.
+- **Hướng dẫn Giao diện (UI/UX) cho Form / Modal Thẩm định Báo cáo**:
+  - **Gợi ý tải file PDF**: Thêm dòng ghi chú nhỏ bên dưới ô upload file:
+    > *"Lưu ý: Bắt buộc tải lên file PDF kết quả quét đạo văn chuẩn (Turnitin / KiểmTraTàiLiệu / DoIT). Tên file/tài liệu khi quét nên theo chuẩn `Lop_MSV_HoTen` để hệ thống tự động nhận diện và đối chiếu Mã sinh viên."*
+  - **Gợi ý nhập số liệu**: Thêm tooltip/placeholder:
+    > *"Nhập chính xác tỷ lệ % hiển thị trên file PDF (hệ thống sẽ tự động đối chiếu số liệu và cảnh báo nếu có sự sai lệch)."*
+  - **Xử lý phản hồi lỗi từ Backend**:
+    - Khi nhận mã lỗi `PLAGIARISM_SCORE_MISMATCH`: Tô đỏ ô nhập tỷ lệ đạo văn kèm thông báo *"Tỷ lệ bạn nhập không khớp với con số trong file PDF vừa tải lên. Vui lòng kiểm tra lại."*
+    - Khi nhận mã lỗi `PLAGIARISM_REPORT_STUDENT_ID_MISMATCH`: Bật Toast/Modal cảnh báo nghiêm trọng *"Cảnh báo: File PDF này thuộc về sinh viên khác, không khớp với sinh viên đang được chấm! Vui lòng kiểm tra lại file đã chọn."*
+    - Khi nhận mã lỗi `PROGRESS_REPORT_NOT_SUBMITTED`: Hiển thị nút bấm liên kết nhanh *"Nộp Phiếu theo dõi tiến độ ngay"* dẫn tới Modal nộp phiếu tiến độ.
 

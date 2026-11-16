@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -14,6 +14,7 @@ import {
   History,
   X,
 } from 'lucide-react'
+import { toast } from '@/shared/components/feedback/toast.store'
 import {
   Button,
   FileDropZone,
@@ -34,10 +35,10 @@ import {
   getReviewBlockedReason,
   isPdfFileUrl,
   isSafeReportFileUrl,
+  resolvePlagiarismReviewError,
   validatePlagiarismFile,
 } from '../services/reportCheck.service'
 import {
-  REPORT_REVIEW_ERROR_CODES,
   type FinalReportDecision,
   type FinalReportStatus,
   type ReportCheckItem,
@@ -192,6 +193,9 @@ const FinalReportReviewModalContent: React.FC<{
     !Number.isNaN(watchedPlagiarismRate) &&
     watchedPlagiarismRate > 35
 
+  const [missingProgressReportError, setMissingProgressReportError] =
+    useState(false)
+
   useEffect(() => {
     if (isPlagiarismOverLimit && selectedDecision === 'APPROVED') {
       const fallbackDecision = allowedDecisions.find((d) => d !== 'APPROVED')
@@ -204,6 +208,7 @@ const FinalReportReviewModalContent: React.FC<{
   const onSubmit = async (values: ReviewFormValues) => {
     if (!item.publicId || !values.plagiarismFile) return
     clearErrors('root.server')
+    setMissingProgressReportError(false)
 
     try {
       await onSubmitReview({
@@ -215,29 +220,32 @@ const FinalReportReviewModalContent: React.FC<{
       })
     } catch (error) {
       if (isApiError(error)) {
-        const msg = error.message
-        if (error.code === REPORT_REVIEW_ERROR_CODES.VALIDATION_ERROR) {
-          const lower = msg.toLowerCase()
-          if (lower.includes('đạo văn') || lower.includes('tỷ lệ')) {
-            setError('plagiarismRate', { message: msg }, { shouldFocus: true })
-            return
-          }
-          if (lower.includes('file') || lower.includes('tệp')) {
-            setError('plagiarismFile', { message: msg })
-            return
-          }
-          if (
-            lower.includes('quyết định') ||
-            lower.includes('kết quả') ||
-            lower.includes('approved') ||
-            lower.includes('request_changes') ||
-            lower.includes('rejected')
-          ) {
-            setError('decision', { message: msg })
-            return
-          }
+        const resolved = resolvePlagiarismReviewError(error.code, error.message)
+
+        if (resolved.isStudentMismatch) {
+          toast.error(resolved.message)
         }
-        setError('root.server', { message: msg })
+        if (resolved.isMissingProgressReport) {
+          setMissingProgressReportError(true)
+        }
+
+        if (resolved.field === 'plagiarismRate') {
+          setError(
+            'plagiarismRate',
+            { message: resolved.message },
+            { shouldFocus: true },
+          )
+          return
+        }
+        if (resolved.field === 'plagiarismFile') {
+          setError('plagiarismFile', { message: resolved.message })
+          return
+        }
+        if (resolved.field === 'decision') {
+          setError('decision', { message: resolved.message })
+          return
+        }
+        setError('root.server', { message: resolved.message })
         return
       }
       setError('root.server', {
@@ -300,7 +308,7 @@ const FinalReportReviewModalContent: React.FC<{
                 <span className="text-slate-500">Đề tài: </span>
                 <span className="font-semibold text-slate-900">{item.topic}</span>
               </div>
-              {item.progressReport && (
+              {item.progressReport ? (
                 <div className="text-[12px] text-emerald-700 flex items-center gap-1.5 flex-wrap">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   <span>Đã nộp Phiếu theo dõi tiến độ</span>
@@ -315,6 +323,20 @@ const FinalReportReviewModalContent: React.FC<{
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
+                </div>
+              ) : (
+                <div className="text-[12px] text-amber-800 flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                  <span className="inline-flex items-center gap-1.5 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Chưa nộp Phiếu theo dõi tiến độ</span>
+                  </span>
+                  <a
+                    href="/lecturer/guiding-evaluation"
+                    className="inline-flex items-center gap-1 text-[#1565C0] hover:underline font-bold"
+                  >
+                    <span>Nộp Phiếu theo dõi tiến độ ngay</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               )}
             </div>
@@ -378,7 +400,7 @@ const FinalReportReviewModalContent: React.FC<{
             <FormField
               label="Tỷ lệ đạo văn (%)"
               required
-              hint="Giá trị hợp lệ từ 0 đến 100 (ví dụ: 12.5)."
+              hint="Nhập chính xác tỷ lệ % hiển thị trên file PDF (hệ thống sẽ tự động đối chiếu số liệu và cảnh báo nếu có sự sai lệch)."
               error={errors.plagiarismRate?.message}
             >
               <Input
@@ -387,7 +409,7 @@ const FinalReportReviewModalContent: React.FC<{
                 min={0}
                 max={100}
                 disabled={isSubmitting}
-                placeholder="VD: 12.5"
+                placeholder="Nhập chính xác tỷ lệ % hiển thị trên file PDF (VD: 12.5)"
                 {...register('plagiarismRate', { valueAsNumber: true })}
               />
             </FormField>
@@ -406,24 +428,33 @@ const FinalReportReviewModalContent: React.FC<{
             )}
 
             {/* File kết quả kiểm tra trùng lặp */}
-            <FormField
-              label="File kết quả kiểm tra trùng lặp (Turnitin / DoIT)"
-              required
-              error={errors.plagiarismFile?.message}
-            >
-              <FileDropZone
-                file={selectedFile ?? undefined}
-                accept=".doc,.docx,.pdf"
-                hint="Chỉ nhận định dạng .doc, .docx hoặc .pdf (nhỏ hơn 10 MB)"
-                onSelect={(file) => {
-                  clearErrors('root.server')
-                  setValue('plagiarismFile', file, { shouldValidate: true })
-                }}
-                onClear={() => {
-                  setValue('plagiarismFile', null, { shouldValidate: true })
-                }}
-              />
-            </FormField>
+            <div className="space-y-1.5">
+              <FormField
+                label="File kết quả kiểm tra trùng lặp (Turnitin / DoIT)"
+                required
+                error={errors.plagiarismFile?.message}
+              >
+                <FileDropZone
+                  file={selectedFile ?? undefined}
+                  accept=".pdf,application/pdf"
+                  hint="Bắt buộc định dạng .pdf (nhỏ hơn 10 MB)"
+                  onSelect={(file) => {
+                    clearErrors('root.server')
+                    setValue('plagiarismFile', file, { shouldValidate: true })
+                  }}
+                  onClear={() => {
+                    setValue('plagiarismFile', null, { shouldValidate: true })
+                  }}
+                />
+              </FormField>
+              <p className="text-[11.5px] text-slate-500 leading-relaxed">
+                Lưu ý: Bắt buộc tải lên file PDF kết quả quét đạo văn chuẩn (Turnitin / KiểmTraTàiLiệu / DoIT). Tên file/tài liệu khi quét nên theo chuẩn{' '}
+                <code className="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">
+                  Lop_MSV_HoTen
+                </code>{' '}
+                để hệ thống tự động nhận diện và đối chiếu Mã sinh viên.
+              </p>
+            </div>
 
             {/* Ý kiến nhận xét */}
             <FormField
@@ -444,9 +475,21 @@ const FinalReportReviewModalContent: React.FC<{
             </FormField>
 
             {errors.root?.server && (
-              <p role="alert" className="text-sm font-semibold text-[#DC2626]">
-                {errors.root.server.message}
-              </p>
+              <div
+                role="alert"
+                className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-[#DC2626] space-y-2"
+              >
+                <p className="font-semibold">{errors.root.server.message}</p>
+                {missingProgressReportError && (
+                  <a
+                    href="/lecturer/guiding-evaluation"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white font-bold text-xs transition"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Nộp Phiếu theo dõi tiến độ ngay</span>
+                  </a>
+                )}
+              </div>
             )}
           </div>
 
@@ -935,9 +978,20 @@ export const ReportClassroomPreviewModal: React.FC<
                   )}
                 </>
               ) : (
-                <div className="text-amber-300 flex items-start gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>Chưa có phiếu theo dõi tiến độ (bắt buộc nộp trước khi thẩm định).</span>
+                <div className="space-y-2">
+                  <div className="text-amber-300 flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>Chưa có phiếu theo dõi tiến độ (bắt buộc nộp trước khi thẩm định).</span>
+                  </div>
+                  {(detail?.canReview ?? item.canReview) && (
+                    <a
+                      href="/lecturer/guiding-evaluation"
+                      className="inline-flex items-center gap-1 text-blue-400 hover:underline font-semibold"
+                    >
+                      <span>Nộp Phiếu theo dõi tiến độ ngay</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               )}
             </div>

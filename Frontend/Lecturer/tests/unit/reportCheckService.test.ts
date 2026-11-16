@@ -7,7 +7,9 @@ import {
   getAllowedReviewDecisions,
   getReviewBlockedReason,
   mapFinalReportToCheckItem,
+  mapPlagiarismReviewError,
   reportCheckService,
+  resolvePlagiarismReviewError,
   validatePlagiarismFile,
   validateReviewForm,
 } from '@/features/lecturer/report_check'
@@ -163,26 +165,35 @@ describe('reportCheckService & helpers', () => {
     expect(deadline.deadlineEndDate).toBe('2099-12-31T23:59:59')
   })
 
-  it('validates plagiarism file format and < 10MB limit', () => {
-    expect(validatePlagiarismFile(null)).toBe('File tải lên không được để trống.')
+  it('validates plagiarism file format (.pdf only) and < 10MB limit', () => {
+    expect(validatePlagiarismFile(null)).toBe(
+      'File báo cáo kiểm tra trùng lặp không được để trống.',
+    )
     expect(
       validatePlagiarismFile(new File(['abc'], 'result.txt', { type: 'text/plain' })),
-    ).toBe('File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf.')
+    ).toBe(
+      'File kiểm tra trùng lặp bắt buộc là định dạng .pdf (xuất từ Turnitin / KiểmTraTàiLiệu).',
+    )
+    expect(
+      validatePlagiarismFile(new File(['abc'], 'turnitin.docx')),
+    ).toBe(
+      'File kiểm tra trùng lặp bắt buộc là định dạng .pdf (xuất từ Turnitin / KiểmTraTàiLiệu).',
+    )
 
     const bigFile = new File(['x'], 'big.pdf', { type: 'application/pdf' })
     Object.defineProperty(bigFile, 'size', { value: PLAGIARISM_MAX_FILE_SIZE_BYTES })
     expect(validatePlagiarismFile(bigFile)).toBe('File tải lên phải nhỏ hơn 10MB.')
 
-    expect(
-      validatePlagiarismFile(new File(['ok'], 'turnitin.docx')),
-    ).toBeNull()
+    const validPdf = new File(['ok'], '64KTPM3_2051060001_NguyenVanAn.pdf', {
+      type: 'application/pdf',
+    })
+    expect(validatePlagiarismFile(validPdf)).toBeNull()
 
-    const validDocx = new File(['ok'], 'turnitin.docx')
     expect(
       validateReviewForm({
         decision: null,
         plagiarismRate: 10,
-        plagiarismFile: validDocx,
+        plagiarismFile: validPdf,
       }),
     ).toBe('Vui lòng chọn kết quả thẩm định báo cáo.')
 
@@ -190,7 +201,7 @@ describe('reportCheckService & helpers', () => {
       validateReviewForm({
         decision: 'APPROVED',
         plagiarismRate: null,
-        plagiarismFile: validDocx,
+        plagiarismFile: validPdf,
       }),
     ).toBe('Vui lòng nhập tỷ lệ đạo văn.')
 
@@ -198,7 +209,7 @@ describe('reportCheckService & helpers', () => {
       validateReviewForm({
         decision: 'APPROVED',
         plagiarismRate: -1,
-        plagiarismFile: validDocx,
+        plagiarismFile: validPdf,
       }),
     ).toBe('Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100%.')
 
@@ -206,7 +217,7 @@ describe('reportCheckService & helpers', () => {
       validateReviewForm({
         decision: 'APPROVED',
         plagiarismRate: 36,
-        plagiarismFile: validDocx,
+        plagiarismFile: validPdf,
       }),
     ).toBe('Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt.')
 
@@ -214,7 +225,7 @@ describe('reportCheckService & helpers', () => {
       validateReviewForm({
         decision: 'REQUEST_CHANGES',
         plagiarismRate: 36,
-        plagiarismFile: validDocx,
+        plagiarismFile: validPdf,
       }),
     ).toBeNull()
 
@@ -222,9 +233,54 @@ describe('reportCheckService & helpers', () => {
       validateReviewForm({
         decision: 'APPROVED',
         plagiarismRate: 35,
-        plagiarismFile: validDocx,
+        plagiarismFile: validPdf,
       }),
     ).toBeNull()
+  })
+
+  it('maps and resolves Plagiarism Auto-Verification error codes accurately', () => {
+    expect(mapPlagiarismReviewError('PLAGIARISM_SCORE_MISMATCH')).toContain(
+      'Số liệu không khớp!',
+    )
+    expect(
+      resolvePlagiarismReviewError(
+        4000,
+        'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập khác với kết quả trong file báo cáo PDF. Vui lòng kiểm tra lại tài liệu!',
+      ),
+    ).toMatchObject({
+      field: 'plagiarismRate',
+      isStudentMismatch: false,
+    })
+
+    expect(
+      resolvePlagiarismReviewError(
+        4000,
+        'Cảnh báo nhầm tài liệu! File báo cáo PDF có mã sinh viên không khớp với sinh viên đang duyệt.',
+      ),
+    ).toMatchObject({
+      field: 'plagiarismFile',
+      isStudentMismatch: true,
+    })
+
+    expect(
+      resolvePlagiarismReviewError(
+        4000,
+        'Không tìm thấy dữ liệu tỷ lệ trùng lặp hợp lệ trên trang 1 của tài liệu. Vui lòng kiểm tra lại đúng mẫu báo cáo PDF!',
+      ),
+    ).toMatchObject({
+      field: 'plagiarismFile',
+      isStudentMismatch: false,
+    })
+
+    expect(
+      resolvePlagiarismReviewError(
+        3093,
+        'GVHD chưa nộp phiếu theo dõi tiến độ cho đề tài này',
+      ),
+    ).toMatchObject({
+      field: 'root',
+      isMissingProgressReport: true,
+    })
   })
 
   it('enforces canReviewFinalReport, blocked reasons, and allowed decisions', () => {
