@@ -278,6 +278,7 @@ export const formatReportDeadlineForReview = (
 | **400** | `4000` | `PLAGIARISM_RATE_REQUIRED` | Vui lòng nhập tỷ lệ đạo văn | Chưa nhập tỷ lệ % trùng lặp |
 | **400** | `4000` | `PLAGIARISM_RATE_INVALID` | Tỷ lệ đạo văn phải nằm trong khoảng 0% đến 100% | Số âm hoặc lớn hơn 100% |
 | **400** | `4000` | `PLAGIARISM_RATE_EXCEEDED` | Tỷ lệ đạo văn vượt quá 35%, không đủ điều kiện phê duyệt Đạt | Tỷ lệ > 35.0% nhưng GVHD lại bấm APPROVED |
+| **400** | `4000` | `DOCUMENT_FILE_NAME_INVALID` | Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf) | **Sai định dạng tên file (`Tenlop_MaSV_HoVaTen`)** $\rightarrow$ FE nhắc đổi tên file đủ 3 thành phần phân tách bằng `_` |
 | **400** | `4000` | `PLAGIARISM_REPORT_FILE_REQUIRED` | Vui lòng tải lên file PDF báo cáo kiểm tra trùng lặp! | Chưa chọn file báo cáo đạo văn |
 | **400** | `4000` | `PLAGIARISM_SCORE_MISMATCH` | Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập khác với kết quả trong file báo cáo PDF. Vui lòng kiểm tra lại tài liệu! | **Số GVHD gõ khác số đọc được trong PDF** $\rightarrow$ FE báo đỏ nhắc GVHD kiểm tra lại số liệu hoặc file |
 | **400** | `4000` | `PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND` | Không tìm thấy Mã sinh viên hợp lệ trong mục 'Tên tài liệu' của file báo cáo PDF (Quy chuẩn: Lop_MSV_HoTen)! | Tên tài liệu khi scan không chứa chuỗi 10 chữ số MSV |
@@ -328,6 +329,20 @@ import type { FinalReportStatus, ThesisFinalReportResponse } from './finalReport
 export const PLAGIARISM_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // Nhỏ hơn 10 MB
 export const PLAGIARISM_ALLOWED_EXTENSIONS = ['pdf'] as const; // Bắt buộc PDF chuẩn
 
+// Validate định dạng tên file chung: Tenlop_MaSV_HoVaTen.<ext>
+export const isValidDocumentFileName = (fileName: string): boolean => {
+  const trimmed = fileName.trim();
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed;
+  const dotIndex = fileNameOnly.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false;
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim();
+  const parts = baseName.split('_');
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0);
+};
+
 export const validateReviewForm = (params: {
   plagiarismRate: number | null | undefined;
   plagiarismFile: File | null | undefined;
@@ -357,12 +372,17 @@ export const validateReviewForm = (params: {
   if (file.size >= PLAGIARISM_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.';
   }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)';
+  }
   return null;
 };
 
 // Hàm ánh xạ thông báo lỗi thân thiện cho GVHD khi Backend ném mã lỗi đối chiếu PDF
 export const mapPlagiarismReviewError = (errorCode: string | number, backendMessage?: string): string => {
   switch (errorCode) {
+    case 'DOCUMENT_FILE_NAME_INVALID':
+      return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)';
     case 'PLAGIARISM_SCORE_MISMATCH':
       return 'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập trên Form khác với kết quả ghi nhận trong file báo cáo PDF. Vui lòng kiểm tra lại tỷ lệ % đã gõ!';
     case 'PLAGIARISM_REPORT_STUDENT_ID_MISMATCH':

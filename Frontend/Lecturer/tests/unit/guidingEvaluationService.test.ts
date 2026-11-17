@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/shared/api'
 import {
   PROGRESS_MAX_FILE_SIZE_BYTES,
+  PROGRESS_REPORT_ERROR_CODES,
   canLecturerSubmitProgressReport,
   formatProgressDeadlineForSupervisor,
   getProgressUploadBlockedReason,
   guidingEvaluationService,
+  isValidDocumentFileName,
   mapFinalReportToGuidingItem,
   validateProgressFile,
 } from '@/features/lecturer/guiding_evaluation'
@@ -158,7 +160,21 @@ describe('guidingEvaluationService & helpers', () => {
     expect(deadline.deadlineEndDate).toBe('2099-12-31T23:59:59')
   })
 
-  it('validates progress report file format and < 10MB limit', () => {
+  it('validates file name according to Tenlop_MaSV_HoVaTen rule', () => {
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_NguyenVanAn.docx')).toBe(true)
+    expect(isValidDocumentFileName('C:/docs/DHKTPM17A_22110001_NguyenVanAn.doc')).toBe(true)
+    expect(isValidDocumentFileName('\\\\shared\\DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+    expect(isValidDocumentFileName('phieu_tien_do.pdf')).toBe(true)
+
+    expect(isValidDocumentFileName('phieu_an.pdf')).toBe(false)
+    expect(isValidDocumentFileName('phieu_tien_do_an_tot_nghiep.pdf')).toBe(false)
+    expect(isValidDocumentFileName('DHKTPM17A__NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('noextension')).toBe(false)
+    expect(isValidDocumentFileName('.pdf')).toBe(false)
+  })
+
+  it('validates progress report file format, < 10MB limit, and Tenlop_MaSV_HoVaTen name', () => {
     expect(validateProgressFile(null)).toBe('File tải lên không được để trống.')
     expect(
       validateProgressFile(new File(['abc'], 'notes.txt', { type: 'text/plain' })),
@@ -168,6 +184,14 @@ describe('guidingEvaluationService & helpers', () => {
     Object.defineProperty(bigFile, 'size', { value: PROGRESS_MAX_FILE_SIZE_BYTES })
     expect(validateProgressFile(bigFile)).toBe('File tải lên phải nhỏ hơn 10MB.')
 
+    const invalidNameFile = new File(['ok'], 'phieu_an.pdf', { type: 'application/pdf' })
+    expect(validateProgressFile(invalidNameFile)).toBe(
+      'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+    )
+
+    expect(
+      validateProgressFile(new File(['ok'], 'DHKTPM17A_2051060001_NguyenVanAn.docx')),
+    ).toBeNull()
     expect(
       validateProgressFile(new File(['ok'], 'phieu_tien_do.docx')),
     ).toBeNull()
@@ -225,6 +249,24 @@ describe('guidingEvaluationService & helpers', () => {
       text: '2026-11-25',
       badgeText: 'Đang mở',
       canSubmitWindow: true,
+    })
+  })
+
+  it('matches backend ErrorCode contract in API_Supervisor_ProgressReport.md', () => {
+    expect(PROGRESS_REPORT_ERROR_CODES).toMatchObject({
+      REPORT_FILE_EMPTY: 4000,
+      REPORT_FILE_INVALID_FORMAT: 4000,
+      REPORT_FILE_TOO_LARGE: 4000,
+      DOCUMENT_FILE_NAME_INVALID: 4000,
+      CLOUDINARY_SERVICE_FAIL: 4000,
+      THESIS_TOPIC_NOT_FOUND: 3049,
+      THESIS_FINAL_REPORT_NOT_FOUND: 3089,
+      REPORT_STAGE_INVALID: 3090,
+      REPORT_DEADLINE_NOT_FOUND: 3094,
+      PROGRESS_REPORT_DEADLINE_CLOSED: 3096,
+      TOPIC_NOT_IN_PROGRESS: 3057,
+      FORBIDDEN: 2001,
+      UNAUTHORIZED: 2000,
     })
   })
 })

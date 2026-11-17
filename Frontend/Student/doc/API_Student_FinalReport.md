@@ -56,6 +56,10 @@ Tài liệu hướng dẫn kết nối Frontend (`Frontend/Student`) với Backe
   - File không được rỗng và có tên file gốc hợp lệ (`4000 - REPORT_FILE_EMPTY`).
   - Chỉ nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`** (`4000 - REPORT_FILE_INVALID_FORMAT`).
   - Dung lượng **nhỏ hơn 10 MB** (`file.size < 10 * 1024 * 1024` bytes; từ `10 MB` trở lên trả `4000 - REPORT_FILE_TOO_LARGE`).
+  - **Định dạng tên file bắt buộc (`Tenlop_MaSV_HoVaTen`)**:
+    - Tên file (phần trước dấu chấm mở rộng) phải có đầy đủ **3 thành phần**: `Tenlop`, `MaSV`, `HoVaTen` phân tách bằng dấu gạch dưới `_` (ví dụ: `DHKTPM17A_22110001_NguyenVanAn.pdf`, `DHKTPM17B_22110002_TranThiBinh.docx`).
+    - Không được thiếu hoặc để trống bất kỳ thành phần nào.
+    - Nếu sai định dạng tên file, Backend trả lỗi `4000 - DOCUMENT_FILE_NAME_INVALID` (*"Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)"*).
 - **Kết quả kiểm tra trùng lặp (đạo văn) & nhận xét từ GVHD**:
   - Mỗi lần GVHD chính thẩm định báo cáo, GVHD bắt buộc nhập **tỷ lệ đạo văn (`plagiarismRate`, từ `0%` đến `100%`)** và tải lên **file kết quả kiểm tra trùng lặp (`plagiarismFile` / `plagiarismHistoryFile`)** kèm ý kiến nhận xét (`supervisorFeedback`) và kết quả (`APPROVED` / `REQUEST_CHANGES` / `REJECTED`).
   - Toàn bộ thông tin này được lưu trên cả bản ghi báo cáo hiện tại (`ThesisFinalReportResponse`) lẫn từng lần nộp trong mảng `histories` (`ThesisFinalReportHistoryResponse`, sắp xếp mới nhất lên đầu `submittedAt DESC`).
@@ -85,7 +89,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 - **Endpoint**: `POST /report/submit`
 - **Content-Type**: `multipart/form-data`
 - **Form Data Params**:
-  - `file` (`File`, **bắt buộc**): File báo cáo toàn văn tải lên. Chỉ chấp nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`**, tên file gốc hợp lệ, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes).
+  - `file` (`File`, **bắt buộc**): File báo cáo toàn văn tải lên. Chỉ chấp nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes), tên file phải tuân thủ đúng định dạng **`Tenlop_MaSV_HoVaTen.<ext>`** (ví dụ: `DHKTPM17A_22110001_NguyenVanAn.pdf`).
 - **Response Success (HTTP 200)**:
 
 ```json
@@ -303,6 +307,7 @@ export const formatReportDeadlineForStudent = (
 | **400** | `4000` | `REPORT_FILE_EMPTY` | File tải lên không được để trống |
 | **400** | `4000` | `REPORT_FILE_INVALID_FORMAT` | File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf |
 | **400** | `4000` | `REPORT_FILE_TOO_LARGE` | File tải lên phải nhỏ hơn 10MB |
+| **400** | `4000` | `DOCUMENT_FILE_NAME_INVALID` | Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng `Tenlop_MaSV_HoVaTen` (VD: `DHKTPM17A_22110001_NguyenVanAn.pdf`) |
 | **400** | `4000` | `CLOUDINARY_SERVICE_FAIL` | Upload file thất bại |
 | **404** | `3089` | `THESIS_FINAL_REPORT_NOT_FOUND` | Không tìm thấy báo cáo Final của đề tài |
 | **409** | `3090` | `REPORT_STAGE_INVALID` | Đề tài chưa được duyệt đề cương hoặc không ở giai đoạn làm báo cáo |
@@ -406,6 +411,20 @@ export interface ThesisFinalReportResponse {
 export const REPORT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // Nhỏ hơn 10 MB
 export const REPORT_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const;
 
+// Validate định dạng tên file chung: Tenlop_MaSV_HoVaTen.<ext>
+export const isValidDocumentFileName = (fileName: string): boolean => {
+  const trimmed = fileName.trim();
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed;
+  const dotIndex = fileNameOnly.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false;
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim();
+  const parts = baseName.split('_');
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0);
+};
+
 export const validateReportFile = (file: File | null | undefined): string | null => {
   if (!file || file.size === 0 || !file.name.trim()) {
     return 'File tải lên không được để trống.';
@@ -417,6 +436,9 @@ export const validateReportFile = (file: File | null | undefined): string | null
   }
   if (file.size >= REPORT_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.';
+  }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)';
   }
   return null;
 };

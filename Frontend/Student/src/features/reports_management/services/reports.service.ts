@@ -5,7 +5,21 @@ import type { ThesisFinalReportResponse } from '../types/reports.types'
 export const REPORT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // Nhỏ hơn 10 MB
 export const REPORT_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const
 
-/** Kiểm tra file báo cáo Final theo quy định Backend (.doc, .docx, .pdf và < 10 MB). */
+/** Validate định dạng tên file quy chuẩn Backend: Tenlop_MaSV_HoVaTen.<ext> */
+export function isValidDocumentFileName(fileName: string): boolean {
+  const trimmed = fileName.trim()
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed
+  const dotIndex = fileNameOnly.lastIndexOf('.')
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim()
+  const parts = baseName.split('_')
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0)
+}
+
+/** Kiểm tra file báo cáo Final theo quy định Backend (.doc, .docx, .pdf, < 10 MB và Tenlop_MaSV_HoVaTen). */
 export function validateReportFile(file: File | null | undefined): string | null {
   if (!file || file.size === 0 || !file.name.trim()) {
     return 'File tải lên không được để trống.'
@@ -21,6 +35,9 @@ export function validateReportFile(file: File | null | undefined): string | null
   }
   if (file.size >= REPORT_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.'
+  }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)'
   }
   return null
 }

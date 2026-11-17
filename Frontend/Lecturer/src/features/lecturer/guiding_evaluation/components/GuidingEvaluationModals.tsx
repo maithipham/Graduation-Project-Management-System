@@ -151,13 +151,20 @@ const UploadTrackingModalContent: React.FC<{
     } catch (error) {
       if (isApiError(error)) {
         const msg = error.message
-        if (error.code === PROGRESS_REPORT_ERROR_CODES.VALIDATION_ERROR) {
+        if (
+          error.code === PROGRESS_REPORT_ERROR_CODES.VALIDATION_ERROR ||
+          error.code === PROGRESS_REPORT_ERROR_CODES.DOCUMENT_FILE_NAME_INVALID ||
+          error.code === PROGRESS_REPORT_ERROR_CODES.REPORT_FILE_EMPTY ||
+          error.code === PROGRESS_REPORT_ERROR_CODES.REPORT_FILE_INVALID_FORMAT ||
+          error.code === PROGRESS_REPORT_ERROR_CODES.REPORT_FILE_TOO_LARGE
+        ) {
           const lower = msg.toLowerCase()
           if (
             lower.includes('file') ||
             lower.includes('tệp') ||
             lower.includes('định dạng') ||
-            lower.includes('mb')
+            lower.includes('mb') ||
+            lower.includes('tên')
           ) {
             setError('file', { message: msg })
             return
@@ -255,12 +262,12 @@ const UploadTrackingModalContent: React.FC<{
               label="Tệp phiếu theo dõi tiến độ"
               required
               error={errors.file?.message}
-              hint="Định dạng hỗ trợ: .doc, .docx, .pdf (dung lượng nhỏ hơn 10 MB)"
+              hint="Định dạng: .doc, .docx, .pdf (< 10 MB). Đặt tên theo cú pháp: Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)"
             >
               <FileDropZone
                 file={selectedFile ?? undefined}
                 accept=".doc,.docx,.pdf"
-                hint="Chỉ nhận .doc, .docx hoặc .pdf (< 10MB)"
+                hint="Chỉ nhận .doc, .docx hoặc .pdf (< 10MB) theo định dạng Tenlop_MaSV_HoVaTen"
                 onSelect={(file) => {
                   setValue('file', file, { shouldValidate: true })
                 }}

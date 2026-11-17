@@ -3,9 +3,11 @@ import { apiClient } from '@/shared/api'
 import {
   OUTLINE_ERROR_CODES,
   OUTLINE_MAX_FILE_SIZE_BYTES,
+  buildDefaultDocxFileName,
   extractOutlineFileName,
   getOutlineSubmitState,
   isSafeFileUrl,
+  isValidDocumentFileName,
   outlineService,
   validateOutlineFile,
 } from '@/features/outline_management'
@@ -268,24 +270,61 @@ describe('getOutlineSubmitState', () => {
 })
 
 describe('validateOutlineFile & OUTLINE_ERROR_CODES', () => {
-  it('validates empty, invalid extension, >= 10 MB, and valid outline files', () => {
+  it('validates document filename format (Tenlop_MaSV_HoVaTen)', () => {
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+    expect(isValidDocumentFileName('DHKTPM17B_22110002_TranThiBinh.docx')).toBe(true)
+    expect(isValidDocumentFileName('Lop_2051060001_NguyenVanAn.docx')).toBe(true)
+
+    // Invalid format cases
+    expect(isValidDocumentFileName('De_cuong_MSSV_HoTen.pdf')).toBe(false)
+    expect(isValidDocumentFileName('outline.pdf')).toBe(false)
+    expect(isValidDocumentFileName('De_cuong.docx')).toBe(false)
+    expect(isValidDocumentFileName('_22110001_NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('DHKTPM17A__NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_.pdf')).toBe(false)
+  })
+
+  it('buildDefaultDocxFileName creates filename satisfying Tenlop_MaSV_HoVaTen format', () => {
+    const fnWithClass = buildDefaultDocxFileName('2051060001', 'Nguyễn Văn An', 'DHKTPM17A')
+    expect(fnWithClass).toBe('DHKTPM17A_2051060001_NguyenVanAn.docx')
+    expect(isValidDocumentFileName(fnWithClass)).toBe(true)
+
+    const fnWithoutClass = buildDefaultDocxFileName('2051060001', 'Trần Thị Bình')
+    expect(fnWithoutClass).toBe('Lop_2051060001_TranThiBinh.docx')
+    expect(isValidDocumentFileName(fnWithoutClass)).toBe(true)
+  })
+
+  it('validates empty, invalid extension, >= 10 MB, invalid naming, and valid outline files', () => {
     expect(validateOutlineFile(null)).toBe('Vui lòng chọn file đề cương cần tải lên.')
 
     const emptyFile = new File([], 'empty.pdf', { type: 'application/pdf' })
     expect(validateOutlineFile(emptyFile)).toBe('Vui lòng chọn file đề cương cần tải lên.')
 
-    const invalidExt = new File(['abc'], 'outline.txt', { type: 'text/plain' })
+    const invalidExt = new File(['abc'], 'DHKTPM17A_22110001_NguyenVanAn.txt', {
+      type: 'text/plain',
+    })
     expect(validateOutlineFile(invalidExt)).toBe(
       'File đề cương chỉ hỗ trợ định dạng .doc, .docx hoặc .pdf.',
     )
 
-    const exactLimitFile = new File(['x'], 'big.pdf', { type: 'application/pdf' })
+    const exactLimitFile = new File(['x'], 'DHKTPM17A_22110001_NguyenVanAn.pdf', {
+      type: 'application/pdf',
+    })
     Object.defineProperty(exactLimitFile, 'size', { value: OUTLINE_MAX_FILE_SIZE_BYTES })
     expect(validateOutlineFile(exactLimitFile)).toBe(
       'Dung lượng file đề cương phải nhỏ hơn 10 MB.',
     )
 
-    const validDocx = new File(['valid'], 'De_cuong.DOCX', {
+    // Invalid naming format
+    const invalidNameFile = new File(['abc'], 'De_cuong.DOCX', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    expect(validateOutlineFile(invalidNameFile)).toBe(
+      'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+    )
+
+    // Valid file format and name
+    const validDocx = new File(['valid'], 'DHKTPM17A_2051060001_NguyenVanAn.DOCX', {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
     expect(validateOutlineFile(validDocx)).toBeNull()
@@ -296,6 +335,7 @@ describe('validateOutlineFile & OUTLINE_ERROR_CODES', () => {
       OUTLINE_FILE_EMPTY: 4000,
       OUTLINE_FILE_INVALID_FORMAT: 4000,
       OUTLINE_FILE_TOO_LARGE: 4000,
+      DOCUMENT_FILE_NAME_INVALID: 4000,
       OUTLINE_TITLE_TOO_LONG: 4000,
       CLOUDINARY_SERVICE_FAIL: 4000,
       FILE_EMPTY: 4000,

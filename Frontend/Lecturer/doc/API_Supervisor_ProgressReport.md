@@ -53,6 +53,10 @@ Tài liệu hướng dẫn kết nối Frontend với Backend (`tlu_gpms_system`
   - File không được rỗng và có tên file gốc hợp lệ (`4000 - REPORT_FILE_EMPTY`).
   - Chỉ nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`** (`4000 - REPORT_FILE_INVALID_FORMAT`).
   - Dung lượng **nhỏ hơn 10 MB** (`file.size < 10 * 1024 * 1024` bytes; từ `10 MB` trở lên trả `4000 - REPORT_FILE_TOO_LARGE`).
+  - **Định dạng tên file bắt buộc (`Tenlop_MaSV_HoVaTen`)**:
+    - Tên file (phần trước dấu chấm mở rộng) phải có đầy đủ **3 thành phần**: `Tenlop`, `MaSV`, `HoVaTen` phân tách bằng dấu gạch dưới `_` (ví dụ: `DHKTPM17A_22110001_NguyenVanAn.pdf`, `DHKTPM17B_22110002_TranThiBinh.docx`).
+    - Không được thiếu hoặc để trống bất kỳ thành phần nào.
+    - Nếu sai định dạng tên file, Backend trả lỗi `4000 - DOCUMENT_FILE_NAME_INVALID` (*"Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)"*).
 - **Thông báo real-time (SSE)**:
   - Khi GVHD chính nộp hoặc cập nhật Phiếu theo dõi tiến độ thành công, Backend tự động gửi thông báo SSE cho sinh viên: *"GVHD đã nộp phiếu theo dõi tiến độ."*
 
@@ -187,7 +191,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 - **Content-Type**: `multipart/form-data`
 - **Form Data Params**:
   - `topicPublicId` (`UUID`, **bắt buộc**): `topicPublicId` của đề tài sinh viên (lấy từ `item.topicPublicId`).
-  - `file` (`File`, **bắt buộc**): File phiếu theo dõi tiến độ. Chỉ nhận **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes).
+  - `file` (`File`, **bắt buộc**): File phiếu theo dõi tiến độ. Chỉ nhận **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes), tên file phải tuân thủ đúng định dạng **`Tenlop_MaSV_HoVaTen.<ext>`** (ví dụ: `DHKTPM17A_22110001_NguyenVanAn.pdf`).
   - `supervisorNote` (`string`, *không bắt buộc*): Nhận xét đánh giá tổng kết tiến độ của GVHD (chuỗi chỉ có khoảng trắng sẽ được lưu `null`).
 - **Response Success (HTTP 200)**:
 
@@ -301,6 +305,7 @@ export const formatProgressDeadlineForSupervisor = (
 | **400** | `4000` | `REPORT_FILE_EMPTY` | File tải lên không được để trống |
 | **400** | `4000` | `REPORT_FILE_INVALID_FORMAT` | File tải lên chỉ nhận định dạng .doc, .docx hoặc .pdf |
 | **400** | `4000` | `REPORT_FILE_TOO_LARGE` | File tải lên phải nhỏ hơn 10MB |
+| **400** | `4000` | `DOCUMENT_FILE_NAME_INVALID` | Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng `Tenlop_MaSV_HoVaTen` (VD: `DHKTPM17A_22110001_NguyenVanAn.pdf`) |
 | **400** | `4000` | `CLOUDINARY_SERVICE_FAIL` | Upload file thất bại |
 | **404** | `3049` | `THESIS_TOPIC_NOT_FOUND` | Không tìm thấy đề tài đồ án |
 | **404** | `3089` | `THESIS_FINAL_REPORT_NOT_FOUND` | Không tìm thấy báo cáo Final của đề tài |
@@ -336,6 +341,20 @@ import type { FinalReportStatus, ThesisFinalReportResponse } from './finalReport
 export const PROGRESS_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // Nhỏ hơn 10 MB
 export const PROGRESS_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const;
 
+// Validate định dạng tên file chung: Tenlop_MaSV_HoVaTen.<ext>
+export const isValidDocumentFileName = (fileName: string): boolean => {
+  const trimmed = fileName.trim();
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed;
+  const dotIndex = fileNameOnly.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false;
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim();
+  const parts = baseName.split('_');
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0);
+};
+
 export const validateProgressFile = (file: File | null | undefined): string | null => {
   if (!file || file.size === 0 || !file.name.trim()) {
     return 'File tải lên không được để trống.';
@@ -347,6 +366,9 @@ export const validateProgressFile = (file: File | null | undefined): string | nu
   }
   if (file.size >= PROGRESS_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.';
+  }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)';
   }
   return null;
 };

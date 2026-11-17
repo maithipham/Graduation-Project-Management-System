@@ -636,15 +636,7 @@ export const OutlineHistoryModal: React.FC<OutlineHistoryModalProps> = ({
                     const isRejected = h.status === 'REJECTED'
                     const fileName = getFileNameFromUrl(h.outlineHistoryFile)
                     const submitNumber = histories.length - i
-                    const hasExactOutlineFileMatch = histories.some(
-                      (row) => row.outlineHistoryFile === detailData?.outlineFile,
-                    )
-                    const isLatestRow = hasExactOutlineFileMatch
-                      ? h.outlineHistoryFile === detailData?.outlineFile
-                      : i === 0
-                    const rowAdvisorFeedback =
-                      h.advisorFeedback ||
-                      (isLatestRow ? detailData?.advisorFeedback : null)
+                    const rowAdvisorFeedback = h.advisorFeedback?.trim() || null
 
                     return (
                       <tr

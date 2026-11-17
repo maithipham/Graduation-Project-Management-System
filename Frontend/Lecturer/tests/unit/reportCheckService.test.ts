@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/shared/api'
 import {
   PLAGIARISM_MAX_FILE_SIZE_BYTES,
+  REPORT_REVIEW_ERROR_CODES,
   canReviewFinalReport,
   formatReportDeadlineForReview,
   getAllowedReviewDecisions,
   getReviewBlockedReason,
+  isValidDocumentFileName,
   mapFinalReportToCheckItem,
   mapPlagiarismReviewError,
   reportCheckService,
@@ -165,7 +167,21 @@ describe('reportCheckService & helpers', () => {
     expect(deadline.deadlineEndDate).toBe('2099-12-31T23:59:59')
   })
 
-  it('validates plagiarism file format (.pdf only) and < 10MB limit', () => {
+  it('validates file name according to Tenlop_MaSV_HoVaTen rule', () => {
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+    expect(isValidDocumentFileName('64KTPM3_2251172405_LuongThiThuyLien.pdf')).toBe(true)
+    expect(isValidDocumentFileName('C:/docs/DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+    expect(isValidDocumentFileName('\\\\shared\\DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+
+    expect(isValidDocumentFileName('turnitin.pdf')).toBe(false)
+    expect(isValidDocumentFileName('64KTPM3_NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('Bao_cao_DATN_MSSV_HoTen.pdf')).toBe(false)
+    expect(isValidDocumentFileName('DHKTPM17A__NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('noextension')).toBe(false)
+    expect(isValidDocumentFileName('.pdf')).toBe(false)
+  })
+
+  it('validates plagiarism file format (.pdf only), < 10MB limit, and Tenlop_MaSV_HoVaTen name', () => {
     expect(validatePlagiarismFile(null)).toBe(
       'File báo cáo kiểm tra trùng lặp không được để trống.',
     )
@@ -183,6 +199,13 @@ describe('reportCheckService & helpers', () => {
     const bigFile = new File(['x'], 'big.pdf', { type: 'application/pdf' })
     Object.defineProperty(bigFile, 'size', { value: PLAGIARISM_MAX_FILE_SIZE_BYTES })
     expect(validatePlagiarismFile(bigFile)).toBe('File tải lên phải nhỏ hơn 10MB.')
+
+    const invalidNamePdf = new File(['ok'], 'turnitin.pdf', {
+      type: 'application/pdf',
+    })
+    expect(validatePlagiarismFile(invalidNamePdf)).toBe(
+      'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+    )
 
     const validPdf = new File(['ok'], '64KTPM3_2051060001_NguyenVanAn.pdf', {
       type: 'application/pdf',
@@ -223,6 +246,16 @@ describe('reportCheckService & helpers', () => {
 
     expect(
       validateReviewForm({
+        decision: 'APPROVED',
+        plagiarismRate: 12.5,
+        plagiarismFile: invalidNamePdf,
+      }),
+    ).toBe(
+      'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+    )
+
+    expect(
+      validateReviewForm({
         decision: 'REQUEST_CHANGES',
         plagiarismRate: 36,
         plagiarismFile: validPdf,
@@ -239,6 +272,20 @@ describe('reportCheckService & helpers', () => {
   })
 
   it('maps and resolves Plagiarism Auto-Verification error codes accurately', () => {
+    expect(mapPlagiarismReviewError('DOCUMENT_FILE_NAME_INVALID')).toBe(
+      'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+    )
+    expect(
+      resolvePlagiarismReviewError(
+        'DOCUMENT_FILE_NAME_INVALID',
+        'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+      ),
+    ).toMatchObject({
+      field: 'plagiarismFile',
+      isStudentMismatch: false,
+      isMissingProgressReport: false,
+    })
+
     expect(mapPlagiarismReviewError('PLAGIARISM_SCORE_MISMATCH')).toContain(
       'Số liệu không khớp!',
     )
@@ -328,6 +375,40 @@ describe('reportCheckService & helpers', () => {
       badgeText: 'Đang mở',
       canReviewWindow: true,
       allowedDecisions: ['APPROVED', 'REQUEST_CHANGES'],
+    })
+  })
+
+  it('matches backend ErrorCode contract in API_Supervisor_FinalReportReview.md', () => {
+    expect(REPORT_REVIEW_ERROR_CODES).toMatchObject({
+      FINAL_REPORT_DECISION_NULL: 4000,
+      PLAGIARISM_RATE_REQUIRED: 4000,
+      PLAGIARISM_RATE_INVALID: 4000,
+      PLAGIARISM_RATE_EXCEEDED: 4000,
+      DOCUMENT_FILE_NAME_INVALID: 4000,
+      PLAGIARISM_REPORT_FILE_REQUIRED: 4000,
+      PLAGIARISM_SCORE_MISMATCH: 4000,
+      PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND: 4000,
+      PLAGIARISM_REPORT_STUDENT_ID_MISMATCH: 4000,
+      PLAGIARISM_REPORT_DATA_NOT_FOUND: 4000,
+      PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY: 4000,
+      PDF_FILE_EMPTY: 4000,
+      AI_SERVICE_TIMEOUT: 4000,
+      EXPECTED_STUDENT_ID_REQUIRED: 4000,
+      REPORT_FILE_EMPTY: 4000,
+      REPORT_FILE_INVALID_FORMAT: 4000,
+      REPORT_FILE_TOO_LARGE: 4000,
+      FINAL_REPORT_DECISION_INVALID_IN_SUBMISSION_PERIOD: 4000,
+      FINAL_REPORT_DECISION_INVALID_IN_GRADING_PERIOD: 4000,
+      CLOUDINARY_SERVICE_FAIL: 4000,
+      THESIS_FINAL_REPORT_NOT_FOUND: 3089,
+      REPORT_DEADLINE_NOT_FOUND: 3094,
+      FINAL_REPORT_SUBMISSION_DEADLINE_CLOSED: 3095,
+      FINAL_REPORT_GRADING_CLOSED: 3097,
+      FINAL_REPORT_NOT_PENDING: 3092,
+      PROGRESS_REPORT_NOT_SUBMITTED: 3093,
+      TOPIC_NOT_IN_PROGRESS: 3057,
+      FORBIDDEN: 2001,
+      UNAUTHORIZED: 2000,
     })
   })
 })

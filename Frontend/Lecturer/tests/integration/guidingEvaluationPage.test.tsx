@@ -215,7 +215,8 @@ describe('GuidingEvaluationPage integration', () => {
                   topicPublicId: 'top-1',
                   supervisorPublicId: 'lec-1',
                   supervisorName: 'Trần Văn Bình',
-                  progressFile: 'https://res.cloudinary.com/demo/raw/upload/phieu_an.pdf',
+                  progressFile:
+                    'https://res.cloudinary.com/demo/raw/upload/DHKTPM17A_2051060001_NguyenVanAn.pdf',
                   supervisorNote: 'Đủ điều kiện bảo vệ',
                   submittedAt: '2026-11-12T18:00:00',
                 },
@@ -258,7 +259,9 @@ describe('GuidingEvaluationPage integration', () => {
 
     // Chọn file hợp lệ + nhập ghi chú rồi nộp
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
-    const file = new File(['progress'], 'phieu_an.pdf', { type: 'application/pdf' })
+    const file = new File(['progress'], 'DHKTPM17A_2051060001_NguyenVanAn.pdf', {
+      type: 'application/pdf',
+    })
     await user.upload(fileInput, file)
     await user.type(
       screen.getByLabelText(/Nhận xét tổng kết tiến độ/i),
@@ -274,7 +277,9 @@ describe('GuidingEvaluationPage integration', () => {
     })
 
     // Sau khi invalidate query, tên file phiếu tiến độ mới hiển thị lên bảng
-    expect(await screen.findByText('phieu_an.pdf')).toBeInTheDocument()
+    expect(
+      await screen.findByText('DHKTPM17A_2051060001_NguyenVanAn.pdf'),
+    ).toBeInTheDocument()
   })
 
   it('calls fallback /api/v1/deadlines when supervisor-list returns empty array', async () => {

@@ -7,6 +7,7 @@ import {
   getFinalReportSubmitState,
   getReportDeadlineDisplay,
   isSafeReportFileUrl,
+  isValidDocumentFileName,
   reportsService,
   validateReportFile,
 } from '@/features/reports_management'
@@ -153,7 +154,20 @@ describe('Final Report URL & File Helpers', () => {
     expect(extractReportFileName(null)).toBe('Tệp báo cáo')
   })
 
-  it('validates empty, invalid extension, >= 10 MB, and valid report files', () => {
+  it('validates file name according to Tenlop_MaSV_HoVaTen rule', () => {
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+    expect(isValidDocumentFileName('DHKTPM17A_22110001_NguyenVanAn.docx')).toBe(true)
+    expect(isValidDocumentFileName('C:/docs/DHKTPM17A_22110001_NguyenVanAn.doc')).toBe(true)
+    expect(isValidDocumentFileName('\\\\shared\\DHKTPM17A_22110001_NguyenVanAn.pdf')).toBe(true)
+
+    expect(isValidDocumentFileName('DHKTPM17A_NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('Bao_cao_DATN_MSSV_HoTen.pdf')).toBe(false)
+    expect(isValidDocumentFileName('DHKTPM17A__NguyenVanAn.pdf')).toBe(false)
+    expect(isValidDocumentFileName('noextension')).toBe(false)
+    expect(isValidDocumentFileName('.pdf')).toBe(false)
+  })
+
+  it('validates empty, invalid extension, >= 10 MB, invalid name format, and valid report files', () => {
     expect(validateReportFile(null)).toBe('File tải lên không được để trống.')
 
     const emptyFile = new File([], 'empty.pdf', { type: 'application/pdf' })
@@ -168,7 +182,12 @@ describe('Final Report URL & File Helpers', () => {
     Object.defineProperty(exactLimitFile, 'size', { value: REPORT_MAX_FILE_SIZE_BYTES })
     expect(validateReportFile(exactLimitFile)).toBe('File tải lên phải nhỏ hơn 10MB.')
 
-    const validDocx = new File(['valid'], 'Bao_cao_Final.DOCX', {
+    const invalidNameFile = new File(['valid'], 'Bao_cao.pdf', { type: 'application/pdf' })
+    expect(validateReportFile(invalidNameFile)).toBe(
+      'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)',
+    )
+
+    const validDocx = new File(['valid'], 'DHKTPM17A_2051060001_NguyenVanAn.DOCX', {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
     expect(validateReportFile(validDocx)).toBeNull()
@@ -288,6 +307,9 @@ describe('getReportDeadlineDisplay & getFinalReportSubmitState', () => {
 
   it('matches backend ErrorCode contract in API_Student_FinalReport.md', () => {
     expect(FINAL_REPORT_ERROR_CODES).toMatchObject({
+      UNAUTHORIZED: 2000,
+      FORBIDDEN: 2001,
+      DOCUMENT_FILE_NAME_INVALID: 4000,
       REPORT_FILE_EMPTY: 4000,
       REPORT_FILE_INVALID_FORMAT: 4000,
       REPORT_FILE_TOO_LARGE: 4000,

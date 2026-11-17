@@ -48,7 +48,7 @@ canWriteAdvisorFeedback = false                          canWriteAdvisorFeedback
                                                             { "feedback": "Nhận xét góp ý..." }
                                                                   │
                                                                   ▼
-                                                      - Lưu vào outline.advisorFeedback
+                                                      - Lưu vào outline.advisorFeedback VÀ bản ghi history gần nhất
                                                       - KHÔNG thay đổi status đề cương
                                                       - KHÔNG thay đổi currentStage đề tài
                                                       - Bắn thông báo SSE real-time cho sinh viên
@@ -309,6 +309,7 @@ API này dùng chung cho cả GVHD, GVNX và Sinh viên để mở popup/drawer 
         "reviewerPublicId": null,
         "reviewerName": null,
         "reviewFeedback": null,
+        "advisorFeedback": "Đã đọc bản sửa v2, sinh viên đã cập nhật sơ đồ kiến trúc khá tốt.",
         "reviewedAt": null
       },
       {
@@ -321,6 +322,7 @@ API này dùng chung cho cả GVHD, GVNX và Sinh viên để mở popup/drawer 
         "reviewerPublicId": "018db26a-932f-789a-bc01-444444444444",
         "reviewerName": "PGS.TS. Lê Nhận Xét",
         "reviewFeedback": "Nội dung phần 2 quá sơ sài, yêu cầu bổ sung sơ đồ use-case và thiết kế bảng dữ liệu.",
+        "advisorFeedback": "Em cần rà soát lại bố cục chương 1 và chương 2.",
         "reviewedAt": "2026-11-11T16:20:00"
       }
     ]
@@ -472,6 +474,7 @@ export interface ThesisOutlineHistoryResponse {
   reviewerPublicId?: string | null;
   reviewerName?: string | null;
   reviewFeedback?: string | null;
+  advisorFeedback?: string | null; // Ý kiến nhận xét/góp ý của GVHD ở lần nộp này
   reviewedAt?: string | null;
 }
 

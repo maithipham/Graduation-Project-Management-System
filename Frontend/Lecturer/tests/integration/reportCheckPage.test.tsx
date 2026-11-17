@@ -290,7 +290,9 @@ describe('ReportCheckPage integration', () => {
     await user.click(approvedRadio)
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
-    const file = new File(['report'], 'turnitin.pdf', { type: 'application/pdf' })
+    const file = new File(['report'], '64KTPM3_2051060001_NguyenVanAn.pdf', {
+      type: 'application/pdf',
+    })
     await user.upload(fileInput, file)
 
     await user.click(screen.getByRole('button', { name: 'Xác nhận thẩm định' }))

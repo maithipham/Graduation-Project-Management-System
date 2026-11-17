@@ -34,6 +34,20 @@ interface RawDeadlinesGroupedResponse {
   stage2?: RawDeadlineMilestone[] | null
 }
 
+/** Validate định dạng tên file chung: Tenlop_MaSV_HoVaTen.<ext> */
+export function isValidDocumentFileName(fileName: string): boolean {
+  const trimmed = fileName.trim()
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed
+  const dotIndex = fileNameOnly.lastIndexOf('.')
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim()
+  const parts = baseName.split('_')
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0)
+}
+
 export function validatePlagiarismFile(file: File | null | undefined): string | null {
   if (!file || file.size === 0 || !file.name.trim()) {
     return 'File báo cáo kiểm tra trùng lặp không được để trống.'
@@ -49,6 +63,9 @@ export function validatePlagiarismFile(file: File | null | undefined): string | 
   }
   if (file.size >= PLAGIARISM_MAX_FILE_SIZE_BYTES) {
     return 'File tải lên phải nhỏ hơn 10MB.'
+  }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)'
   }
   return null
 }
@@ -86,6 +103,8 @@ export function mapPlagiarismReviewError(
   backendMessage?: string,
 ): string {
   switch (errorCode) {
+    case 'DOCUMENT_FILE_NAME_INVALID':
+      return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)'
     case 'PLAGIARISM_SCORE_MISMATCH':
       return 'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập trên Form khác với kết quả ghi nhận trong file báo cáo PDF. Vui lòng kiểm tra lại tỷ lệ % đã gõ!'
     case 'PLAGIARISM_REPORT_STUDENT_ID_MISMATCH':
@@ -107,6 +126,9 @@ export function mapPlagiarismReviewError(
 
   if (backendMessage) {
     const lower = backendMessage.toLowerCase()
+    if (lower.includes('tên file không đúng định dạng') || lower.includes('tenlop_masv_hovaten')) {
+      return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)'
+    }
     if (lower.includes('số liệu không khớp') || lower.includes('khác với kết quả trong file')) {
       return 'Số liệu không khớp! Tỷ lệ trùng lặp bạn nhập trên Form khác với kết quả ghi nhận trong file báo cáo PDF. Vui lòng kiểm tra lại tỷ lệ % đã gõ!'
     }
@@ -188,13 +210,16 @@ export function resolvePlagiarismReviewError(
     }
   }
 
-  // 4. Các lỗi thuộc về cấu trúc / nội dung file PDF báo cáo trùng lặp
+  // 4. Các lỗi thuộc về cấu trúc / nội dung / tên file PDF báo cáo trùng lặp
   if (
+    errorCode === 'DOCUMENT_FILE_NAME_INVALID' ||
     errorCode === 'PLAGIARISM_REPORT_STUDENT_ID_NOT_FOUND' ||
     errorCode === 'PLAGIARISM_REPORT_DATA_NOT_FOUND' ||
     errorCode === 'PLAGIARISM_REPORT_INTERNAL_INCONSISTENCY' ||
     errorCode === 'PLAGIARISM_REPORT_FILE_REQUIRED' ||
     errorCode === 'PDF_FILE_EMPTY' ||
+    lower.includes('tên file không đúng định dạng') ||
+    lower.includes('tenlop_masv_hovaten') ||
     lower.includes('không tìm thấy mã sinh viên') ||
     lower.includes('trang 1 của tài liệu') ||
     lower.includes('bất thường trong file pdf') ||

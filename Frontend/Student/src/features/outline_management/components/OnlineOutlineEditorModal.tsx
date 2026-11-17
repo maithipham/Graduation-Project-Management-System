@@ -87,7 +87,11 @@ export const OnlineOutlineEditorModal: React.FC<OnlineOutlineEditorModalProps> =
 
   if (!open) return null
 
-  const defaultFileName = buildDefaultDocxFileName(studentMeta.mssv, studentMeta.name)
+  const defaultFileName = buildDefaultDocxFileName(
+    studentMeta.mssv,
+    studentMeta.name,
+    studentMeta.className || data.className,
+  )
 
   const saveDraft = (silent = false) => {
     try {

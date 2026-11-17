@@ -55,12 +55,16 @@ Tài liệu hướng dẫn kết nối Frontend (`Frontend/Student`) với Backe
   - File không được rỗng và phải có tên file gốc hợp lệ (`4000 - OUTLINE_FILE_EMPTY`).
   - Chỉ nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`** (không phân biệt hoa/thường; sai định dạng trả `4000 - OUTLINE_FILE_INVALID_FORMAT`).
   - Dung lượng **nhỏ hơn 10 MB** (`file.size < 10 * 1024 * 1024` bytes; từ `10 MB` trở lên trả `4000 - OUTLINE_FILE_TOO_LARGE`).
+  - **Định dạng tên file bắt buộc (`Tenlop_MaSV_HoVaTen`)**:
+    - Tên file (phần trước dấu chấm mở rộng) phải có đầy đủ **3 thành phần**: `Tenlop`, `MaSV`, `HoVaTen` phân tách bằng dấu gạch dưới `_` (ví dụ: `DHKTPM17A_22110001_NguyenVanAn.pdf`, `DHKTPM17B_22110002_TranThiBinh.docx`).
+    - Không được thiếu hoặc để trống bất kỳ thành phần nào.
+    - Nếu sai định dạng tên file, Backend trả lỗi `4000 - DOCUMENT_FILE_NAME_INVALID` (*"Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)"*).
 - **`GET /outline/my-outline` luôn trả thông tin Deadline**:
   - Kể cả khi sinh viên **chưa nộp lần nào** (`publicId: null`, chưa có bản ghi `ThesisOutline`) hoặc **chưa có đề tài trong kỳ** (`topicPublicId: null`), API vẫn trả về đối tượng `ThesisOutlineResponse` chứa thông tin đề tài (nếu có) và 5 trường deadline thực tế của mốc `SV_CHINH_SUA_NOP_LAI_DE_CUONG` (`deadlineName`, `deadlineStartDate`, `deadlineEndDate`, `deadlineActive`, `deadlineStatus`).
   - **Lưu ý khi `publicId === null`**: Do `ThesisOutline` chỉ được tạo ở lần nộp đầu tiên, hàm map khi chưa có `ThesisOutline` chỉ map thông tin từ đề tài và deadline — `reviewerPublicId` và `reviewerName` trả về `null` kể cả khi TBM đã phân công `commentingLecturer` ở Backend. Sau khi nộp lần đầu (`publicId != null`), `reviewerPublicId` và `reviewerName` sẽ có dữ liệu.
-- **Góp ý của GVHD chính (`advisorFeedback`)**:
+- **Góp ý của GVHD chính (`advisorFeedback`) & Quản lý lịch sử nộp**:
   - GVHD chính (không áp dụng cho đồng GVHD) có thể ghi nhận xét góp ý trong thời gian từ `startDate` đến `endDate` (kể cả `EXTENDED`, chỉ chặn khi quá `endDate` hoặc `COMPLETED`), chỉ mang tính góp ý và **không làm thay đổi** `status` của đề cương hay `currentStage` của đề tài.
-  - `advisorFeedback` chỉ lưu bản mới nhất trên `ThesisOutline` (ghi đè lần trước, không lưu vào `histories`).
+  - **Lưu trữ nhận xét theo từng phiên bản trong `histories`**: Nhận xét góp ý của GVHD được lưu trữ vào cả đề cương chính (`outline.advisorFeedback`) và bản ghi lịch sử nộp gần nhất (`histories[i].advisorFeedback`). Khi sinh viên nộp lại bản sửa sau `REQUEST_CHANGES` (`POST /outline/submit`), Backend tự động reset các trường phản hồi trên đề cương chính (`advisorFeedback = null`, `reviewFeedback = null`, `reviewedAt = null`) và tạo bản ghi lịch sử mới (`status = PENDING`, `advisorFeedback = null`). Góp ý và nhận xét của các lần nộp cũ được bảo toàn nguyên vẹn trong từng bản ghi của mảng `histories`. Frontend chỉ cần hiển thị `history.advisorFeedback` theo từng dòng trong bảng lịch sử.
 - **Thông báo real-time (SSE) & Job quét hết hạn**:
   - Mọi thông báo giai đoạn này đều đẩy qua **SSE trên hệ thống (`NotificationService`)**, **không gửi email**:
     - SV nộp bài -> thông báo cho GV nhận xét.
@@ -140,6 +144,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
         "reviewerPublicId": "018db26a-932f-789a-bc01-444444444444",
         "reviewerName": "Phạm Thị Dung",
         "reviewFeedback": "Cần làm rõ kiến trúc phân hệ và kế hoạch kiểm thử.",
+        "advisorFeedback": "Đồng ý với góp ý của GV nhận xét, em bổ sung chương 3.",
         "reviewedAt": "2026-11-10T16:40:00"
       }
     ]
@@ -159,7 +164,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 - **Endpoint**: `POST /outline/submit`
 - **Content-Type**: `multipart/form-data`
 - **Form Data Params**:
-  - `file` (`File`, **bắt buộc**): File đề cương tải lên. Chỉ chấp nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`**, tên file gốc hợp lệ, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes).
+  - `file` (`File`, **bắt buộc**): File đề cương tải lên. Chỉ chấp nhận định dạng **`.doc`**, **`.docx`**, **`.pdf`**, dung lượng **nhỏ hơn 10 MB** (`< 10 * 1024 * 1024` bytes), tên file phải tuân thủ đúng định dạng **`Tenlop_MaSV_HoVaTen.<ext>`** (ví dụ: `DHKTPM17A_22110001_NguyenVanAn.pdf`).
   - `submissionNote` (`string`, *không bắt buộc*): Ghi chú của sinh viên khi nộp/nộp lại (chuỗi chỉ có khoảng trắng sẽ được lưu `null`).
   - `title` (`string`, *không bắt buộc*, tối đa `500` ký tự sau khi `trim()`): Tiêu đề đề cương (nếu bỏ trống, Backend tự lấy tiêu đề hiện tại của đề cương hoặc tên đề tài chính thức `topic.name`).
 - **Response Success (HTTP 200)**:
@@ -181,6 +186,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 | **400** | `4000` | `OUTLINE_FILE_EMPTY` | File đề cương tải lên không được để trống hoặc tên file gốc rỗng. |
 | **400** | `4000` | `OUTLINE_FILE_INVALID_FORMAT` | File đề cương chỉ hỗ trợ định dạng `.doc`, `.docx` hoặc `.pdf`. |
 | **400** | `4000` | `OUTLINE_FILE_TOO_LARGE` | Dung lượng file đề cương phải nhỏ hơn 10 MB. |
+| **400** | `4000` | `DOCUMENT_FILE_NAME_INVALID` | Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng `Tenlop_MaSV_HoVaTen` (VD: `DHKTPM17A_22110001_NguyenVanAn.pdf`). |
 | **400** | `4000` | `OUTLINE_TITLE_TOO_LONG` | Tiêu đề đề cương không được vượt quá 500 ký tự. |
 | **400** | `4000` | `CLOUDINARY_SERVICE_FAIL` | Upload file lên Cloudinary thất bại, vui lòng thử lại. |
 | **400** | `4000` | `FILE_EMPTY` / `FILE_TOO_LARGE` | Thiếu part `file` trong multipart request hoặc file vượt giới hạn upload của server. |
@@ -227,6 +233,7 @@ export interface ThesisOutlineHistoryResponse {
   reviewerPublicId: string | null;
   reviewerName: string | null;
   reviewFeedback: string | null;
+  advisorFeedback: string | null; // Góp ý của GVHD ở lần nộp này
   reviewedAt: string | null;
 }
 
@@ -269,6 +276,20 @@ export interface ThesisOutlineResponse {
 export const OUTLINE_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // Nhỏ hơn 10 MB
 export const OUTLINE_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const;
 
+// Validate định dạng tên file chung: Tenlop_MaSV_HoVaTen.<ext>
+export const isValidDocumentFileName = (fileName: string): boolean => {
+  const trimmed = fileName.trim();
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed;
+  const dotIndex = fileNameOnly.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false;
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim();
+  const parts = baseName.split('_');
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0);
+};
+
 // Validate phía UI trước khi gọi API nộp đề cương
 export const validateOutlineFile = (file: File | null | undefined): string | null => {
   if (!file || file.size === 0 || !file.name.trim()) {
@@ -281,6 +302,9 @@ export const validateOutlineFile = (file: File | null | undefined): string | nul
   }
   if (file.size >= OUTLINE_MAX_FILE_SIZE_BYTES) {
     return 'Dung lượng file đề cương phải nhỏ hơn 10 MB.';
+  }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)';
   }
   return null;
 };

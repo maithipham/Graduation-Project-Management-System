@@ -12,6 +12,7 @@ export interface ThesisOutlineHistoryResponse {
   reviewerPublicId: string | null
   reviewerName: string | null
   reviewFeedback: string | null
+  advisorFeedback: string | null
   reviewedAt: string | null
 }
 
@@ -59,6 +60,7 @@ export const OUTLINE_ERROR_CODES = {
   OUTLINE_FILE_EMPTY: 4000,
   OUTLINE_FILE_INVALID_FORMAT: 4000,
   OUTLINE_FILE_TOO_LARGE: 4000,
+  DOCUMENT_FILE_NAME_INVALID: 4000,
   OUTLINE_TITLE_TOO_LONG: 4000,
   CLOUDINARY_SERVICE_FAIL: 4000,
   FILE_EMPTY: 4000,

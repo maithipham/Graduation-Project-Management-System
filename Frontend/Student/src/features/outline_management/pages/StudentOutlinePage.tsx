@@ -270,10 +270,6 @@ export default function StudentOutlinePage() {
   }
 
   const outlineHistories = outlineData?.histories ?? []
-  const hasExactOutlineFileMatch = Boolean(
-    outlineData?.outlineFile &&
-      outlineHistories.some((h) => h.outlineHistoryFile === outlineData.outlineFile),
-  )
 
   return (
     <div className="w-full max-w-full space-y-4">
@@ -679,16 +675,10 @@ export default function StudentOutlinePage() {
                   </td>
                 </tr>
               ) : (
-                outlineHistories.map((row, idx) => {
+                outlineHistories.map((row) => {
                   const canOpenFile = isSafeFileUrl(row.outlineHistoryFile)
                   const displayFileName = extractOutlineFileName(row.outlineHistoryFile)
-                  const isLatestRow = hasExactOutlineFileMatch
-                    ? row.outlineHistoryFile === outlineData?.outlineFile
-                    : idx === 0
-                  const rowAdvisorFeedback =
-                    isLatestRow && outlineData?.advisorFeedback
-                      ? outlineData.advisorFeedback
-                      : null
+                  const rowAdvisorFeedback = row.advisorFeedback?.trim() || null
 
                   const reviewerFeedbackText = row.reviewFeedback?.trim() || '—'
 

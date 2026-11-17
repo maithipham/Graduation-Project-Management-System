@@ -88,7 +88,8 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
             </p>
             <p>
               • Vui lòng đặt tên tệp theo cú pháp:{' '}
-              <em className="text-slate-600">De_cuong_MSSV_HoTen.pdf</em>
+              <em className="text-slate-700 font-medium">Tenlop_MaSV_HoVaTen.pdf</em>{' '}
+              <span className="text-[11px] text-slate-500">(VD: DHKTPM17A_22110001_NguyenVanAn.pdf)</span>
             </p>
           </div>
 

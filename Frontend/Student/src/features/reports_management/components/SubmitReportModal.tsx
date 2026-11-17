@@ -115,8 +115,11 @@ const SubmitReportModalContent: React.FC<Omit<SubmitReportModalProps, 'open'>> =
                 <strong className="text-slate-700">nhỏ hơn 10 MB</strong>
               </p>
               <p>
-                • Cú pháp đặt tên gợi ý:{' '}
-                <em className="text-slate-600">Bao_cao_DATN_MSSV_HoTen.pdf</em>
+                • Cú pháp đặt tên:{' '}
+                <em className="text-slate-700 font-medium">Tenlop_MaSV_HoVaTen.pdf</em>{' '}
+                <span className="text-[11px] text-slate-500">
+                  (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)
+                </span>
               </p>
             </div>
 
