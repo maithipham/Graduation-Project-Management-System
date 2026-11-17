@@ -123,6 +123,24 @@ export const API_ENDPOINTS = {
     advisorFeedback: (publicId: string) => `/outline/${publicId}/advisor-feedback`,
     deadlines: '/api/v1/deadlines',
   },
+  /** Cấu hình rubric điểm (Trưởng bộ môn) – EvaluationTemplateController */
+  departmentRubric: {
+    base: '/evaluation-template',
+    detail: (publicId: string) => `/evaluation-template/${publicId}`,
+    clone: (publicId: string) => `/evaluation-template/${publicId}/clone`,
+    applyPreview: (publicId: string) => `/evaluation-template/${publicId}/apply-preview`,
+    apply: (publicId: string) => `/evaluation-template/${publicId}/apply`,
+    effectiveFrom: (publicId: string) => `/evaluation-template/${publicId}/effective-from`,
+    cancelApply: (publicId: string) => `/evaluation-template/${publicId}/cancel-apply`,
+    semester: (semesterPublicId: string) => `/semester/${semesterPublicId}/evaluation-template`,
+  },
+  /** Chấm điểm hướng dẫn (GVHD chính) – SupervisorGradeController */
+  advisorGrade: {
+    topics: '/advisor-grade/topic',
+    openSheet: (topicPublicId: string) => `/advisor-grade/topic/${topicPublicId}/sheet`,
+    sheet: (sheetPublicId: string) => `/advisor-grade/sheet/${sheetPublicId}`,
+    submit: (sheetPublicId: string) => `/advisor-grade/sheet/${sheetPublicId}/submit`,
+  },
   lecturer: {
     dashboard: '/lecturer/dashboard',
     topics: '/lecturer/topics',

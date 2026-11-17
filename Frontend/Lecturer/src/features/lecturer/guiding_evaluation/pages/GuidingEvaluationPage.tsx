@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  CheckSquare,
   ChevronDown,
   Clock,
   Download,
-  ExternalLink,
   Eye,
   FileQuestion,
   FileText,
@@ -16,10 +14,13 @@ import { Button, Select, Skeleton } from '@/shared/components/ui'
 import { cn, formatDate } from '@/shared/utils'
 import {
   PreviewTrackingModal,
-  RubricGradingModal,
   StudentReportDetailModal,
   UploadTrackingModal,
 } from '../components/GuidingEvaluationModals'
+import { AdvisorGradeCell } from '../components/AdvisorGradeCell'
+import { AdvisorGradingDialog } from '../components/AdvisorGradingDialog'
+import { useAdvisorGradeTopics } from '../hooks/useAdvisorGrade'
+import type { AdvisorGradeTopic } from '../types/advisorGrade.types'
 import {
   useGuidingEvaluation,
   useGuidingEvaluationCurrentSemester,
@@ -32,7 +33,6 @@ import {
 } from '../services/guidingEvaluation.service'
 import type { GuidingEvaluationTabStatus } from '../types/guidingEvaluation.types'
 import {
-  hasEvaluationScore,
   hasTrackingFile,
   isEvaluationCompleted,
 } from '../utils/guidingEvaluation.utils'
@@ -109,8 +109,6 @@ export default function GuidingEvaluationPage() {
 
     uploadTarget,
     setUploadTarget,
-    rubricTarget,
-    setRubricTarget,
     previewTarget,
     setPreviewTarget,
     detailTarget,
@@ -122,10 +120,20 @@ export default function GuidingEvaluationPage() {
     handlePageSizeChange,
     handlePageChange,
     handleConfirmUpload,
-    handleSaveRubric,
     handleDownloadTrackingFile,
     handleDownloadFinalReportFile,
   } = useGuidingEvaluation(selectedSemesterPublicId || undefined, semesterResolved)
+
+  // Chấm điểm hướng dẫn (API /advisor-grade): C1 ghép vào bảng theo topicPublicId
+  const advisorGradeQuery = useAdvisorGradeTopics(selectedSemesterPublicId || undefined, {
+    enabled: semesterResolved,
+  })
+  const advisorGradeByTopic = useMemo(
+    () => new Map((advisorGradeQuery.data?.items ?? []).map((topic) => [topic.topicPublicId, topic])),
+    [advisorGradeQuery.data],
+  )
+  const advisorGradeDeadline = advisorGradeQuery.data?.deadline ?? null
+  const [gradingTopic, setGradingTopic] = useState<AdvisorGradeTopic | null>(null)
 
   const handleAcademicYearChange = (academicYear: string) => {
     const latestOfYear = semesters.find(
@@ -434,7 +442,6 @@ export default function GuidingEvaluationPage() {
                 pagedItems.map((item, idx) => {
                   const completed = isEvaluationCompleted(item)
                   const hasFile = hasTrackingFile(item)
-                  const hasScore = hasEvaluationScore(item)
                   const canUpload = canLecturerSubmitProgressReport(item)
                   const blockedReason = getProgressUploadBlockedReason(item)
                   const displayStt = startIdx + idx
@@ -609,32 +616,13 @@ export default function GuidingEvaluationPage() {
                           <span className="text-[12px] text-slate-400 italic">
                             Chỉ xem
                           </span>
-                        ) : !hasScore ? (
-                          <button
-                            type="button"
-                            onClick={() => setRubricTarget(item)}
-                            className="h-8 px-3.5 rounded-lg bg-[#1565C0] hover:bg-blue-700 text-white text-[12px] font-bold transition cursor-pointer shadow-xs inline-flex items-center gap-1.5"
-                          >
-                            <CheckSquare className="w-3.5 h-3.5" />
-                            <span>Chấm điểm</span>
-                          </button>
                         ) : (
-                          <div className="inline-flex items-center gap-1.5">
-                            <span className="font-extrabold text-[13.5px] text-slate-900">
-                              {Number(item.score).toFixed(1)}
-                            </span>
-                            <span className="text-xs text-slate-400 font-semibold">
-                              / 10.0
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setRubricTarget(item)}
-                              className="p-1 rounded-md text-slate-400 hover:text-[#1565C0] hover:bg-blue-50 transition cursor-pointer ml-0.5"
-                              title="Xem / Chỉnh sửa điểm Rubric"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          <AdvisorGradeCell
+                            topic={advisorGradeByTopic.get(item.topicPublicId)}
+                            deadline={advisorGradeDeadline}
+                            isLoading={advisorGradeQuery.isPending}
+                            onOpen={setGradingTopic}
+                          />
                         )}
                       </td>
 
@@ -733,11 +721,10 @@ export default function GuidingEvaluationPage() {
         onConfirm={handleConfirmUpload}
       />
 
-      <RubricGradingModal
-        key={`rubric-${rubricTarget?.id ?? 'closed'}`}
-        item={rubricTarget}
-        onClose={() => setRubricTarget(null)}
-        onSave={handleSaveRubric}
+      <AdvisorGradingDialog
+        topic={gradingTopic}
+        deadline={advisorGradeDeadline}
+        onClose={() => setGradingTopic(null)}
       />
 
       <PreviewTrackingModal

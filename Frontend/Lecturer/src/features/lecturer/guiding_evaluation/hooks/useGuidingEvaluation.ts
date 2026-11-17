@@ -26,7 +26,6 @@ import { useGuidingEvaluationStore } from '../store/guidingEvaluation.store'
 import type {
   GuidingEvaluationItem,
   ProgressDeadlineSnapshot,
-  RubricScores,
   SubmitProgressReportPayload,
 } from '../types/guidingEvaluation.types'
 import { isEvaluationCompleted } from '../utils/guidingEvaluation.utils'
@@ -142,13 +141,11 @@ export function useGuidingEvaluation(semesterId?: string, enabled = true) {
     searchQuery,
     pageSize,
     currentPage,
-    localRubrics,
     setFilterStatus,
     setSearchQuery,
     setPageSize,
     setCurrentPage,
-    saveLocalRubric,
-  } = useGuidingEvaluationStore()
+  } =useGuidingEvaluationStore()
 
   const reportsQuery = useSupervisorProgressReports(semesterId, enabled)
   const rawReports = useMemo(
@@ -168,18 +165,8 @@ export function useGuidingEvaluation(semesterId?: string, enabled = true) {
   )
 
   const items = useMemo(
-    () =>
-      rawReports.map((dto) => {
-        const mapped = mapFinalReportToGuidingItem(dto)
-        const localRubric = localRubrics[mapped.topicPublicId]
-        if (!localRubric) return mapped
-        return {
-          ...mapped,
-          score: localRubric.score,
-          rubricScores: localRubric.rubricScores,
-        }
-      }),
-    [rawReports, localRubrics],
+    () => rawReports.map(mapFinalReportToGuidingItem),
+    [rawReports],
   )
 
   const deadlineSnapshot: ProgressDeadlineSnapshot | null = useMemo(() => {
@@ -213,9 +200,6 @@ export function useGuidingEvaluation(semesterId?: string, enabled = true) {
   const submitMutation = useSubmitProgressReport()
 
   const [uploadTarget, setUploadTarget] = useState<GuidingEvaluationItem | null>(
-    null,
-  )
-  const [rubricTarget, setRubricTarget] = useState<GuidingEvaluationItem | null>(
     null,
   )
   const [previewTarget, setPreviewTarget] =
@@ -277,23 +261,6 @@ export function useGuidingEvaluation(semesterId?: string, enabled = true) {
     setUploadTarget(null)
   }
 
-  const handleSaveRubric = (
-    item: GuidingEvaluationItem,
-    totalScore: number,
-    rubricScores: RubricScores,
-    isDraft: boolean,
-  ) => {
-    saveLocalRubric(item.topicPublicId, totalScore, rubricScores, isDraft)
-    setRubricTarget(null)
-    if (isDraft) {
-      toast.info(`Đã lưu nháp bảng điểm cho sinh viên ${item.name}.`)
-    } else {
-      toast.success(
-        `Đã lưu tạm bảng điểm hướng dẫn (${totalScore.toFixed(1)} / 10.0) cho ${item.name}.`,
-      )
-    }
-  }
-
   const handleDownloadTrackingFile = (item: GuidingEvaluationItem) => {
     if (!item.progressFileUrl) return
     void downloadProgressFile(
@@ -335,8 +302,6 @@ export function useGuidingEvaluation(semesterId?: string, enabled = true) {
 
     uploadTarget,
     setUploadTarget,
-    rubricTarget,
-    setRubricTarget,
     previewTarget,
     setPreviewTarget,
     detailTarget,
@@ -348,7 +313,6 @@ export function useGuidingEvaluation(semesterId?: string, enabled = true) {
     handlePageSizeChange: setPageSize,
     handlePageChange,
     handleConfirmUpload,
-    handleSaveRubric,
     handleDownloadTrackingFile,
     handleDownloadFinalReportFile,
   }

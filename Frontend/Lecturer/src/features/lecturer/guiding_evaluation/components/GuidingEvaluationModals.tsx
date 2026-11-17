@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,8 +8,6 @@ import {
   Clock,
   Download,
   ExternalLink,
-  FileDown,
-  FileSpreadsheet,
   FileText,
   FileUp,
   History,
@@ -40,16 +38,8 @@ import {
   PROGRESS_REPORT_ERROR_CODES,
   type GuidingEvaluationItem,
   type GuidingFinalReportStatus,
-  type RubricCriterionKey,
-  type RubricScores,
   type SubmitProgressReportPayload,
 } from '../types/guidingEvaluation.types'
-import {
-  clampRubricValue,
-  computeRubricSummary,
-  getInitialRubricScores,
-  RUBRIC_GROUPS,
-} from '../utils/guidingEvaluation.utils'
 
 const HISTORY_STATUS_BADGE: Record<
   GuidingFinalReportStatus,
@@ -345,204 +335,7 @@ export const UploadTrackingModal: React.FC<UploadTrackingModalProps> = ({
 }
 
 // ==========================================
-// 2. MODAL BẢNG ĐIỂM RUBRIC CHẤM ĐIỂM HƯỚNG DẪN
-// ==========================================
-interface RubricGradingModalProps {
-  item: GuidingEvaluationItem | null
-  onClose: () => void
-  onSave: (
-    item: GuidingEvaluationItem,
-    totalScore: number,
-    rubricScores: RubricScores,
-    isDraft: boolean,
-  ) => void
-}
-
-export const RubricGradingModal: React.FC<RubricGradingModalProps> = ({
-  item,
-  onClose,
-  onSave,
-}) => {
-  const [scores, setScores] = useState<RubricScores>(() =>
-    getInitialRubricScores(item ?? { rubricScores: null }),
-  )
-
-  const summary = useMemo(() => computeRubricSummary(scores), [scores])
-
-  if (!item) return null
-
-  const handleScoreChange = (key: RubricCriterionKey, rawValue: string) => {
-    const parsed = rawValue === '' ? 0 : parseFloat(rawValue)
-    const clamped = clampRubricValue(parsed)
-    setScores((prev) => ({ ...prev, [key]: clamped }))
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="bg-white rounded-2xl w-full max-w-[940px] max-h-[92vh] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
-        {/* Modal Header */}
-        <div className="px-7 py-4.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1565C0] flex items-center justify-center shrink-0 border border-blue-100/80">
-              <FileSpreadsheet className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-[15px] font-bold text-slate-800">
-                  Bảng điểm:{' '}
-                  <span className="text-[#1565C0]">{item.name}</span>
-                </h3>
-                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[11px] font-semibold">
-                  MSV: {item.mssv}
-                </span>
-              </div>
-              <p
-                className="text-[12px] text-slate-500 mt-0.5 max-w-[620px] truncate"
-                title={item.topic}
-              >
-                Đề tài: {item.topic}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="px-3.5 py-1.5 rounded-xl bg-[#0D47A1] text-white flex items-baseline gap-1 shadow-xs">
-              <span className="text-[17px] font-extrabold leading-none tracking-tight">
-                {summary.totalScore.toFixed(1)}
-              </span>
-              <span className="text-[11.5px] font-semibold text-blue-200">
-                /10.0
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Đóng"
-              className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Modal Body: Bảng tiêu chí chấm điểm 5 cột */}
-        <div className="overflow-y-auto px-7 py-4 flex-1">
-          <table className="w-full text-left text-[13px] border-collapse">
-            <thead>
-              <tr className="text-slate-400 text-[11px] font-bold uppercase tracking-wider h-9 border-b border-slate-100 select-none">
-                <th className="px-3 py-2 w-14 text-center">STT</th>
-                <th className="px-4 py-2">TIÊU CHÍ CHẤM ĐIỂM</th>
-                <th className="px-4 py-2 w-28 text-center">TRỌNG SỐ</th>
-                <th className="px-4 py-2 w-36 text-center">ĐIỂM (THANG 10)</th>
-                <th className="px-4 py-2 w-28 text-center">ĐIỂM TỔNG</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100/80">
-              {RUBRIC_GROUPS.map((grp) => (
-                <React.Fragment key={grp.group}>
-                  <tr className="bg-white hover:bg-slate-50/50 transition font-bold text-slate-800">
-                    <td className="px-3 py-2.5 text-center">{grp.group}</td>
-                    <td className="px-4 py-2.5">{grp.title}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-bold bg-blue-50 text-blue-700">
-                        {grp.weight}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-slate-300 font-bold">
-                      —
-                    </td>
-                    <td className="px-4 py-2.5 text-center font-bold text-blue-700 text-[13.5px]">
-                      {summary.groupTotals[grp.group].toFixed(1)}
-                    </td>
-                  </tr>
-                  {grp.criteria.map((crit) => (
-                    <tr key={crit.key} className="hover:bg-slate-50/40 transition">
-                      <td className="px-3 py-2 text-center text-slate-400 text-[12.5px]">
-                        {crit.code}
-                      </td>
-                      <td className="px-4 py-2 text-slate-700">{crit.label}</td>
-                      <td className="px-4 py-2 text-center text-slate-600 font-medium text-[12.5px]">
-                        {crit.weight}%
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <div className="inline-flex items-center justify-center gap-1.5">
-                          <input
-                            type="number"
-                            min={0}
-                            max={10}
-                            step={0.1}
-                            value={scores[crit.key]}
-                            onChange={(e) =>
-                              handleScoreChange(crit.key, e.target.value)
-                            }
-                            className="w-16 h-8 text-center font-bold text-[13px] border border-slate-200 rounded-lg outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 bg-white transition shadow-2xs text-slate-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <span className="text-slate-400 text-[12px] font-medium">
-                            /10
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-center font-bold text-emerald-600 text-[13px]">
-                        {summary.criterionWeighted[crit.key].toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-
-              {/* TỔNG CỘNG HÀNG CUỐI */}
-              <tr className="bg-blue-50/30 border-t-2 border-slate-200">
-                <td
-                  colSpan={2}
-                  className="px-4 py-3.5 text-center font-bold text-slate-800 uppercase tracking-wide text-[12.5px]"
-                >
-                  TỔNG CỘNG ĐIỂM HƯỚNG DẪN ĐỒ ÁN
-                </td>
-                <td className="px-4 py-3.5 text-center font-bold text-blue-700 text-[13px]">
-                  100%
-                </td>
-                <td className="px-4 py-3.5 text-center text-slate-300 font-bold">
-                  —
-                </td>
-                <td className="px-4 py-3.5 text-center font-extrabold text-blue-700 text-[16px]">
-                  {summary.totalScore.toFixed(1)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-7 py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => onSave(item, summary.totalScore, scores, true)}
-            className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
-          >
-            <FileDown className="w-4 h-4 text-slate-500" />
-            <span>Lưu nháp</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onSave(item, summary.totalScore, scores, false)}
-            className="h-10 px-5 rounded-xl bg-[#0D47A1] hover:bg-blue-800 text-white text-[13px] font-bold transition cursor-pointer shadow-xs inline-flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Lưu bảng điểm</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ==========================================
-// 3. MODAL XEM FILE PHIẾU THEO DÕI TIẾN ĐỘ THẬT TỪ BACKEND
+// 2. MODAL XEM FILE PHIẾU THEO DÕI TIẾN ĐỘ THẬT TỪ BACKEND
 // ==========================================
 interface PreviewTrackingModalProps {
   item: GuidingEvaluationItem | null
@@ -855,7 +648,7 @@ export const PreviewTrackingModal: React.FC<PreviewTrackingModalProps> = ({
 }
 
 // ==========================================
-// 4. MODAL CHI TIẾT BÁO CÁO FINAL & LỊCH SỬ NỘP (GET /report/{publicId})
+// 3. MODAL CHI TIẾT BÁO CÁO FINAL & LỊCH SỬ NỘP (GET /report/{publicId})
 // ==========================================
 interface StudentReportDetailModalProps {
   item: GuidingEvaluationItem | null

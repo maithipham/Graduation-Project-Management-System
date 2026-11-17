@@ -145,8 +145,6 @@ export function mapFinalReportToGuidingItem(
     deadlineEndDate: dto.deadlineEndDate,
     deadlineActive: dto.deadlineActive,
     deadlineStatus: dto.deadlineStatus,
-    score: null,
-    rubricScores: null,
   }
 }
 

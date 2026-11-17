@@ -21,6 +21,9 @@ const ScheduleManagementPage = lazy(
 const TemplateManagementPage = lazy(
   () => import('@/features/department/template_management/pages/TemplateManagementPage'),
 )
+const GradingConfigPage = lazy(
+  () => import('@/features/department/score_management/pages/GradingConfigPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
@@ -52,6 +55,8 @@ export const departmentRoutes: RouteObject = {
     { path: 'schedule', element: withSuspense(<ScheduleManagementPage />) },
     // Tài liệu & Biểu mẫu (giao diện demo, chưa nối API)
     { path: 'documents-management', element: withSuspense(<TemplateManagementPage />) },
+    // Cấu hình điểm / Kho rubric (giao diện demo, chưa nối API)
+    { path: 'grading-config', element: withSuspense(<GradingConfigPage />) },
   ],
 }
 

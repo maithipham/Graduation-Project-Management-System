@@ -12,20 +12,6 @@ export type GuidingProgressReportDto = ThesisProgressReportResponse
 export type GuidingFinalReportStatus = FinalReportStatus
 export type GuidingDeadlineStatus = ReportDeadlineStatus
 
-export interface RubricScores {
-  r1_1: number
-  r1_2: number
-  r2_1: number
-  r2_2: number
-  r3_1: number
-  r3_2: number
-  r4_1: number
-  r4_2: number
-  r4_3: number
-}
-
-export type RubricCriterionKey = keyof RubricScores
-
 export type GuidingEvaluationTabStatus = 'all' | 'incomplete' | 'completed'
 
 export interface GuidingEvaluationItem {
@@ -62,8 +48,6 @@ export interface GuidingEvaluationItem {
   deadlineEndDate: string | null
   deadlineActive: boolean | null
   deadlineStatus: GuidingDeadlineStatus | null
-  score: number | null
-  rubricScores: RubricScores | null
 }
 
 export interface GuidingEvaluationCounts {
@@ -115,18 +99,3 @@ export const PROGRESS_REPORT_ERROR_CODES = {
   FORBIDDEN: 2001,
   UNAUTHORIZED: 2000,
 } as const
-
-export interface RubricCriterionConfig {
-  key: RubricCriterionKey
-  code: string
-  label: string
-  weight: number
-  group: 1 | 2 | 3 | 4
-}
-
-export interface RubricGroupConfig {
-  group: 1 | 2 | 3 | 4
-  title: string
-  weight: number
-  criteria: RubricCriterionConfig[]
-}
