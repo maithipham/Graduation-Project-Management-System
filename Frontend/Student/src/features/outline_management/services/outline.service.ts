@@ -218,11 +218,14 @@ export function extractOutlineFileName(fileUrl?: string | null): string {
   const segments = withoutQuery.split('/').filter(Boolean)
   const rawName = segments[segments.length - 1]
   if (!rawName) return fileUrl
+  let decoded = rawName
   try {
-    return decodeURIComponent(rawName)
+    decoded = decodeURIComponent(rawName)
   } catch {
-    return rawName
+    decoded = rawName
   }
+  // Loại bỏ tiền tố UUID do Backend CloudinaryService tự sinh (dạng UUID_)
+  return decoded.replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_/, '')
 }
 
 export const outlineService = {
