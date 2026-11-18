@@ -168,6 +168,11 @@ describe('Outline URL & File Name Helpers', () => {
         'https://res.cloudinary.com/demo/raw/upload/v1/De%20cuong%20v2.pdf?download=1',
       ),
     ).toBe('De cuong v2.pdf')
+    expect(
+      extractOutlineFileName(
+        'https://res.cloudinary.com/demo/raw/upload/v1/b8209cf9-5abb-4b6b-8e8c-601b3a2f28ff_63CNTT1_2151062704_NguyenVanAn.docx',
+      ),
+    ).toBe('63CNTT1_2151062704_NguyenVanAn.docx')
     expect(extractOutlineFileName(null)).toBe('Tệp đề cương')
   })
 })

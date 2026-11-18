@@ -700,7 +700,7 @@ export default function StudentOutlinePage() {
                                 {displayFileName}
                               </a>
                               <a
-                                href={row.outlineHistoryFile}
+                                href={`/student/outline/preview?url=${encodeURIComponent(row.outlineHistoryFile)}&file=${encodeURIComponent(displayFileName)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1 rounded text-slate-400 hover:text-[#1565C0] hover:bg-blue-50 transition"
@@ -748,13 +748,6 @@ export default function StudentOutlinePage() {
       <SubmitOutlineFileModal
         open={fileModalOpen}
         isSubmitting={submitOutlineMutation.isPending}
-        defaultTitle={
-          outlineData?.title ||
-          outlineData?.topicName ||
-          topicOverview?.officialName ||
-          topicOverview?.provisionalName ||
-          ''
-        }
         onClose={() => setFileModalOpen(false)}
         onSubmitFile={handleFileSubmit}
       />
