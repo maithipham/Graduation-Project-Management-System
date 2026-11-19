@@ -34,7 +34,7 @@ export function CouncilDetailDialog({ council, open, onOpenChange }: CouncilDeta
                 {council.code}
               </span>
               <DialogTitle className="text-base font-bold tracking-tight text-slate-800">
-                {council.name || `Hội đồng ${council.code}`}
+                {council.name || council.code}
               </DialogTitle>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">

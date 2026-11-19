@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, ShieldAlert } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { useMyInfo } from '@/features/auth'
+import { ApiError } from '@/shared/types'
+import { useMajors } from '@/features/department/student_management'
 import { useSemesterScope } from '@/features/department/lecturer_management/hooks/useSemesterScope'
 import { useManagedMajor } from '@/features/department/lecturer_management/hooks/useTeachers'
 import { SemesterScopeFilter } from '@/features/department/lecturer_management/components/SemesterScopeFilter'
@@ -13,6 +16,11 @@ import { AssignStudentsWorkspace } from '../components/AssignStudentsWorkspace'
 import type { DefenseCouncil } from '../types'
 
 export default function DefenseCouncilPage() {
+  const { data: user } = useMyInfo()
+  const isAuthorized = user?.roles
+    ? user.roles.some((r) => r === 'ADMIN' || r === 'HEAD_OF_MAJOR')
+    : true
+
   const [activeTab, setActiveTab] = useState<'list' | 'members' | 'students'>('list')
   const [selectedCouncilId, setSelectedCouncilId] = useState<string>('')
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false)
@@ -29,22 +37,40 @@ export default function DefenseCouncilPage() {
     onSemesterChange,
   } = useSemesterScope({ defaultToCurrent: true, allowAll: false })
 
-  const { data: managedMajor, isLoading: majorLoading } = useManagedMajor()
+  const { data: managedMajor } = useManagedMajor()
+  const { data: majors, isPending: majorsLoading } = useMajors()
 
-  const currentMajorCode = (managedMajor?.code || managedMajor?.name || 'KTPM')
+  const [selectedMajorId, setSelectedMajorId] = useState<string>('')
+
+  useEffect(() => {
+    if (managedMajor?.publicId) {
+      setSelectedMajorId(managedMajor.publicId)
+    } else if (majors && majors.length > 0 && !selectedMajorId) {
+      setSelectedMajorId(majors[0].publicId)
+    }
+  }, [managedMajor, majors, selectedMajorId])
+
+  const currentMajor =
+    majors?.find((m) => m.publicId === selectedMajorId) || managedMajor
+  const currentMajorCode = (currentMajor?.code || currentMajor?.name || 'KTPM')
     .replace(/[^A-Za-z0-9]/g, '')
     .toUpperCase()
     .slice(0, 5)
 
   // Use selected IDs (publicId UUID) for queries
   const activeSemesterId = selectedSemesterId || ''
-  const activeMajorId = managedMajor?.publicId || ''
+  const activeMajorId = selectedMajorId || managedMajor?.publicId || ''
 
   // Query Councils
-  const { data: councilData, isPending: councilsLoading } = useDefenseCouncils(
-    activeSemesterId,
-    activeMajorId,
-  )
+  const {
+    data: councilData,
+    isPending: councilsLoading,
+    error: councilsError,
+  } = useDefenseCouncils(activeSemesterId, activeMajorId)
+
+  const isForbiddenError =
+    councilsError instanceof ApiError &&
+    (councilsError.status === 403 || councilsError.code === 2001)
 
   const councils = councilData?.councils || []
   const incompleteCount = councilData?.incompleteCouncilCount ?? 0
@@ -64,8 +90,29 @@ export default function DefenseCouncilPage() {
     setActiveTab('members')
   }
 
+  if (user && !isAuthorized) {
+    return (
+      <div className="bg-white border border-rose-200 rounded-2xl p-12 text-center shadow-xs max-w-xl mx-auto my-12">
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 mx-auto flex items-center justify-center mb-3">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-800">Không có quyền truy cập</h3>
+        <p className="text-xs text-slate-500 mt-1">
+          Chức năng Quản lý Hội đồng bảo vệ chỉ dành cho vai trò Quản trị viên (ADMIN) hoặc Trưởng bộ môn (HEAD_OF_MAJOR).
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 max-w-[1440px] w-full mx-auto">
+      {isForbiddenError && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
+          <span>Bạn không có quyền truy cập dữ liệu Hội đồng bảo vệ (HTTP 403, mã lỗi 2001).</span>
+        </div>
+      )}
+
       {/* HEADER / TOOLBAR: BỘ LỌC NĂM HỌC, HỌC KỲ, BỘ MÔN */}
       <div className="flex items-center justify-between gap-3 flex-wrap bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
         <div className="flex items-center gap-3 flex-wrap">
@@ -80,13 +127,27 @@ export default function DefenseCouncilPage() {
             onSemesterChange={onSemesterChange}
           />
 
-          {/* Managed Major (Read-only for TBM) */}
-          <div className="h-9 px-3.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 flex items-center shadow-2xs">
-            {majorLoading ? (
-              <span className="text-slate-400">Đang tải ngành...</span>
-            ) : (
-              <span>{managedMajor?.name || 'Kỹ thuật phần mềm'}</span>
-            )}
+          {/* Major Filter */}
+          <div className="flex items-center gap-1.5">
+            <select
+              value={selectedMajorId}
+              onChange={(e) => setSelectedMajorId(e.target.value)}
+              aria-label="Chọn bộ môn"
+              className="h-9 px-3 pr-8 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-2xs cursor-pointer"
+              disabled={majorsLoading}
+            >
+              {majors && majors.length > 0 ? (
+                majors.map((m) => (
+                  <option key={m.publicId} value={m.publicId}>
+                    {m.name}
+                  </option>
+                ))
+              ) : (
+                <option value={managedMajor?.publicId || '1'}>
+                  {managedMajor?.name || 'Kỹ thuật phần mềm (KTPM)'}
+                </option>
+              )}
+            </select>
           </div>
         </div>
       </div>
@@ -101,19 +162,17 @@ export default function DefenseCouncilPage() {
           <button
             type="button"
             onClick={() => setActiveTab('list')}
-            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
-              activeTab === 'list'
+            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${activeTab === 'list'
                 ? 'bg-white text-[#1565C0] font-bold shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 font-medium'
-            }`}
+              }`}
           >
             <span>Danh sách hội đồng</span>
             <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                activeTab === 'list'
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${activeTab === 'list'
                   ? 'bg-[#E3F2FD] text-[#1565C0]'
                   : 'bg-slate-100 text-slate-600'
-              }`}
+                }`}
             >
               {councils.length}
             </span>
@@ -123,11 +182,10 @@ export default function DefenseCouncilPage() {
           <button
             type="button"
             onClick={() => setActiveTab('members')}
-            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
-              activeTab === 'members'
+            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${activeTab === 'members'
                 ? 'bg-white text-[#1565C0] font-bold shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 font-medium'
-            }`}
+              }`}
           >
             <span>Gán giảng viên vào hội đồng</span>
             {incompleteCount > 0 ? (
@@ -145,11 +203,10 @@ export default function DefenseCouncilPage() {
           <button
             type="button"
             onClick={() => setActiveTab('students')}
-            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
-              activeTab === 'students'
+            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${activeTab === 'students'
                 ? 'bg-white text-[#1565C0] font-bold shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 font-medium'
-            }`}
+              }`}
           >
             <span>Gán sinh viên vào hội đồng</span>
             <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-[#1565C0]">

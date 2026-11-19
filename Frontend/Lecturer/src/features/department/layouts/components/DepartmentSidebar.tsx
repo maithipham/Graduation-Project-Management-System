@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ChevronRight,
@@ -6,6 +6,7 @@ import {
   PanelLeftOpen,
   X,
 } from 'lucide-react'
+import { useMyInfo } from '@/features/auth'
 import { departmentNavItems } from './departmentNav.config'
 
 interface DepartmentSidebarProps {
@@ -26,6 +27,23 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
   onMobileClose,
 }) => {
   const location = useLocation()
+  const { data: user } = useMyInfo()
+
+  const visibleNavItems = useMemo(() => {
+    return departmentNavItems
+      .filter((item) => {
+        if (!item.roles) return true
+        return user?.roles?.some((role) => item.roles?.includes(role))
+      })
+      .map((item) => {
+        if (!item.children) return item
+        const filteredChildren = item.children.filter((child) => {
+          if (!child.roles) return true
+          return user?.roles?.some((role) => child.roles?.includes(role))
+        })
+        return { ...item, children: filteredChildren }
+      })
+  }, [user?.roles])
 
   // Quản lý trạng thái mở/đóng của sub-menu Accordion (mặc định mở 'Quản lý giáo viên')
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
@@ -105,7 +123,7 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
         className="flex-1 overflow-y-auto px-3 py-3 space-y-2 scrollbar-thin scrollbar-thumb-white/20"
         aria-label="Menu trưởng bộ môn"
       >
-        {departmentNavItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon
           const hasChildren = Boolean(item.children && item.children.length > 0)
           const isAccordionOpen = Boolean(openSubmenus[item.to])
@@ -128,8 +146,8 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
                   onClick={() => handleAccordionToggle(item.to)}
                   title={collapsed ? item.label : undefined}
                   className={`group relative h-10 rounded-lg flex items-center text-[13px] transition-all duration-150 cursor-pointer select-none ${collapsed
-                      ? 'w-11 mx-auto justify-center p-0'
-                      : 'w-full px-3 gap-3 justify-start'
+                    ? 'w-11 mx-auto justify-center p-0'
+                    : 'w-full px-3 gap-3 justify-start'
                     } ${highlightParent
                       ? ACTIVE_ITEM
                       : 'text-blue-100 font-medium hover:text-white hover:bg-white/10'
@@ -158,8 +176,8 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
                 {/* Nhóm con (Sub-items với hiệu ứng max-height mượt mà) */}
                 <div
                   className={`overflow-hidden transition-all duration-200 ease-in-out ${!collapsed && isAccordionOpen
-                      ? 'max-h-48 opacity-100 pt-0.5'
-                      : 'max-h-0 opacity-0 py-0 pointer-events-none'
+                    ? 'max-h-48 opacity-100 pt-0.5'
+                    : 'max-h-0 opacity-0 py-0 pointer-events-none'
                     }`}
                 >
                   <div className="pl-3 space-y-0.5">
@@ -241,8 +259,8 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
           type="button"
           onClick={onToggle}
           className={`hidden lg:flex h-10 items-center rounded-xl text-blue-100 hover:text-white hover:bg-white/10 transition-colors text-[13px] font-medium tracking-wide cursor-pointer ${collapsed
-              ? 'w-11 mx-auto justify-center px-0'
-              : 'w-full px-3 gap-3'
+            ? 'w-11 mx-auto justify-center px-0'
+            : 'w-full px-3 gap-3'
             }`}
           title={collapsed ? 'Mở rộng menu (Ctrl B)' : 'Thu gọn menu (Ctrl B)'}
           aria-label="Thu gọn hoặc mở rộng menu"

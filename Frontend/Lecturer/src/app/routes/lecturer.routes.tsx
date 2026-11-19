@@ -37,9 +37,17 @@ const DefenseCouncilPage = lazy(
   () =>
     import('@/features/lecturer/defense_management/pages/DefenseCouncilPage'),
 )
+const CouncilExaminerPage = lazy(
+  () =>
+    import('@/features/lecturer/defense_management/pages/CouncilExaminerPage'),
+)
 const DefenseReviewPage = lazy(
   () =>
     import('@/features/lecturer/defense_management/pages/DefenseReviewPage'),
+)
+const ExaminerGradingPage = lazy(
+  () =>
+    import('@/features/lecturer/defense_management/pages/ExaminerGradingPage'),
 )
 const LecturerTemplatesPage = lazy(
   () =>
@@ -107,8 +115,16 @@ export const lecturerRoutes: RouteObject = {
       element: withSuspense(<DefenseCouncilPage />),
     },
     {
+      path: 'defense/councils/:councilPublicId',
+      element: withSuspense(<CouncilExaminerPage />),
+    },
+    {
       path: 'defense/reviews',
       element: withSuspense(<DefenseReviewPage />),
+    },
+    {
+      path: 'defense/reviews/:examinerAssignmentPublicId',
+      element: withSuspense(<ExaminerGradingPage />),
     },
     {
       path: 'templates',

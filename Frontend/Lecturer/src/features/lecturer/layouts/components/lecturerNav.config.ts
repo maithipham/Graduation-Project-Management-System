@@ -19,6 +19,8 @@ export type LecturerNavBadgeKey =
   | 'outlines'
   | 'thesisExecutionGroup'
   | 'reports'
+  | 'defenseGroup'
+  | 'defenseReviews'
 
 export interface LecturerSubNavItem {
   to: string
@@ -89,9 +91,28 @@ export const lecturerNavItems: LecturerNavItem[] = [
     ],
   },
   {
-    to: '/lecturer/defense',
+    to: '/lecturer/defense-group',
     label: 'Bảo vệ đồ án',
     icon: Award,
+    badgeKey: 'defenseGroup',
+    children: [
+      {
+        to: '/lecturer/defense',
+        label: 'Lịch bảo vệ & phản biện',
+        icon: FileText,
+      },
+      {
+        to: '/lecturer/defense/reviews',
+        label: 'Đánh giá phản biện',
+        icon: ClipboardCheck,
+        badgeKey: 'defenseReviews',
+      },
+      {
+        to: '/lecturer/defense/councils',
+        label: 'Hội đồng bảo vệ',
+        icon: ShieldCheck,
+      },
+    ],
   },
   {
     to: '/lecturer/templates',

@@ -45,7 +45,12 @@ export function toApiError(error: AxiosError): ApiError {
   if (body && typeof body === 'object' && 'message' in body) {
     const apiRes = body as Partial<ApiResponse>
     const code = typeof apiRes.code === 'number' ? apiRes.code : (status ?? NETWORK_ERROR_CODE)
-    return new ApiError(apiRes.message || 'Có lỗi xảy ra từ máy chủ', code, apiRes.data, status)
+    const fallbackMsg = status === 403 || code === 2001 ? 'Bạn không có quyền truy cập' : 'Có lỗi xảy ra từ máy chủ'
+    return new ApiError(apiRes.message || fallbackMsg, code, apiRes.data, status)
+  }
+
+  if (status === 403) {
+    return new ApiError('Bạn không có quyền truy cập', 2001, body, 403)
   }
 
   if (status) {

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Check, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { toast } from '@/shared/components/feedback/toast.store'
 import type { DefenseCouncil } from '../types'
 import {
   useEligibleStudents,
@@ -36,6 +37,9 @@ export function AssignStudentsWorkspace({
     () => councils.find((c) => c.publicId === selectedCouncilId) || councils[0],
     [councils, selectedCouncilId],
   )
+
+  const isCouncilAcceptingStudents =
+    activeCouncil?.status === 'DRAFT' || activeCouncil?.status === 'PUBLISHED'
 
   const isAssignedMode = subTab === 'assigned'
 
@@ -94,6 +98,13 @@ export function AssignStudentsWorkspace({
   const handleAssign = () => {
     if (!activeCouncil || selectedTopicIds.size === 0) return
 
+    if (!isCouncilAcceptingStudents) {
+      toast.warning(
+        'Chỉ được gán sinh viên vào Hội đồng ở trạng thái Bản nháp (DRAFT) hoặc Đã công bố (PUBLISHED).',
+      )
+      return
+    }
+
     assignStudentsMutation.mutate(
       {
         councilPublicId: activeCouncil.publicId,
@@ -130,22 +141,20 @@ export function AssignStudentsWorkspace({
             <button
               type="button"
               onClick={() => handleSubTabChange('unassigned')}
-              className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                subTab === 'unassigned'
+              className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${subTab === 'unassigned'
                   ? 'bg-white text-[#1565C0] font-bold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
+                }`}
             >
               <span>Chưa gán HĐ</span>
             </button>
             <button
               type="button"
               onClick={() => handleSubTabChange('assigned')}
-              className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                subTab === 'assigned'
+              className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${subTab === 'assigned'
                   ? 'bg-white text-[#1565C0] font-bold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
+                }`}
             >
               <span>Đã gán HĐ</span>
             </button>
@@ -182,11 +191,10 @@ export function AssignStudentsWorkspace({
               return (
                 <div
                   key={s.thesisTopicPublicId}
-                  className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 ${
-                    isChecked
+                  className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 ${isChecked
                       ? 'border-[#1565C0]/60 bg-blue-50/40 shadow-2xs'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
-                  }`}
+                    }`}
                 >
                   <label
                     htmlFor={`sv-chk-${s.thesisTopicPublicId}`}
@@ -272,11 +280,10 @@ export function AssignStudentsWorkspace({
                 key={i}
                 type="button"
                 onClick={() => setPage(i)}
-                className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  i === page
+                className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-bold transition cursor-pointer ${i === page
                     ? 'bg-[#1565C0] text-white shadow-xs'
                     : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {i + 1}
               </button>
@@ -308,8 +315,18 @@ export function AssignStudentsWorkspace({
             type="button"
             size="sm"
             onClick={handleAssign}
-            disabled={!activeCouncil || selectedTopicIds.size === 0 || assignStudentsMutation.isPending}
-            className="h-8 px-3 rounded-lg bg-[#1565C0] text-white text-xs font-semibold hover:bg-[#0D47A1] inline-flex items-center gap-1.5 shrink-0"
+            disabled={
+              !activeCouncil ||
+              !isCouncilAcceptingStudents ||
+              selectedTopicIds.size === 0 ||
+              assignStudentsMutation.isPending
+            }
+            title={
+              !isCouncilAcceptingStudents
+                ? `Hội đồng ở trạng thái ${activeCouncil?.status || ''} không được gán sinh viên (chỉ DRAFT hoặc PUBLISHED)`
+                : undefined
+            }
+            className="h-8 px-3 rounded-lg bg-[#1565C0] text-white text-xs font-semibold hover:bg-[#0D47A1] inline-flex items-center gap-1.5 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Check className="w-3.5 h-3.5" />
             <span>Gán ({selectedTopicIds.size} SV)</span>
@@ -323,23 +340,33 @@ export function AssignStudentsWorkspace({
               <div
                 key={c.publicId}
                 onClick={() => onSelectCouncil(c.publicId)}
-                className={`p-3.5 rounded-xl border-2 transition cursor-pointer select-none ${
-                  isSel
+                className={`p-3.5 rounded-xl border-2 transition cursor-pointer select-none ${isSel
                     ? 'border-[#1565C0] bg-blue-50/40 shadow-xs'
                     : 'border-slate-200 bg-white hover:border-[#1565C0]/60 hover:bg-slate-50/60'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span
-                    className={`font-bold text-sm truncate ${
-                      isSel ? 'text-[#0D47A1]' : 'text-slate-800'
-                    }`}
+                    className={`font-bold text-sm truncate ${isSel ? 'text-[#0D47A1]' : 'text-slate-800'
+                      }`}
                   >
-                    {c.code} — {c.name || `Hội đồng ${c.code}`}
+                    {c.code} — {c.name || c.code}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-[#1565C0] border border-sky-200 shrink-0">
-                    {c.studentCount} SV
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {c.status === 'COMPLETED' && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        ĐÃ XONG
+                      </span>
+                    )}
+                    {c.status === 'CANCELLED' && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        ĐÃ HỦY
+                      </span>
+                    )}
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-[#1565C0] border border-sky-200">
+                      {c.studentCount} SV
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 text-xs text-slate-500">

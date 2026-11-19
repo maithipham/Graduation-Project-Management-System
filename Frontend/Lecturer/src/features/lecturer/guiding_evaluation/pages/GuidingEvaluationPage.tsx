@@ -14,20 +14,20 @@ import {
   RubricGradingModal,
   UploadTrackingModal,
 } from '../components/GuidingEvaluationModals'
-import { useGuidingEvaluation } from '../hooks/useGuidingEvaluation'
-import type { GuidingEvaluationTabStatus } from '../types/guidingEvaluation.types'
+import { Skeleton } from '@/shared/components/ui'
+import { formatDate } from '@/shared/utils'
 import {
-  getMissingEvaluationStatus,
-  hasEvaluationScore,
-  hasTrackingFile,
-  isEvaluationCompleted,
-} from '../utils/guidingEvaluation.utils'
+  getAdvisorMissingText,
+  isAdvisorEvaluationCompleted,
+  useGuidingEvaluation,
+} from '../hooks/useGuidingEvaluation'
+import type { AdvisorEvaluationFilter } from '../types'
 
 export default function GuidingEvaluationPage() {
   const {
-    teacher,
-    academicYear,
-    semester,
+    isPending,
+    isError,
+    gradingEndAt,
     counts,
     filterStatus,
     searchQuery,
@@ -50,13 +50,10 @@ export default function GuidingEvaluationPage() {
     handleSearchChange,
     handlePageSizeChange,
     handlePageChange,
-    handleConfirmUpload,
-    handleSaveRubric,
-    handleDownloadTrackingFile,
   } = useGuidingEvaluation()
 
   const tabs: Array<{
-    status: GuidingEvaluationTabStatus
+    status: AdvisorEvaluationFilter
     label: string
     count: number
   }> = [
@@ -125,7 +122,9 @@ export default function GuidingEvaluationPage() {
           <Clock className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
             Hạn hoàn thành:{' '}
-            <b className="font-bold text-amber-900">25/11/2026 23:59</b>
+            <b className="font-bold text-amber-900">
+              {gradingEndAt ? formatDate(gradingEndAt, 'full') : 'Chưa thiết lập'}
+            </b>
           </span>
         </div>
       </div>
@@ -157,7 +156,21 @@ export default function GuidingEvaluationPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {pagedItems.length === 0 ? (
+              {isPending ? (
+                Array.from({ length: 5 }, (_, i) => (
+                  <tr key={i}>
+                    <td colSpan={6} className="py-3 px-5">
+                      <Skeleton className="h-10 w-full" />
+                    </td>
+                  </tr>
+                ))
+              ) : isError ? (
+                <tr>
+                  <td colSpan={6} className="py-14 text-center text-rose-600 text-[13px]">
+                    Không tải được danh sách sinh viên hướng dẫn.
+                  </td>
+                </tr>
+              ) : pagedItems.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-14 text-center text-slate-400">
                     <FileQuestion className="w-10 h-10 mx-auto mb-2 text-slate-300" />
@@ -171,15 +184,18 @@ export default function GuidingEvaluationPage() {
                 </tr>
               ) : (
                 pagedItems.map((item, idx) => {
-                  const completed = isEvaluationCompleted(item)
-                  const missingText = getMissingEvaluationStatus(item)
-                  const hasFile = hasTrackingFile(item)
-                  const hasScore = hasEvaluationScore(item)
+                  const completed = isAdvisorEvaluationCompleted(item)
+                  const missingText = getAdvisorMissingText(item)
+                  const hasFile = Boolean(item.progressFileUrl)
+                  const hasScore = item.sheetStatus === 'SUBMITTED' && item.advisorScore !== null
+                  const fileName = decodeURIComponent(
+                    item.progressFileUrl?.split('/').pop()?.split('?')[0] ?? '',
+                  )
                   const displayStt = startIdx + idx
 
                   return (
                     <tr
-                      key={item.id}
+                      key={item.topicPublicId}
                       className="hover:bg-slate-50/70 transition border-b border-slate-100 last:border-b-0"
                     >
                       {/* 1. STT */}
@@ -190,10 +206,11 @@ export default function GuidingEvaluationPage() {
                       {/* 2. SINH VIÊN HƯỚNG DẪN */}
                       <td className="py-4 px-5">
                         <div className="font-bold text-[13.5px] text-slate-900 leading-snug">
-                          {item.name}
+                          {item.studentName}
                         </div>
                         <div className="text-[12px] text-slate-500 font-mono mt-0.5">
-                          {item.mssv}
+                          {item.studentCode}
+                          {item.className ? ` · ${item.className}` : ''}
                         </div>
                       </td>
 
@@ -201,9 +218,9 @@ export default function GuidingEvaluationPage() {
                       <td className="py-4 px-5 max-w-[340px]">
                         <div
                           className="text-[13px] font-medium text-slate-800 leading-snug line-clamp-2"
-                          title={item.topic}
+                          title={item.topicName ?? ''}
                         >
-                          {item.topic}
+                          {item.topicName || 'Chưa cập nhật tên đề tài'}
                         </div>
                       </td>
 
@@ -228,7 +245,7 @@ export default function GuidingEvaluationPage() {
                                 className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-[12.5px] truncate cursor-pointer"
                                 title="Nhấp để xem trước phiếu theo dõi"
                               >
-                                {item.fileName}
+                                {fileName || 'Phiếu theo dõi tiến độ'}
                               </button>
                               <button
                                 type="button"
@@ -241,7 +258,7 @@ export default function GuidingEvaluationPage() {
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-slate-400 font-normal">
                               <span>
-                                Nộp lúc: {item.submittedAt || '20/11/2026 14:30'}
+                                Nộp lúc: {item.progressSubmittedAt ? formatDate(item.progressSubmittedAt, 'full') : '—'}
                               </span>
                               <span>•</span>
                               <button
@@ -267,12 +284,12 @@ export default function GuidingEvaluationPage() {
                             className="h-8 px-3.5 rounded-lg bg-[#1565C0] hover:bg-blue-700 text-white text-[12px] font-bold transition cursor-pointer shadow-xs inline-flex items-center gap-1.5"
                           >
                             <CheckSquare className="w-3.5 h-3.5" />
-                            <span>Chấm điểm</span>
+                            <span>{item.sheetStatus === 'DRAFT' ? 'Tiếp tục chấm' : 'Chấm điểm'}</span>
                           </button>
                         ) : (
                           <div className="inline-flex items-center gap-1.5">
                             <span className="font-extrabold text-[13.5px] text-slate-900">
-                              {Number(item.score).toFixed(1)}
+                              {Number(item.advisorScore).toFixed(1)}
                             </span>
                             <span className="text-xs text-slate-400 font-semibold">
                               / 10.0
@@ -377,28 +394,22 @@ export default function GuidingEvaluationPage() {
 
       {/* Modals */}
       <UploadTrackingModal
-        key={`upload-${uploadTarget?.id ?? 'closed'}`}
+        key={`upload-${uploadTarget?.topicPublicId ?? 'closed'}`}
         item={uploadTarget}
         onClose={() => setUploadTarget(null)}
-        onConfirm={handleConfirmUpload}
       />
 
       <RubricGradingModal
-        key={`rubric-${rubricTarget?.id ?? 'closed'}`}
+        key={`rubric-${rubricTarget?.topicPublicId ?? 'closed'}`}
         item={rubricTarget}
         onClose={() => setRubricTarget(null)}
-        onSave={handleSaveRubric}
       />
 
       <PreviewTrackingModal
-        key={`preview-${previewTarget?.id ?? 'closed'}`}
+        key={`preview-${previewTarget?.topicPublicId ?? 'closed'}`}
         item={previewTarget}
-        teacher={teacher}
-        academicYear={academicYear}
-        semester={semester}
         onClose={() => setPreviewTarget(null)}
         onReUpload={(it) => setUploadTarget(it)}
-        onDownload={handleDownloadTrackingFile}
       />
     </div>
   )
