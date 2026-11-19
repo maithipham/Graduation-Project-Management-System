@@ -62,39 +62,24 @@ export function sumWeight(groups: { criteria: { weight: number }[] }[]): number 
 }
 
 /**
- * Rubric Sắp áp dụng phải luôn hợp lệ khi lưu (không thì BE trả 3103):
+ * Rubric đã áp dụng (Sắp / Đang áp dụng, chưa có phiếu chấm) phải luôn hợp lệ khi lưu (không thì BE trả 3103):
  * tổng đúng 100% và không có nhóm nào trống tiêu chí. Trả lý do chặn, null = được lưu.
  */
 export function getScheduledSaveBlockReason(groups: { criteria: { weight: number }[] }[]): string | null {
-  if (groups.length === 0) return 'Rubric sắp áp dụng phải có ít nhất một nhóm tiêu chí'
+  if (groups.length === 0) return 'Rubric đã áp dụng phải có ít nhất một nhóm tiêu chí'
   if (groups.some((group) => group.criteria.length === 0)) return 'Mỗi nhóm tiêu chí phải có ít nhất một tiêu chí'
   const total = sumWeight(groups)
   if (total !== 100) return `Tổng trọng số (${total}%) phải bằng 100%`
   return null
 }
 
-/** Hôm nay theo giờ máy, dạng yyyy-MM-dd (không dùng toISOString vì lệch ngày theo UTC) */
-export function todayApiDate(now: Date = new Date()): string {
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 /**
- * A7, A8, A9 – ngày áp dụng: bắt buộc, yyyy-MM-dd (giá trị của <input type="date">), không ở quá khứ.
- * Điều kiện "sau ngày áp dụng của rubric liền trước" để BE kiểm tra (3104).
- * `today` truyền vào được để test.
+ * A7, A8, A9 – khoảng học kỳ: "Từ kỳ" bắt buộc, "Đến kỳ" null = chưa xác định.
+ * Kỳ đã kết thúc / "Đến kỳ" trước "Từ kỳ" / trùng rubric khác để BE kiểm tra (3123–3125).
  */
-export function createEffectiveFromSchema(today: string = todayApiDate()) {
-  return z.object({
-    effectiveFrom: z
-      .string()
-      .min(1, 'Vui lòng chọn ngày áp dụng')
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày áp dụng không hợp lệ')
-      // Chuỗi yyyy-MM-dd so sánh theo thứ tự chữ đúng bằng thứ tự ngày
-      .refine((value) => value >= today, 'Ngày áp dụng không được ở quá khứ'),
-  })
-}
+export const semesterRangeSchema = z.object({
+  fromSemesterId: z.string({ error: 'Vui lòng chọn Từ kỳ' }).min(1, 'Vui lòng chọn Từ kỳ'),
+  toSemesterId: z.string().min(1).nullable(),
+})
 
-export type EffectiveFromInput = z.infer<ReturnType<typeof createEffectiveFromSchema>>
+export type SemesterRangeInput = z.infer<typeof semesterRangeSchema>

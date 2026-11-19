@@ -112,13 +112,7 @@ export default function GradingConfigPage() {
         </button>
       </div>
 
-      <CurrentRubricCard
-        role={role}
-        roleLabel={roleLabel}
-        candidates={listQuery.data ?? []}
-        onOpenRubric={setDetailId}
-        onClone={cloneRubric}
-      />
+      <CurrentRubricCard role={role} roleLabel={roleLabel} onOpenRubric={setDetailId} />
 
       <RubricVersionTable
         page={page}

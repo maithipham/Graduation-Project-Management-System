@@ -23,11 +23,11 @@ interface RubricVersionTableProps {
 /** [tiêu đề, độ rộng, căn giữa] theo đúng mockup */
 const COLUMNS: [label: string, width: string, center: boolean][] = [
   ['STT', 'w-[5%]', true],
-  ['Tên biểu mẫu', 'w-[24%]', false],
+  ['Tên biểu mẫu', 'w-[22%]', false],
   ['Trạng thái', 'w-[11%]', false],
-  ['Áp dụng từ', 'w-[10%]', true],
-  ['Đến', 'w-[10%]', true],
-  ['Học kỳ', 'w-[14%]', true],
+  ['Bắt đầu', 'w-[12%]', true],
+  ['Kết thúc', 'w-[12%]', true],
+  ['Học kỳ', 'w-[12%]', true],
   ['Sửa gần nhất', 'w-[14%]', false],
   ['Thao tác', 'w-[12%]', true],
 ]

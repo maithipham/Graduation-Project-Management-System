@@ -1,52 +1,29 @@
-import { useState } from 'react'
-import { ArrowLeftRight, CalendarDays, Lock } from 'lucide-react'
+import { CalendarDays } from 'lucide-react'
 import { useSemesterScope } from '@/features/department/lecturer_management'
-import { Button, Select, Skeleton } from '@/shared/components/ui'
+import { Select, Skeleton } from '@/shared/components/ui'
 import { useSemesterRubrics } from '../hooks/useSemesterRubrics'
-import type { RubricListItem, RubricRole } from '../types'
-import { ChangeRubricDialog, type ChangeRubricTarget } from './ChangeRubricDialog'
-import { RubricInUseDialog, type RubricInUseInfo } from './RubricInUseDialog'
-import { RubricStatusBadge } from './RubricStatusBadge'
+import type { RubricRole } from '../types'
 
 interface CurrentRubricCardProps {
   role: RubricRole
   roleLabel: string
-  /** Kho rubric cùng loại phiếu (A1) để chọn khi đổi */
-  candidates: RubricListItem[]
   onOpenRubric: (publicId: string) => void
-  onClone: (publicId: string, name: string) => void
 }
 
-/** Thẻ "Rubric áp dụng cho học kỳ" (B1) với dropdown Năm học / Học kỳ, kèm nút đổi rubric (B2) */
-export function CurrentRubricCard({ role, roleLabel, candidates, onOpenRubric, onClone }: CurrentRubricCardProps) {
+/**
+ * Thẻ "Rubric áp dụng cho học kỳ" (B1, chỉ xem) với dropdown Năm học / Học kỳ.
+ * Rubric của học kỳ do khoảng "Từ kỳ" – "Đến kỳ" của rubric quyết định nên không đổi tay ở đây.
+ */
+export function CurrentRubricCard({ role, roleLabel, onOpenRubric }: CurrentRubricCardProps) {
   const scope = useSemesterScope({ allowAll: false })
   const semesterId = scope.activeSemesterId
-  const semesterName = scope.activeSemester?.name ?? ''
   const rubricsQuery = useSemesterRubrics(semesterId)
   const assignment = rubricsQuery.data?.find((item) => item.role === role) ?? null
-
-  const [changeTarget, setChangeTarget] = useState<ChangeRubricTarget | null>(null)
-  const [inUseInfo, setInUseInfo] = useState<RubricInUseInfo | null>(null)
-
-  const locked = assignment !== null && !assignment.canChange
-
-  function handleChange() {
-    if (!semesterId) return
-    if (locked) {
-      setInUseInfo({
-        semesterName,
-        templatePublicId: assignment.templatePublicId,
-        templateName: assignment.templateName,
-      })
-      return
-    }
-    setChangeTarget({ semesterPublicId: semesterId, semesterName, assignment })
-  }
 
   return (
     <section
       aria-label="Rubric áp dụng cho học kỳ"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-xs"
+      className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-xs"
     >
       <div className="flex min-w-0 items-start gap-3">
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1565C0]">
@@ -82,7 +59,6 @@ export function CurrentRubricCard({ role, roleLabel, candidates, onOpenRubric, o
                 </option>
               ))}
             </Select>
-            <span className="text-[12px] font-semibold text-slate-500">· {roleLabel}</span>
           </div>
 
           {!semesterId ? (
@@ -106,50 +82,14 @@ export function CurrentRubricCard({ role, roleLabel, candidates, onOpenRubric, o
               >
                 {assignment.templateName}
               </button>
-              {assignment.status && <RubricStatusBadge status={assignment.status} label={assignment.statusLabel} />}
             </div>
           ) : (
-            <p className="text-[13.5px] font-semibold text-amber-700">Chưa chọn rubric cho học kỳ này</p>
+            <p className="text-[13.5px] font-semibold text-amber-700">
+              Học kỳ này chưa có rubric {roleLabel}. Hãy áp dụng một rubric có khoảng kỳ chứa học kỳ này.
+            </p>
           )}
         </div>
       </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={!semesterId || rubricsQuery.isPending || rubricsQuery.isError}
-        onClick={handleChange}
-        title={locked ? 'Học kỳ đã có phiếu chấm hoặc đã khóa, không thể đổi rubric' : undefined}
-      >
-        {locked ? <Lock className="h-4 w-4" /> : <ArrowLeftRight className="h-4 w-4" />}
-        {assignment?.templatePublicId ? 'Đổi rubric cho kỳ này' : 'Chọn rubric cho kỳ này'}
-      </Button>
-
-      <ChangeRubricDialog
-        target={changeTarget}
-        role={role}
-        roleLabel={roleLabel}
-        candidates={candidates}
-        onClose={() => setChangeTarget(null)}
-        onLocked={(target) => {
-          setChangeTarget(null)
-          setInUseInfo({
-            semesterName: target.semesterName,
-            templatePublicId: target.assignment?.templatePublicId ?? null,
-            templateName: target.assignment?.templateName ?? null,
-          })
-        }}
-      />
-
-      <RubricInUseDialog
-        info={inUseInfo}
-        onClose={() => setInUseInfo(null)}
-        onClone={(publicId, name) => {
-          setInUseInfo(null)
-          onClone(publicId, name)
-        }}
-      />
     </section>
   )
 }

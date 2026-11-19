@@ -15,17 +15,23 @@ const serviceMock = vi.hoisted(() => ({
   getDetail: vi.fn(),
   save: vi.fn(),
   getApplyPreview: vi.fn(),
-  changeSemesterRubric: vi.fn(),
+  apply: vi.fn(),
+  changeSemesterRange: vi.fn(),
+  cancelApply: vi.fn(),
+  getCancelApplyPreview: vi.fn(),
 }))
 vi.mock('@/features/department/score_management/services/rubric.service', () => ({ rubricService: serviceMock }))
 
 import {
   rubricKeys,
   useApplyPreview,
+  useApplyRubric,
+  useCancelApplyPreview,
+  useCancelApplyRubric,
+  useChangeSemesterRange,
   useRubricList,
   useSaveRubric,
 } from '@/features/department/score_management/hooks/useRubrics'
-import { useChangeSemesterRubric } from '@/features/department/score_management/hooks/useSemesterRubrics'
 
 function setup() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -44,8 +50,8 @@ describe('useRubrics', () => {
         publicId: 't-1',
         name: 'Rubric PB',
         type: 'EXAMINER',
-        effectiveFrom: '01-01-2026',
-        effectiveTo: null,
+        fromSemester: { publicId: 's-1', name: 'HK1 2025-2026' },
+        toSemester: null,
         displayStatus: 'SCHEDULED',
         displayStatusName: 'Sắp áp dụng',
         totalWeight: 100,
@@ -63,22 +69,41 @@ describe('useRubrics', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(serviceMock.getList).toHaveBeenCalledWith('EXAMINER')
-    expect(result.current.data?.[0]).toMatchObject({ role: 'reviewer', status: 'upcoming', effectiveFrom: '01/01/2026' })
+    expect(result.current.data?.[0]).toMatchObject({
+      role: 'reviewer',
+      status: 'upcoming',
+      fromSemester: { publicId: 's-1', name: 'HK1 2025-2026' },
+      toSemester: null,
+    })
     expect(queryClient.getQueryData(rubricKeys.list('EXAMINER'))).toBeDefined()
   })
 
-  it('useApplyPreview chỉ gọi khi đã chọn ngày đúng dạng', async () => {
-    serviceMock.getApplyPreview.mockResolvedValue({ assignedSemesterCount: 1 })
+  it('useApplyPreview chỉ gọi khi đã chọn "Từ kỳ"', async () => {
+    serviceMock.getApplyPreview.mockResolvedValue({ assignedSemesters: [], releasedSemesters: [] })
     const { wrapper } = setup()
-    const { result, rerender } = renderHook(({ date }) => useApplyPreview('t-1', date), {
+    const { result, rerender } = renderHook(({ from, to }) => useApplyPreview('t-1', from, to), {
       wrapper,
-      initialProps: { date: '2026-1' as string | null },
+      initialProps: { from: null as string | null, to: null as string | null },
     })
     expect(serviceMock.getApplyPreview).not.toHaveBeenCalled()
 
-    rerender({ date: '2026-12-01' })
+    rerender({ from: 's-1', to: null })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(serviceMock.getApplyPreview).toHaveBeenCalledWith('t-1', '2026-12-01')
+    expect(serviceMock.getApplyPreview).toHaveBeenCalledWith('t-1', 's-1', null)
+  })
+
+  it('useCancelApplyPreview chưa mở hộp xác nhận thì không gọi A7b', async () => {
+    serviceMock.getCancelApplyPreview.mockResolvedValue({ releasedSemesters: [] })
+    const { wrapper } = setup()
+    const { result, rerender } = renderHook(({ id }) => useCancelApplyPreview(id), {
+      wrapper,
+      initialProps: { id: undefined as string | undefined },
+    })
+    expect(serviceMock.getCancelApplyPreview).not.toHaveBeenCalled()
+
+    rerender({ id: 't-1' })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(serviceMock.getCancelApplyPreview).toHaveBeenCalledWith('t-1')
   })
 
   it('useSaveRubric gửi body A5 rồi tải lại danh sách và chi tiết', async () => {
@@ -128,29 +153,62 @@ describe('useRubrics', () => {
     expect(toastMock.error).not.toHaveBeenCalled()
   })
 
-  it('useChangeSemesterRubric gửi đúng loại phiếu, 3111 thì tải lại rubric của học kỳ', async () => {
-    serviceMock.changeSemesterRubric.mockRejectedValueOnce(new ApiError('Học kỳ đã có phiếu chấm', 3111, undefined, 409))
+  it('useApplyRubric gửi khoảng kỳ, tải lại rubric + rubric của học kỳ, xóa kết quả xem trước', async () => {
+    serviceMock.apply.mockResolvedValue(undefined)
+    const { wrapper, queryClient } = setup()
+    queryClient.setQueryData(rubricKeys.preview('t-1', 's-1', null), { assignedSemesters: [] })
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    const { result } = renderHook(() => useApplyRubric(), { wrapper })
+    const body = { fromSemesterId: 's-1', toSemesterId: null }
+
+    await result.current.mutateAsync({ publicId: 't-1', body, name: 'Rubric HĐ' })
+
+    expect(serviceMock.apply).toHaveBeenCalledWith('t-1', body)
+    expect(toastMock.success).toHaveBeenCalledWith('Đã áp dụng Rubric HĐ')
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: rubricKeys.lists() })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: rubricKeys.detail('t-1') })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: rubricKeys.semesters() })
+    expect(queryClient.getQueryData(rubricKeys.preview('t-1', 's-1', null))).toBeUndefined()
+  })
+
+  it('useApplyRubric lỗi khoảng kỳ (3125) không tự tải lại; 3107 thì tải lại rubric', async () => {
+    serviceMock.apply.mockRejectedValueOnce(new ApiError('Trùng khoảng kỳ', 3125, undefined, 409))
     const { wrapper, queryClient } = setup()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
-    const { result } = renderHook(() => useChangeSemesterRubric(), { wrapper })
-    const variables = {
-      semesterPublicId: 's-1',
-      role: 'council' as const,
-      templatePublicId: 't-9',
-      semesterName: 'Học kỳ 1 2026-2027',
-      roleLabel: 'Hội đồng',
-      templateName: 'Rubric HĐ',
-    }
+    const { result } = renderHook(() => useApplyRubric(), { wrapper })
+    const variables = { publicId: 't-1', body: { fromSemesterId: 's-1', toSemesterId: 's-2' }, name: 'R' }
 
     await expect(result.current.mutateAsync(variables)).rejects.toBeInstanceOf(ApiError)
-    expect(serviceMock.changeSemesterRubric).toHaveBeenCalledWith('s-1', {
-      evaluationType: 'COUNCIL',
-      templatePublicId: 't-9',
-    })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: rubricKeys.semester('s-1') })
+    expect(invalidate).not.toHaveBeenCalled()
 
-    serviceMock.changeSemesterRubric.mockResolvedValueOnce(undefined)
-    await result.current.mutateAsync(variables)
-    expect(toastMock.success).toHaveBeenCalledWith('Đã đổi rubric Hội đồng của Học kỳ 1 2026-2027 sang Rubric HĐ.')
+    serviceMock.apply.mockRejectedValueOnce(new ApiError('Rubric không còn là Nháp', 3107, undefined, 409))
+    await expect(result.current.mutateAsync(variables)).rejects.toBeInstanceOf(ApiError)
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: rubricKeys.detail('t-1') })
+    expect(toastMock.success).not.toHaveBeenCalled()
+  })
+
+  it('useChangeSemesterRange gọi A9 và báo đã cập nhật kỳ', async () => {
+    serviceMock.changeSemesterRange.mockResolvedValue(undefined)
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useChangeSemesterRange(), { wrapper })
+    const body = { fromSemesterId: 's-1', toSemesterId: 's-3' }
+
+    await result.current.mutateAsync({ publicId: 't-1', body, name: 'Rubric HD' })
+
+    expect(serviceMock.changeSemesterRange).toHaveBeenCalledWith('t-1', body)
+    expect(toastMock.success).toHaveBeenCalledWith('Đã cập nhật kỳ áp dụng của Rubric HD')
+  })
+
+  it('useCancelApplyRubric gọi A10, rubric trở về Nháp', async () => {
+    serviceMock.cancelApply.mockResolvedValue(undefined)
+    const { wrapper, queryClient } = setup()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    const { result } = renderHook(() => useCancelApplyRubric(), { wrapper })
+
+    await result.current.mutateAsync({ publicId: 't-1', name: 'Rubric PB' })
+
+    expect(serviceMock.cancelApply).toHaveBeenCalledWith('t-1')
+    expect(toastMock.success).toHaveBeenCalledWith('Đã hủy áp dụng Rubric PB, rubric trở về bản nháp')
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: rubricKeys.semesters() })
   })
 })

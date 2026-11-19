@@ -14,7 +14,7 @@ interface RubricPendingRowProps {
 
 /**
  * Dòng nhập inline ở đầu bảng khi bấm "Tạo mới". Chỉ nhập tên (A3 chỉ nhận type + name),
- * ngày áp dụng chọn sau ở nút "Áp dụng" trong popup chi tiết. Enter = lưu, Esc = hủy.
+ * kỳ áp dụng chọn sau ở nút "Áp dụng" trong popup chi tiết. Enter = lưu, Esc = hủy.
  */
 export function RubricPendingRow({ name, error, isPending, onChange, onSave, onCancel }: RubricPendingRowProps) {
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -46,8 +46,9 @@ export function RubricPendingRow({ name, error, isPending, onChange, onSave, onC
       <td className="px-3 py-3">
         <RubricStatusBadge status="draft" />
       </td>
-      <td colSpan={4} className="px-3 py-3 text-[12px] italic text-slate-400">
-        Chọn ngày áp dụng sau khi thiết lập xong tiêu chí
+      {/* Trải 4 cột: Bắt đầu, Kết thúc, Học kỳ, Sửa gần nhất (bảng 8 cột) */}
+      <td colSpan={4} className="px-3 py-3 text-center text-[12px] italic text-slate-400">
+        Chọn kỳ áp dụng sau khi thiết lập xong tiêu chí
       </td>
       <td className="px-3 py-3">
         <div className="flex items-center justify-center gap-1.5">

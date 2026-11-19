@@ -1,5 +1,4 @@
 import type {
-  ApiDate,
   BeDate,
   BeDateTime,
   EvaluationTemplateDetail,
@@ -55,13 +54,12 @@ export function toRubricStatus(status: TemplateDisplayStatus): RubricStatus {
 }
 
 // ---------------------------------------------------------------------------
-// Ngày: BE trả "dd-MM-yyyy", nhận "yyyy-MM-dd"; giao diện hiện "dd/MM/yyyy"
+// Ngày: BE trả "dd-MM-yyyy"; giao diện hiện "dd/MM/yyyy"
 // (tự tách chuỗi thay vì qua Date để không lệch ngày do múi giờ)
 // ---------------------------------------------------------------------------
 
 const BE_DATE = /^(\d{2})-(\d{2})-(\d{4})/
 const BE_DATE_TIME = /^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})/
-const API_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
 
 /** "16-11-2026" → "16/11/2026"; null/sai định dạng → null */
 export function formatBeDate(value: BeDate | null | undefined): string | null {
@@ -76,16 +74,13 @@ export function formatBeDateTime(value: BeDateTime | null | undefined): string |
   return formatBeDate(value)
 }
 
-/** "16-11-2026" → "2026-11-16" (để đặt sẵn vào <input type="date"> hoặc gửi lại BE) */
-export function beDateToApiDate(value: BeDate | null | undefined): ApiDate | null {
+/**
+ * "16-11-2026" → "20261116": chuỗi so sánh được theo thứ tự ngày (dùng để lọc / so học kỳ).
+ * Sai định dạng → "" (đứng trước mọi ngày hợp lệ)
+ */
+export function beDateSortKey(value: BeDate | null | undefined): string {
   const match = value ? BE_DATE.exec(value) : null
-  return match ? `${match[3]}-${match[2]}-${match[1]}` : null
-}
-
-/** "2026-11-16" → "16/11/2026" (hiện ngày người dùng vừa chọn) */
-export function formatApiDate(value: ApiDate | null | undefined): string | null {
-  const match = value ? API_DATE.exec(value) : null
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : null
+  return match ? `${match[3]}${match[2]}${match[1]}` : ''
 }
 
 // ---------------------------------------------------------------------------
@@ -99,8 +94,9 @@ export function toRubricListItem(dto: EvaluationTemplateSummary): RubricListItem
     name: dto.name,
     status: toRubricStatus(dto.displayStatus),
     statusLabel: dto.displayStatusName,
-    effectiveFrom: formatBeDate(dto.effectiveFrom),
-    effectiveTo: formatBeDate(dto.effectiveTo),
+    // BE có thể bỏ hẳn field null khỏi JSON → `?? null` để luôn có key
+    fromSemester: dto.fromSemester ?? null,
+    toSemester: dto.toSemester ?? null,
     totalWeight: dto.totalWeight,
     criteriaCount: dto.criteriaCount,
     isValid: dto.isValid,
@@ -142,8 +138,8 @@ export function toRubricDetail(dto: EvaluationTemplateDetail): RubricDetail {
     name: dto.name,
     status: toRubricStatus(dto.displayStatus),
     statusLabel: dto.displayStatusName,
-    effectiveFrom: formatBeDate(dto.effectiveFrom),
-    effectiveTo: formatBeDate(dto.effectiveTo),
+    fromSemester: dto.fromSemester ?? null,
+    toSemester: dto.toSemester ?? null,
     totalWeight: dto.totalWeight,
     criteriaCount: dto.criteriaCount,
     semesterCount: dto.semesterCount,
@@ -155,7 +151,8 @@ export function toRubricDetail(dto: EvaluationTemplateDetail): RubricDetail {
     canEdit: dto.canEdit,
     canApply: dto.canApply,
     applyBlockedReason: dto.applyBlockedReason,
-    canChangeEffectiveFrom: dto.canChangeEffectiveFrom,
+    canChangeFromSemester: dto.canChangeFromSemester,
+    canChangeToSemester: dto.canChangeToSemester,
     canCancelApply: dto.canCancelApply,
     createdByName: dto.createdByName,
     createdAt: formatBeDateTime(dto.createdAt),
@@ -163,17 +160,17 @@ export function toRubricDetail(dto: EvaluationTemplateDetail): RubricDetail {
   }
 }
 
+/** Học kỳ chưa có rubric loại đó: BE trả null hoặc bỏ hẳn các field rubric → đưa hết về null */
 export function toSemesterRubricAssignment(dto: SemesterEvaluationTemplate): SemesterRubricAssignment {
   return {
     role: toRubricRole(dto.evaluationType),
     roleLabel: dto.evaluationTypeName,
-    templatePublicId: dto.templatePublicId,
-    templateName: dto.templateName,
+    templatePublicId: dto.templatePublicId ?? null,
+    templateName: dto.templateName ?? null,
     status: dto.displayStatus ? toRubricStatus(dto.displayStatus) : null,
-    statusLabel: dto.displayStatusName,
-    effectiveFrom: formatBeDate(dto.effectiveFrom),
-    effectiveTo: formatBeDate(dto.effectiveTo),
-    canChange: dto.canChange,
+    statusLabel: dto.displayStatusName ?? null,
+    fromSemester: dto.fromSemester ?? null,
+    toSemester: dto.toSemester ?? null,
   }
 }
 

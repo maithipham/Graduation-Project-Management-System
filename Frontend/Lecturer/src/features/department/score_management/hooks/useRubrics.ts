@@ -1,7 +1,7 @@
 import { skipToken, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback'
 import { rubricService } from '../services/rubric.service'
-import type { ApiDate, EvaluationType, RubricRole, RubricTreeGroup } from '../types'
+import type { EvaluationType, RubricRole, RubricTreeGroup, SemesterRangeBody } from '../types'
 import {
   toEvaluationType,
   toRubricDetail,
@@ -19,13 +19,15 @@ export const rubricKeys = {
   list: (type: EvaluationType) => [...rubricKeys.lists(), type] as const,
   details: () => [...rubricKeys.all, 'detail'] as const,
   detail: (publicId: string | undefined) => [...rubricKeys.details(), publicId] as const,
-  preview: (publicId: string | undefined, effectiveFrom: ApiDate | null) =>
-    [...rubricKeys.all, 'preview', publicId, effectiveFrom] as const,
+  previews: () => [...rubricKeys.all, 'preview'] as const,
+  preview: (publicId: string | undefined, fromSemesterId: string | null, toSemesterId: string | null) =>
+    [...rubricKeys.previews(), publicId, fromSemesterId, toSemesterId ?? ''] as const,
+  cancelPreviews: () => [...rubricKeys.all, 'cancel-preview'] as const,
+  cancelPreview: (publicId: string | undefined) => [...rubricKeys.cancelPreviews(), publicId] as const,
   semesters: () => [...rubricKeys.all, 'semester'] as const,
   semester: (semesterPublicId: string | undefined) => [...rubricKeys.semesters(), semesterPublicId] as const,
+  semesterOptions: () => [...rubricKeys.all, 'semester-options'] as const,
 }
-
-const API_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 // ---------------------------------------------------------------------------
 // Đọc
@@ -49,14 +51,30 @@ export function useRubricDetail(publicId: string | undefined) {
 }
 
 /**
- * A7 – xem trước khi Áp dụng / Đổi ngày. Chỉ gọi khi đã chọn ngày đúng dạng yyyy-MM-dd.
- * Không tự thử lại: ngày sai (3104) thì hiện lỗi ngay dưới ô chọn ngày.
+ * A7 – xem trước Áp dụng / Sửa kỳ áp dụng. Chỉ gọi khi đã chọn "Từ kỳ"; `toSemesterId` null = chưa xác định.
+ * Không tự thử lại: lỗi khoảng kỳ (3123–3126…) hiện ngay dưới 2 ô chọn.
  */
-export function useApplyPreview(publicId: string | undefined, effectiveFrom: ApiDate | null) {
-  const ready = publicId !== undefined && effectiveFrom !== null && API_DATE.test(effectiveFrom)
+export function useApplyPreview(
+  publicId: string | undefined,
+  fromSemesterId: string | null,
+  toSemesterId: string | null,
+) {
   return useQuery({
-    queryKey: rubricKeys.preview(publicId, effectiveFrom),
-    queryFn: ready ? () => rubricService.getApplyPreview(publicId, effectiveFrom) : skipToken,
+    queryKey: rubricKeys.preview(publicId, fromSemesterId, toSemesterId),
+    queryFn:
+      publicId !== undefined && fromSemesterId !== null
+        ? () => rubricService.getApplyPreview(publicId, fromSemesterId, toSemesterId)
+        : skipToken,
+    retry: false,
+    staleTime: 0,
+  })
+}
+
+/** A7b – xem trước Hủy áp dụng. `publicId` undefined (hộp thoại đang đóng) → chưa gọi API */
+export function useCancelApplyPreview(publicId: string | undefined) {
+  return useQuery({
+    queryKey: rubricKeys.cancelPreview(publicId),
+    queryFn: publicId === undefined ? skipToken : () => rubricService.getCancelApplyPreview(publicId),
     retry: false,
     staleTime: 0,
   })
@@ -74,8 +92,13 @@ function refreshRubric(queryClient: QueryClient, publicId: string) {
   ])
 }
 
-/** Áp dụng / đổi ngày / hủy áp dụng còn làm BE gán lại rubric của học kỳ → tải lại cả B1 */
+/**
+ * Áp dụng / sửa kỳ / hủy áp dụng còn làm BE gán lại rubric của học kỳ → tải lại cả B1.
+ * Kết quả xem trước (A7, A7b) đã cũ → xóa hẳn khỏi cache
+ */
 function refreshRubricAndSemesters(queryClient: QueryClient, publicId: string) {
+  queryClient.removeQueries({ queryKey: rubricKeys.previews() })
+  queryClient.removeQueries({ queryKey: rubricKeys.cancelPreviews() })
   return Promise.all([
     refreshRubric(queryClient, publicId),
     queryClient.invalidateQueries({ queryKey: rubricKeys.semesters() }),
@@ -96,11 +119,10 @@ function refreshOnStaleError(queryClient: QueryClient, error: unknown, publicId:
     hasRubricErrorCode(
       error,
       RUBRIC_ERROR.NOT_EDITABLE,
-      RUBRIC_ERROR.NOT_LATEST,
       RUBRIC_ERROR.HAS_SHEETS,
       RUBRIC_ERROR.NOT_DRAFT,
       RUBRIC_ERROR.IN_USE,
-      RUBRIC_ERROR.NOT_SCHEDULED,
+      RUBRIC_ERROR.NOT_APPLIED_STATUS,
       RUBRIC_ERROR.TREE_ITEM_INVALID,
     )
   ) {
@@ -175,12 +197,12 @@ export function useDeleteRubric() {
   })
 }
 
-/** A8 – áp dụng rubric Nháp từ ngày đã chọn (yyyy-MM-dd) */
+/** A8 – áp dụng rubric Nháp cho khoảng học kỳ đã chọn */
 export function useApplyRubric() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ publicId, effectiveFrom }: { publicId: string; effectiveFrom: ApiDate; name: string }) =>
-      rubricService.apply(publicId, effectiveFrom),
+    mutationFn: ({ publicId, body }: { publicId: string; body: SemesterRangeBody; name: string }) =>
+      rubricService.apply(publicId, body),
     onSuccess: (_data, { publicId, name }) => {
       toast.success(`Đã áp dụng ${name}`)
       return refreshRubricAndSemesters(queryClient, publicId)
@@ -189,14 +211,14 @@ export function useApplyRubric() {
   })
 }
 
-/** A9 – đổi ngày áp dụng của rubric Sắp áp dụng */
-export function useChangeEffectiveFrom() {
+/** A9 – sửa kỳ áp dụng ("Từ kỳ" / "Đến kỳ") của rubric Sắp / Đang áp dụng */
+export function useChangeSemesterRange() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ publicId, effectiveFrom }: { publicId: string; effectiveFrom: ApiDate; name: string }) =>
-      rubricService.changeEffectiveFrom(publicId, effectiveFrom),
+    mutationFn: ({ publicId, body }: { publicId: string; body: SemesterRangeBody; name: string }) =>
+      rubricService.changeSemesterRange(publicId, body),
     onSuccess: (_data, { publicId, name }) => {
-      toast.success(`Đã đổi ngày áp dụng của ${name}`)
+      toast.success(`Đã cập nhật kỳ áp dụng của ${name}`)
       return refreshRubricAndSemesters(queryClient, publicId)
     },
     onError: (error, { publicId }) => refreshOnStaleError(queryClient, error, publicId),

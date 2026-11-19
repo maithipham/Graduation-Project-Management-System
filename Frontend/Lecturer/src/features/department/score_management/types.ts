@@ -12,23 +12,40 @@ export type RubricStatus = 'draft' | 'upcoming' | 'active' | 'archived'
 /** Loại phiếu chấm (BE gửi / nhận đúng mã chữ hoa) */
 export type EvaluationType = 'ADVISOR' | 'EXAMINER' | 'COUNCIL'
 
-/** Trạng thái hiển thị: BE tính từ ngày, không lưu DB */
+/** Trạng thái hiển thị: BE tính từ khoảng học kỳ so với hôm nay, không lưu DB */
 export type TemplateDisplayStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'EXPIRED'
 
 /** Ngày BE trả về: "dd-MM-yyyy" */
 export type BeDate = string
 /** Ngày giờ BE trả về: "dd-MM-yyyy HH:mm:ss" */
 export type BeDateTime = string
-/** Ngày gửi lên BE: "yyyy-MM-dd" */
-export type ApiDate = string
+
+/** Học kỳ rút gọn trong response rubric */
+export interface SemesterRef {
+  publicId: string
+  name: string
+}
+
+/** Một dòng của GET /semester (chỉ các field ô chọn "Từ kỳ" / "Đến kỳ" cần) */
+export interface RubricSemesterOption {
+  publicId: string
+  name: string
+  startDate: BeDate
+  endDate: BeDate
+  /** Tên trạng thái tiếng Việt */
+  status: string
+  statusCode: 'UPCOMING' | 'ONGOING' | 'COMPLETED'
+}
 
 /** A1 – một dòng của GET /evaluation-template?type= */
 export interface EvaluationTemplateSummary {
   publicId: string
   name: string
   type: EvaluationType
-  effectiveFrom: BeDate | null
-  effectiveTo: BeDate | null
+  /** "Từ kỳ"; null = Nháp */
+  fromSemester: SemesterRef | null
+  /** "Đến kỳ"; null = chưa xác định kỳ kết thúc (hoặc Nháp) */
+  toSemester: SemesterRef | null
   displayStatus: TemplateDisplayStatus
   displayStatusName: string
   totalWeight: number
@@ -63,8 +80,10 @@ export interface EvaluationTemplateDetail {
   publicId: string
   name: string
   type: EvaluationType
-  effectiveFrom: BeDate | null
-  effectiveTo: BeDate | null
+  /** "Từ kỳ"; null = Nháp */
+  fromSemester: SemesterRef | null
+  /** "Đến kỳ"; null = chưa xác định kỳ kết thúc (hoặc Nháp) */
+  toSemester: SemesterRef | null
   displayStatus: TemplateDisplayStatus
   displayStatusName: string
   /** Khóa lạc quan (giống @Version JPA): gửi lại đúng số này khi lưu */
@@ -76,7 +95,10 @@ export interface EvaluationTemplateDetail {
   canEdit: boolean
   canApply: boolean
   applyBlockedReason: string | null
-  canChangeEffectiveFrom: boolean
+  /** Ô "Từ kỳ" trong hộp thoại Sửa kỳ áp dụng được chọn (đã áp dụng, chưa có phiếu chấm) */
+  canChangeFromSemester: boolean
+  /** Nút "Sửa kỳ áp dụng" (đã áp dụng, kể cả đã có phiếu chấm) */
+  canChangeToSemester: boolean
   canCancelApply: boolean
   canDelete: boolean
   createdByName: string | null
@@ -103,40 +125,35 @@ export interface SaveRubricBody {
   }[]
 }
 
-/** A8, A9 – body { effectiveFrom } */
-export interface EffectiveFromBody {
-  effectiveFrom: ApiDate
+/** A8, A9 – body; toSemesterId null = chưa xác định kỳ kết thúc */
+export interface SemesterRangeBody {
+  fromSemesterId: string
+  toSemesterId: string | null
 }
 
-/** A7 – GET /evaluation-template/{publicId}/apply-preview */
+/** A7 (xem trước Áp dụng / Sửa kỳ) và A7b (xem trước Hủy áp dụng – không có from/to) */
 export interface ApplyPreview {
-  effectiveFrom: BeDate
-  closingTemplatePublicId: string | null
-  closingTemplateName: string | null
-  closingTemplateEffectiveFrom: BeDate | null
-  closingTemplateEffectiveTo: BeDate | null
-  assignedSemesterCount: number
-  keptSemesterCount: number
+  fromSemester?: SemesterRef | null
+  toSemester?: SemesterRef | null
+  /** Học kỳ mới vào khoảng → sẽ dùng rubric này */
+  assignedSemesters: SemesterRef[]
+  /** Học kỳ rời khỏi khoảng → sẽ không còn rubric loại này */
+  releasedSemesters: SemesterRef[]
 }
 
-/** B1 – một dòng của GET /semester/{id}/evaluation-template (luôn đủ 3 dòng) */
+/**
+ * B1 – một dòng của GET /semester/{id}/evaluation-template (luôn đủ 3 dòng, chỉ xem).
+ * Học kỳ chưa có rubric loại đó thì các field rubric là null hoặc bị ẩn khỏi JSON.
+ */
 export interface SemesterEvaluationTemplate {
   evaluationType: EvaluationType
   evaluationTypeName: string
-  templatePublicId: string | null
-  templateName: string | null
-  effectiveFrom: BeDate | null
-  effectiveTo: BeDate | null
-  displayStatus: TemplateDisplayStatus | null
-  displayStatusName: string | null
-  /** false = học kỳ đã có phiếu chấm loại này → khóa nút Đổi */
-  canChange: boolean
-}
-
-/** B2 – body PUT /semester/{id}/evaluation-template */
-export interface ChangeSemesterRubricBody {
-  evaluationType: EvaluationType
-  templatePublicId: string
+  templatePublicId?: string | null
+  templateName?: string | null
+  fromSemester?: SemesterRef | null
+  toSemester?: SemesterRef | null
+  displayStatus?: TemplateDisplayStatus | null
+  displayStatusName?: string | null
 }
 
 // ============================================================================
@@ -150,9 +167,10 @@ export interface RubricListItem {
   name: string
   status: RubricStatus
   statusLabel: string
-  /** DD/MM/YYYY, null = chưa áp dụng */
-  effectiveFrom: string | null
-  effectiveTo: string | null
+  /** null = Nháp (chưa áp dụng) */
+  fromSemester: SemesterRef | null
+  /** null = chưa xác định kỳ kết thúc */
+  toSemester: SemesterRef | null
   totalWeight: number
   criteriaCount: number
   isValid: boolean
@@ -191,14 +209,15 @@ export interface RubricDetail extends Omit<RubricListItem, 'isValid'> {
   canEdit: boolean
   canApply: boolean
   applyBlockedReason: string | null
-  canChangeEffectiveFrom: boolean
+  canChangeFromSemester: boolean
+  canChangeToSemester: boolean
   canCancelApply: boolean
   createdByName: string | null
   createdAt: string | null
   groups: RubricTreeGroup[]
 }
 
-/** Rubric đang gán cho học kỳ của 1 loại phiếu (từ B1) */
+/** Rubric đang gán cho học kỳ của 1 loại phiếu (từ B1, chỉ xem) */
 export interface SemesterRubricAssignment {
   role: RubricRole
   roleLabel: string
@@ -207,7 +226,6 @@ export interface SemesterRubricAssignment {
   templateName: string | null
   status: RubricStatus | null
   statusLabel: string | null
-  effectiveFrom: string | null
-  effectiveTo: string | null
-  canChange: boolean
+  fromSemester: SemesterRef | null
+  toSemester: SemesterRef | null
 }

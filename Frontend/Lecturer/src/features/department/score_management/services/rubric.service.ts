@@ -1,15 +1,16 @@
 import { API_ENDPOINTS, apiClient } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
+import type { RawSpringPage } from '@/shared/utils'
 import type {
-  ApiDate,
   ApplyPreview,
-  ChangeSemesterRubricBody,
   CreateRubricBody,
   EvaluationTemplateDetail,
   EvaluationTemplateSummary,
   EvaluationType,
+  RubricSemesterOption,
   SaveRubricBody,
   SemesterEvaluationTemplate,
+  SemesterRangeBody,
 } from '../types'
 
 const RUBRIC = API_ENDPOINTS.departmentRubric
@@ -55,27 +56,34 @@ export const rubricService = {
     await apiClient.delete<ApiResponse<null>>(RUBRIC.detail(publicId))
   },
 
-  /** A7 – xem trước khi Áp dụng / Đổi ngày. Không ghi DB; lỗi hiện dưới ô chọn ngày */
-  async getApplyPreview(publicId: string, effectiveFrom: ApiDate): Promise<ApplyPreview> {
+  /**
+   * A7 – xem trước Áp dụng (Nháp) / Sửa kỳ áp dụng (Sắp / Đang áp dụng). Không ghi DB;
+   * lỗi khoảng kỳ hiện ngay dưới 2 ô chọn. `toSemesterId` null = chưa xác định (không gửi query)
+   */
+  async getApplyPreview(publicId: string, fromSemesterId: string, toSemesterId: string | null): Promise<ApplyPreview> {
     const res = await apiClient.get<ApiResponse<ApplyPreview>>(RUBRIC.applyPreview(publicId), {
-      params: { effectiveFrom },
+      params: { fromSemesterId, toSemesterId: toSemesterId ?? undefined },
       skipErrorToast: true,
     })
     return res.data.data
   },
 
-  /** A8 – áp dụng rubric Nháp từ ngày `effectiveFrom` */
-  async apply(publicId: string, effectiveFrom: ApiDate): Promise<void> {
-    await apiClient.post<ApiResponse<null>>(RUBRIC.apply(publicId), { effectiveFrom }, { skipErrorToast: true })
+  /** A7b – xem trước Hủy áp dụng: `releasedSemesters` = các kỳ sẽ mất rubric. Lỗi hiện trong hộp thoại xác nhận */
+  async getCancelApplyPreview(publicId: string): Promise<ApplyPreview> {
+    const res = await apiClient.get<ApiResponse<ApplyPreview>>(RUBRIC.cancelApplyPreview(publicId), {
+      skipErrorToast: true,
+    })
+    return res.data.data
   },
 
-  /** A9 – đổi ngày áp dụng của rubric Sắp áp dụng */
-  async changeEffectiveFrom(publicId: string, effectiveFrom: ApiDate): Promise<void> {
-    await apiClient.patch<ApiResponse<null>>(
-      RUBRIC.effectiveFrom(publicId),
-      { effectiveFrom },
-      { skipErrorToast: true },
-    )
+  /** A8 – áp dụng rubric Nháp cho khoảng học kỳ */
+  async apply(publicId: string, body: SemesterRangeBody): Promise<void> {
+    await apiClient.post<ApiResponse<null>>(RUBRIC.apply(publicId), body, { skipErrorToast: true })
+  },
+
+  /** A9 – sửa kỳ áp dụng của rubric Sắp / Đang áp dụng */
+  async changeSemesterRange(publicId: string, body: SemesterRangeBody): Promise<void> {
+    await apiClient.patch<ApiResponse<null>>(RUBRIC.semesterRange(publicId), body, { skipErrorToast: true })
   },
 
   /** A10 – hủy áp dụng, rubric về Nháp */
@@ -83,7 +91,7 @@ export const rubricService = {
     await apiClient.post<ApiResponse<null>>(RUBRIC.cancelApply(publicId))
   },
 
-  /** B1 – 3 rubric (hướng dẫn / phản biện / hội đồng) của một học kỳ */
+  /** B1 – 3 rubric (hướng dẫn / phản biện / hội đồng) của một học kỳ, chỉ xem */
   async getSemesterRubrics(semesterPublicId: string): Promise<SemesterEvaluationTemplate[]> {
     const res = await apiClient.get<ApiResponse<SemesterEvaluationTemplate[] | null>>(
       RUBRIC.semester(semesterPublicId),
@@ -91,8 +99,15 @@ export const rubricService = {
     return res.data.data ?? []
   },
 
-  /** B2 – đổi rubric của một loại phiếu trong học kỳ */
-  async changeSemesterRubric(semesterPublicId: string, body: ChangeSemesterRubricBody): Promise<void> {
-    await apiClient.put<ApiResponse<null>>(RUBRIC.semester(semesterPublicId), body)
+  /**
+   * Học kỳ cho ô chọn "Từ kỳ" / "Đến kỳ": dùng GET /semester có sẵn, sắp tăng dần theo ngày bắt đầu.
+   * Không dùng lại semesterService.getAllSemesters (code dùng chung, sắp giảm dần)
+   */
+  async getSemesterOptions(): Promise<RubricSemesterOption[]> {
+    const res = await apiClient.get<ApiResponse<RawSpringPage<RubricSemesterOption> | null>>(
+      API_ENDPOINTS.semester.base,
+      { params: { page: 0, size: 100, sortBy: 'startDate', sortDir: 'ASC' } },
+    )
+    return res.data.data?.content ?? []
   },
 }

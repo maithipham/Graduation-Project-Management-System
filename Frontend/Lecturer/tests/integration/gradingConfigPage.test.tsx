@@ -27,10 +27,11 @@ const serviceMock = vi.hoisted(() => ({
   remove: vi.fn(),
   getApplyPreview: vi.fn(),
   apply: vi.fn(),
-  changeEffectiveFrom: vi.fn(),
+  changeSemesterRange: vi.fn(),
   cancelApply: vi.fn(),
   getSemesterRubrics: vi.fn(),
-  changeSemesterRubric: vi.fn(),
+  getCancelApplyPreview: vi.fn(),
+  getSemesterOptions: vi.fn(),
 }))
 vi.mock('@/features/department/score_management/services/rubric.service', () => ({ rubricService: serviceMock }))
 
@@ -63,13 +64,15 @@ vi.mock('@/features/department/lecturer_management', () => {
 
 import GradingConfigPage from '@/features/department/score_management/pages/GradingConfigPage'
 
+const HK1 = { publicId: 's-1', name: 'Học kỳ 1 năm học 2026-2027' }
+
 function summary(overrides: Partial<EvaluationTemplateSummary> = {}): EvaluationTemplateSummary {
   return {
     publicId: 't-active',
     name: 'Rubric HD 2026',
     type: 'ADVISOR',
-    effectiveFrom: '01-01-2026',
-    effectiveTo: null,
+    fromSemester: HK1,
+    toSemester: null,
     displayStatus: 'ACTIVE',
     displayStatusName: 'Đang áp dụng',
     totalWeight: 100,
@@ -87,7 +90,7 @@ function summary(overrides: Partial<EvaluationTemplateSummary> = {}): Evaluation
 const DRAFT = summary({
   publicId: 't-draft',
   name: 'Rubric HD nháp',
-  effectiveFrom: null,
+  fromSemester: null,
   displayStatus: 'DRAFT',
   displayStatusName: 'Nháp',
   totalWeight: 60,
@@ -102,8 +105,8 @@ function detail(overrides: Partial<EvaluationTemplateDetail> = {}): EvaluationTe
     publicId: 't-draft',
     name: 'Rubric HD nháp',
     type: 'ADVISOR',
-    effectiveFrom: null,
-    effectiveTo: null,
+    fromSemester: null,
+    toSemester: null,
     displayStatus: 'DRAFT',
     displayStatusName: 'Nháp',
     version: 3,
@@ -114,7 +117,8 @@ function detail(overrides: Partial<EvaluationTemplateDetail> = {}): EvaluationTe
     canEdit: true,
     canApply: true,
     applyBlockedReason: null,
-    canChangeEffectiveFrom: false,
+    canChangeFromSemester: false,
+    canChangeToSemester: false,
     canCancelApply: false,
     canDelete: true,
     createdByName: 'Nguyễn Văn A',
@@ -144,11 +148,10 @@ function semesterRow(overrides: Partial<SemesterEvaluationTemplate> = {}): Semes
     evaluationTypeName: 'Hướng dẫn',
     templatePublicId: 't-active',
     templateName: 'Rubric HD 2026',
-    effectiveFrom: '01-01-2026',
-    effectiveTo: null,
+    fromSemester: HK1,
+    toSemester: null,
     displayStatus: 'ACTIVE',
     displayStatusName: 'Đang áp dụng',
-    canChange: true,
     ...overrides,
   }
 }
@@ -173,6 +176,11 @@ describe('GradingConfigPage (nối API)', () => {
     )
     serviceMock.getSemesterRubrics.mockResolvedValue([semesterRow()])
     serviceMock.getDetail.mockResolvedValue(detail())
+    serviceMock.getSemesterOptions.mockResolvedValue([
+      { publicId: 's-0', name: 'HK2 2025-2026', startDate: '01-02-2026', endDate: '30-06-2026', status: 'Đã kết thúc', statusCode: 'COMPLETED' },
+      { ...HK1, startDate: '01-09-2026', endDate: '15-01-2027', status: 'Đang diễn ra', statusCode: 'ONGOING' },
+      { publicId: 's-2', name: 'HK2 2026-2027', startDate: '01-02-2027', endDate: '30-06-2027', status: 'Sắp diễn ra', statusCode: 'UPCOMING' },
+    ])
   })
 
   it('hiển thị kho rubric theo tab (A1) và đổi tab gọi đúng loại phiếu', async () => {
@@ -294,7 +302,7 @@ describe('GradingConfigPage (nối API)', () => {
         name: 'Rubric HD 2026',
         displayStatus: 'ACTIVE',
         displayStatusName: 'Đang áp dụng',
-        effectiveFrom: '01-01-2026',
+        fromSemester: HK1,
         canEdit: false,
         canApply: false,
         canDelete: false,
@@ -330,54 +338,179 @@ describe('GradingConfigPage (nối API)', () => {
     expect(toastMock.success).toHaveBeenCalledWith('Đã xóa Rubric HD nháp')
   })
 
-  it('thẻ học kỳ (B1) hiện rubric đang gán; đổi rubric (B2) chỉ cho chọn rubric đã áp dụng', async () => {
-    serviceMock.getList.mockImplementation(async () => [
-      summary(),
-      DRAFT,
-      summary({ publicId: 't-next', name: 'Rubric HD 2027', displayStatus: 'SCHEDULED', displayStatusName: 'Sắp áp dụng' }),
-    ])
-    serviceMock.changeSemesterRubric.mockResolvedValue(undefined)
+  it('bảng hiện khoảng kỳ áp dụng, bản nháp hiện "Chưa áp dụng"', async () => {
+    renderPage()
+    const table = await findTable()
+    expect(await table.findByText('2026-2027 - Học kỳ 1')).toBeInTheDocument()
+    const draftRow = table.getByRole('button', { name: 'Rubric HD nháp' }).closest('tr') as HTMLElement
+    expect(within(draftRow).getAllByText('Chưa áp dụng').length).toBeGreaterThan(0)
+  })
+
+  it('thẻ học kỳ (B1) chỉ xem: hiện rubric + khoảng kỳ, bấm tên mở chi tiết', async () => {
+    serviceMock.getDetail.mockResolvedValue(detail({ publicId: 't-active', name: 'Rubric HD 2026' }))
     const user = userEvent.setup()
     renderPage()
 
     const card = within(await screen.findByRole('region', { name: 'Rubric áp dụng cho học kỳ' }))
     expect(await card.findByRole('button', { name: 'Rubric HD 2026' })).toBeInTheDocument()
+    expect(card.queryByText('(Học kỳ 1 năm học 2026-2027 → Chưa xác định)')).not.toBeInTheDocument()
     expect(serviceMock.getSemesterRubrics).toHaveBeenCalledWith('s-1')
+    // Không còn đổi rubric thủ công ở thẻ học kỳ
+    expect(card.queryByRole('button', { name: /Đổi rubric/ })).not.toBeInTheDocument()
 
-    await user.click(card.getByRole('button', { name: /Đổi rubric cho kỳ này/ }))
-    const dialog = within(await screen.findByRole('dialog'))
-    // Bản nháp và rubric đang gán không có trong danh sách chọn
-    expect(dialog.queryByText('Rubric HD nháp')).not.toBeInTheDocument()
-    expect(dialog.getAllByRole('radio')).toHaveLength(1)
-
-    await user.click(dialog.getByRole('radio'))
-    await user.click(dialog.getByRole('button', { name: 'Xác nhận đổi' }))
-
-    await waitFor(() =>
-      expect(serviceMock.changeSemesterRubric).toHaveBeenCalledWith('s-1', {
-        evaluationType: 'ADVISOR',
-        templatePublicId: 't-next',
-      }),
-    )
-    expect(toastMock.success).toHaveBeenCalledWith(
-      'Đã đổi rubric Hướng dẫn của Học kỳ 1 năm học 2026-2027 sang Rubric HD 2027.',
-    )
+    await user.click(card.getByRole('button', { name: 'Rubric HD 2026' }))
+    await screen.findByRole('dialog')
+    expect(serviceMock.getDetail).toHaveBeenCalledWith('t-active')
   })
 
-  it('học kỳ đã có phiếu chấm (canChange = false) thì mở popup không thể đổi', async () => {
-    serviceMock.getSemesterRubrics.mockResolvedValue([semesterRow({ canChange: false })])
-    serviceMock.clone.mockResolvedValue('t-copy')
-    const user = userEvent.setup()
+  it('học kỳ chưa có rubric thì thẻ B1 nhắc áp dụng rubric', async () => {
+    serviceMock.getSemesterRubrics.mockResolvedValue([{ evaluationType: 'ADVISOR', evaluationTypeName: 'Hướng dẫn' }])
     renderPage()
 
-    const card = within(await screen.findByRole('region', { name: 'Rubric áp dụng cho học kỳ' }))
-    await card.findByRole('button', { name: 'Rubric HD 2026' })
-    await user.click(card.getByRole('button', { name: /Đổi rubric cho kỳ này/ }))
+    expect(
+      await screen.findByText(/Học kỳ này chưa có rubric Hướng dẫn\. Hãy áp dụng một rubric có khoảng kỳ chứa học kỳ này\./),
+    ).toBeInTheDocument()
+  })
 
-    const dialog = within(await screen.findByRole('dialog'))
-    expect(dialog.getByText('Không thể đổi rubric')).toBeInTheDocument()
-    await user.click(dialog.getByRole('button', { name: /Nhân bản để áp dụng kỳ sau/ }))
-    await waitFor(() => expect(serviceMock.clone).toHaveBeenCalledWith('t-active'))
-    expect(serviceMock.changeSemesterRubric).not.toHaveBeenCalled()
+  it('áp dụng bản nháp (A7 → A8): bỏ kỳ đã kết thúc, xem trước rồi gửi khoảng kỳ', async () => {
+    serviceMock.getApplyPreview.mockResolvedValue({
+      fromSemester: HK1,
+      toSemester: null,
+      assignedSemesters: [HK1],
+      releasedSemesters: [],
+    })
+    serviceMock.apply.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderPage()
+    const table = await findTable()
+
+    await user.click(await table.findByRole('button', { name: 'Rubric HD nháp' }))
+    const detailDialog = within(await screen.findByRole('dialog'))
+    await user.click(await detailDialog.findByRole('button', { name: 'Áp dụng' }))
+
+    const applyDialog = within(
+      (await screen.findByRole('heading', { name: 'Áp dụng rubric' })).closest('[role="dialog"]') as HTMLElement,
+    )
+    const fromSelect = await applyDialog.findByLabelText(/Từ kỳ/)
+    // Kỳ đã kết thúc không có trong "Từ kỳ"
+    expect(within(fromSelect).queryByText(/HK2 2025-2026/)).not.toBeInTheDocument()
+
+    await user.selectOptions(fromSelect, 's-1')
+    expect(await applyDialog.findByText(/Các học kỳ sẽ dùng rubric này/)).toHaveTextContent(
+      'Các học kỳ sẽ dùng rubric này: Học kỳ 1 năm học 2026-2027',
+    )
+    expect(serviceMock.getApplyPreview).toHaveBeenCalledWith('t-draft', 's-1', null)
+
+    await user.click(applyDialog.getByRole('button', { name: 'Xác nhận áp dụng' }))
+    await waitFor(() =>
+      expect(serviceMock.apply).toHaveBeenCalledWith('t-draft', { fromSemesterId: 's-1', toSemesterId: null }),
+    )
+    expect(toastMock.success).toHaveBeenCalledWith('Đã áp dụng Rubric HD nháp')
+  })
+
+  it('áp dụng bị BE từ chối (3125 trùng khoảng kỳ) thì hiện lỗi trong popup', async () => {
+    serviceMock.getApplyPreview.mockResolvedValue({ assignedSemesters: [HK1], releasedSemesters: [] })
+    serviceMock.apply.mockRejectedValue(
+      new ApiError('Khoảng kỳ trùng với rubric "Rubric HD 2026"', 3125, undefined, 409),
+    )
+    const user = userEvent.setup()
+    renderPage()
+    const table = await findTable()
+
+    await user.click(await table.findByRole('button', { name: 'Rubric HD nháp' }))
+    await user.click(await within(await screen.findByRole('dialog')).findByRole('button', { name: 'Áp dụng' }))
+    const applyDialog = within(
+      (await screen.findByRole('heading', { name: 'Áp dụng rubric' })).closest('[role="dialog"]') as HTMLElement,
+    )
+    await user.selectOptions(await applyDialog.findByLabelText(/Từ kỳ/), 's-1')
+    await user.click(await applyDialog.findByRole('button', { name: 'Xác nhận áp dụng' }))
+
+    expect(await applyDialog.findByText('Khoảng kỳ trùng với rubric "Rubric HD 2026"')).toBeInTheDocument()
+    expect(toastMock.success).not.toHaveBeenCalled()
+    expect(toastMock.error).not.toHaveBeenCalled()
+  })
+
+  it('sửa kỳ khi đã có phiếu chấm: khóa "Từ kỳ", chỉ đổi "Đến kỳ" (A9)', async () => {
+    serviceMock.getDetail.mockResolvedValue(
+      detail({
+        publicId: 't-active',
+        name: 'Rubric HD 2026',
+        displayStatus: 'ACTIVE',
+        displayStatusName: 'Đang áp dụng',
+        fromSemester: HK1,
+        canEdit: false,
+        canApply: false,
+        canDelete: false,
+        canChangeFromSemester: false,
+        canChangeToSemester: true,
+        semesterCount: 1,
+        sheetCount: 5,
+      }),
+    )
+    serviceMock.getApplyPreview.mockResolvedValue({ assignedSemesters: [], releasedSemesters: [] })
+    serviceMock.changeSemesterRange.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderPage()
+    const table = await findTable()
+
+    await user.click(await table.findByRole('button', { name: 'Rubric HD 2026' }))
+    await user.click(await within(await screen.findByRole('dialog')).findByRole('button', { name: 'Sửa kỳ áp dụng' }))
+    const changeDialog = within(
+      (await screen.findByRole('heading', { name: 'Sửa kỳ áp dụng' })).closest('[role="dialog"]') as HTMLElement,
+    )
+
+    expect(await changeDialog.findByLabelText(/Từ kỳ/)).toBeDisabled()
+    expect(changeDialog.getByText('Đã có phiếu chấm nên không đổi được')).toBeInTheDocument()
+    // Chưa đổi gì thì chưa lưu được
+    expect(changeDialog.getByRole('button', { name: 'Lưu kỳ áp dụng' })).toBeDisabled()
+
+    await user.selectOptions(changeDialog.getByLabelText('Đến kỳ'), 's-2')
+    await waitFor(() => expect(changeDialog.getByRole('button', { name: 'Lưu kỳ áp dụng' })).toBeEnabled())
+    await user.click(changeDialog.getByRole('button', { name: 'Lưu kỳ áp dụng' }))
+
+    await waitFor(() =>
+      expect(serviceMock.changeSemesterRange).toHaveBeenCalledWith('t-active', {
+        fromSemesterId: 's-1',
+        toSemesterId: 's-2',
+      }),
+    )
+    expect(toastMock.success).toHaveBeenCalledWith('Đã cập nhật kỳ áp dụng của Rubric HD 2026')
+  })
+
+  it('hủy áp dụng (A7b → A10) báo các học kỳ sẽ mất rubric rồi đưa về Nháp', async () => {
+    serviceMock.getDetail.mockResolvedValue(
+      detail({
+        publicId: 't-next',
+        name: 'Rubric HD 2027',
+        displayStatus: 'SCHEDULED',
+        displayStatusName: 'Sắp áp dụng',
+        fromSemester: { publicId: 's-2', name: 'HK2 2026-2027' },
+        canApply: false,
+        canDelete: false,
+        canChangeFromSemester: true,
+        canChangeToSemester: true,
+        canCancelApply: true,
+      }),
+    )
+    serviceMock.getCancelApplyPreview.mockResolvedValue({ releasedSemesters: [{ publicId: 's-2', name: 'HK2 2026-2027' }] })
+    serviceMock.cancelApply.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderPage()
+    const table = await findTable()
+
+    await user.click(await table.findByRole('button', { name: 'Rubric HD nháp' }))
+    await user.click(await within(await screen.findByRole('dialog')).findByRole('button', { name: 'Hủy áp dụng' }))
+
+    expect(
+      await screen.findByText(/Các học kỳ sau sẽ không còn rubric Hướng dẫn: HK2 2026-2027\. Bạn có chắc chắn\?/),
+    ).toBeInTheDocument()
+    expect(serviceMock.getCancelApplyPreview).toHaveBeenCalledWith('t-next')
+
+    const confirmDialog = within(
+      (await screen.findByRole('heading', { name: 'Hủy áp dụng rubric' })).closest('[role="dialog"]') as HTMLElement,
+    )
+    await user.click(confirmDialog.getByRole('button', { name: 'Hủy áp dụng' }))
+    await waitFor(() => expect(serviceMock.cancelApply).toHaveBeenCalledWith('t-next'))
+    expect(toastMock.success).toHaveBeenCalledWith('Đã hủy áp dụng Rubric HD 2027, rubric trở về bản nháp')
   })
 })

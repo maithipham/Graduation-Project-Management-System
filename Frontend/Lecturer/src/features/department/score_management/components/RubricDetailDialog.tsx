@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { CalendarClock, CalendarX, ClipboardPlus, Lock, Save, Send } from 'lucide-react'
 import { Button, Dialog, DialogContent, Skeleton } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
-import { useCancelApplyRubric, useRubricDetail, useSaveRubric } from '../hooks/useRubrics'
-import type { RubricDetail, RubricTreeCriterion, RubricTreeGroup } from '../types'
+import { useCancelApplyPreview, useCancelApplyRubric, useRubricDetail, useSaveRubric } from '../hooks/useRubrics'
+import type { ApplyPreview, RubricDetail, RubricTreeCriterion, RubricTreeGroup } from '../types'
+import { getRoleLabel } from '../utils/rubricHelpers'
 import { RUBRIC_ERROR, getRubricErrorMessage, hasRubricErrorCode } from '../utils/rubricErrors'
 import { createTreeKey, renumberTree, sumTreeWeight, toSaveRubricBody } from '../utils/rubricMapper'
 import { getScheduledSaveBlockReason, saveRubricSchema } from '../utils/rubricSchema'
@@ -69,13 +70,6 @@ interface RubricDetailBodyProps {
   onClose: () => void
 }
 
-/** dd/MM/yyyy → yyyy-MM-dd (giá trị của <input type="date">) */
-function displayDateToApiDate(value: string | null): string | null {
-  if (!value) return null
-  const [day, month, year] = value.split('/')
-  return year && month && day ? `${year}-${month}-${day}` : null
-}
-
 function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDetailBodyProps) {
   const readOnly = !detail.canEdit
   const [name, setName] = useState(detail.name)
@@ -90,6 +84,8 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
 
   const saveMutation = useSaveRubric()
   const cancelApplyMutation = useCancelApplyRubric()
+  // A7b: chỉ gọi khi hộp xác nhận Hủy áp dụng đang mở
+  const cancelPreviewQuery = useCancelApplyPreview(confirmCancelApply ? detail.publicId : undefined)
 
   const total = sumTreeWeight(groups)
   const isDirty = name !== detail.name || JSON.stringify(groups) !== JSON.stringify(detail.groups)
@@ -148,8 +144,8 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
       setSaveError(parsed.error.issues[0]?.message ?? 'Dữ liệu rubric không hợp lệ')
       return
     }
-    // Rubric Sắp áp dụng phải luôn hợp lệ (không thì BE trả 3103) → chặn sớm
-    if (detail.status === 'upcoming') {
+    // Rubric đã áp dụng (Sắp / Đang áp dụng) phải luôn hợp lệ (không thì BE trả 3103) → chặn sớm
+    if (detail.status === 'upcoming' || detail.status === 'active') {
       const reason = getScheduledSaveBlockReason(groups)
       if (reason) {
         setSaveError(reason)
@@ -204,7 +200,7 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
         {readOnly && (
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
             <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            Mẫu rubric đã có phiếu chấm hoặc đã hết hạn nên chỉ xem, không thể sửa. Hãy nhân bản để tạo phiên bản mới.
+            Mẫu rubric đã có phiếu chấm hoặc đã hết áp dụng nên chỉ xem, không thể sửa. Hãy nhân bản để tạo phiên bản mới.
           </div>
         )}
 
@@ -275,7 +271,7 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
                 Hủy áp dụng
               </Button>
             )}
-            {detail.canChangeEffectiveFrom && (
+            {detail.canChangeToSemester && (
               <Button
                 type="button"
                 variant="outline"
@@ -285,7 +281,7 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
                 onClick={() => setApplyMode('change')}
               >
                 <CalendarClock className="h-4 w-4" />
-                Đổi ngày áp dụng
+                Sửa kỳ áp dụng
               </Button>
             )}
             {detail.status === 'draft' && (
@@ -345,9 +341,9 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
       <ConfirmDialog
         open={confirmCancelApply}
         title="Hủy áp dụng rubric"
-        description={`Rubric "${detail.name}" sẽ trở về bản nháp và các học kỳ đã gán sẽ quay lại rubric trước đó. Bạn có chắc chắn?`}
+        description={getCancelApplyDescription(detail, cancelPreviewQuery)}
         confirmLabel="Hủy áp dụng"
-        isPending={cancelApplyMutation.isPending}
+        isPending={cancelApplyMutation.isPending || cancelPreviewQuery.isFetching}
         onConfirm={cancelApply}
         onCancel={() => setConfirmCancelApply(false)}
       />
@@ -356,9 +352,27 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
         mode={applyMode}
         publicId={detail.publicId}
         rubricName={detail.name}
-        currentEffectiveFrom={displayDateToApiDate(detail.effectiveFrom)}
+        currentFromSemester={detail.fromSemester}
+        currentToSemester={detail.toSemester}
+        canChangeFromSemester={detail.canChangeFromSemester}
         onClose={() => setApplyMode(null)}
       />
     </>
   )
+}
+
+/** Nội dung hộp xác nhận Hủy áp dụng theo kết quả A7b (các học kỳ sẽ mất rubric) */
+function getCancelApplyDescription(
+  detail: RubricDetail,
+  preview: { data?: ApplyPreview; isPending: boolean; isError: boolean; error: unknown },
+): string {
+  const intro = `Rubric "${detail.name}" sẽ trở về Nháp.`
+  if (preview.isError) {
+    return `${intro} ${getRubricErrorMessage(preview.error, 'Không kiểm tra được các học kỳ bị ảnh hưởng.')}`
+  }
+  if (preview.isPending || !preview.data) return `${intro} Đang kiểm tra các học kỳ bị ảnh hưởng...`
+  const released = preview.data.releasedSemesters
+  if (released.length === 0) return `${intro} Không có học kỳ nào bị ảnh hưởng. Bạn có chắc chắn?`
+  const names = released.map((semester) => semester.name).join(', ')
+  return `${intro} Các học kỳ sau sẽ không còn rubric ${getRoleLabel(detail.role)}: ${names}. Bạn có chắc chắn?`
 }

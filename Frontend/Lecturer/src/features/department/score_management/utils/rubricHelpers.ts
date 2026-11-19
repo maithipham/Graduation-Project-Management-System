@@ -1,4 +1,5 @@
-import type { RubricRole, RubricStatus } from '../types'
+import type { RubricRole, RubricSemesterOption, RubricStatus, SemesterRef } from '../types'
+import { beDateSortKey } from './rubricMapper'
 
 export const RUBRIC_ROLE_TABS: { role: RubricRole; label: string }[] = [
   { role: 'supervisor', label: 'Hướng dẫn' },
@@ -30,13 +31,60 @@ export const RUBRIC_DETAIL_STATUS_LABEL: Record<RubricStatus, string> = {
 }
 
 /**
- * Khoảng áp dụng ở header chi tiết. Chưa có ngày kết thúc: đang áp dụng → "A – nay";
- * sắp áp dụng → "Từ A" (chưa tới ngày nên không ghi "nay")
+ * Cột "Thời gian áp dụng" / header chi tiết: "HK1 2026-2027 → HK2 2027-2028".
+ * Chưa có "Từ kỳ" = Nháp → "Chưa áp dụng"; chưa có "Đến kỳ" → "Chưa xác định" (đặc tả mục 5)
  */
-export function formatEffectiveRange(from: string | null, to: string | null, status: RubricStatus): string {
+export function formatSemesterRange(from: SemesterRef | null, to: SemesterRef | null): string {
   if (!from) return 'Chưa áp dụng'
-  if (to) return `${from} – ${to}`
-  return status === 'upcoming' ? `Từ ${from}` : `${from} – nay`
+  return `${from.name} → ${to?.name ?? 'Chưa xác định'}`
+}
+
+/**
+ * Hiển thị một học kỳ dạng "năm học - học kỳ" cho cột Bắt đầu / Kết thúc.
+ * BE chỉ trả tên ("Học kỳ 1 năm học 2026-2027") → tách bằng regex; tên khác mẫu thì giữ nguyên.
+ */
+export function formatSemesterShort(semester: SemesterRef | null): string {
+  if (!semester) return ''
+  const match = /^(.*?)\s+năm học\s+(\S+)$/i.exec(semester.name.trim())
+  return match ? `${match[2]} - ${match[1]}` : semester.name
+}
+
+// ---------------------------------------------------------------------------
+// Lọc ô chọn "Từ kỳ" / "Đến kỳ" (đặc tả mục 6.1). Chỉ để chặn sớm, BE vẫn kiểm tra lại (3123, 3124)
+// ---------------------------------------------------------------------------
+
+/**
+ * "Từ kỳ": bỏ kỳ đã kết thúc (R1). Khi Sửa kỳ mà "Từ kỳ" hiện tại đã kết thúc vẫn giữ lại kỳ đó
+ * (`currentFromId`) để ô chọn hiện được giá trị đang có.
+ */
+export function getFromSemesterOptions(
+  semesters: RubricSemesterOption[],
+  currentFromId: string | null = null,
+): RubricSemesterOption[] {
+  return semesters.filter((semester) => semester.statusCode !== 'COMPLETED' || semester.publicId === currentFromId)
+}
+
+/** "Đến kỳ": kỳ bắt đầu không sớm hơn "Từ kỳ" đã chọn (R2). Chưa chọn "Từ kỳ" → rỗng */
+export function getToSemesterOptions(
+  semesters: RubricSemesterOption[],
+  fromSemesterId: string | null,
+): RubricSemesterOption[] {
+  const from = semesters.find((semester) => semester.publicId === fromSemesterId)
+  if (!from) return []
+  const fromKey = beDateSortKey(from.startDate)
+  return semesters.filter((semester) => beDateSortKey(semester.startDate) >= fromKey)
+}
+
+/** Đổi "Từ kỳ" làm "Đến kỳ" đang chọn không còn trong danh sách → về null ("Chưa xác định") */
+export function keepValidToSemester(
+  semesters: RubricSemesterOption[],
+  fromSemesterId: string | null,
+  toSemesterId: string | null,
+): string | null {
+  if (toSemesterId === null) return null
+  return getToSemesterOptions(semesters, fromSemesterId).some((semester) => semester.publicId === toSemesterId)
+    ? toSemesterId
+    : null
 }
 
 /** Thang 10 điểm: 100% ứng với 10 điểm */

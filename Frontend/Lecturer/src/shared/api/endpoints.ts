@@ -124,14 +124,19 @@ export const API_ENDPOINTS = {
     deadlines: '/api/v1/deadlines',
   },
   /** Cấu hình rubric điểm (Trưởng bộ môn) – EvaluationTemplateController */
+  // Danh sách học kỳ cho ô chọn "Từ kỳ" / "Đến kỳ" dùng lại semester.base ở trên
   departmentRubric: {
+    // GET: danh sách theo loại (?type=) · POST: tạo rubric Nháp
     base: '/evaluation-template',
+    // GET: chi tiết · PUT: lưu tên + cây · DELETE: xóa Nháp
     detail: (publicId: string) => `/evaluation-template/${publicId}`,
     clone: (publicId: string) => `/evaluation-template/${publicId}/clone`,
     applyPreview: (publicId: string) => `/evaluation-template/${publicId}/apply-preview`,
+    cancelApplyPreview: (publicId: string) => `/evaluation-template/${publicId}/cancel-apply-preview`,
     apply: (publicId: string) => `/evaluation-template/${publicId}/apply`,
-    effectiveFrom: (publicId: string) => `/evaluation-template/${publicId}/effective-from`,
+    semesterRange: (publicId: string) => `/evaluation-template/${publicId}/semester-range`,
     cancelApply: (publicId: string) => `/evaluation-template/${publicId}/cancel-apply`,
+    // GET: 3 rubric của học kỳ (chỉ xem, không còn PUT)
     semester: (semesterPublicId: string) => `/semester/${semesterPublicId}/evaluation-template`,
   },
   /** Chấm điểm hướng dẫn (GVHD chính) – SupervisorGradeController */

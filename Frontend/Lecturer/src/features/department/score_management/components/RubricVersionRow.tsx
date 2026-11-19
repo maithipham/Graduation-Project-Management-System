@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react'
 import type { RubricListItem } from '../types'
+import { formatSemesterRange, formatSemesterShort } from '../utils/rubricHelpers'
 import { RubricActionMenu } from './RubricActionMenu'
 import { RubricStatusBadge } from './RubricStatusBadge'
 
@@ -11,7 +12,7 @@ interface RubricVersionRowProps {
   onDelete: () => void
 }
 
-/** Một dòng trong kho rubric (A1). Đổi tên / ngày áp dụng làm trong popup chi tiết */
+/** Một dòng trong kho rubric (A1). Đổi tên / kỳ áp dụng làm trong popup chi tiết */
 export function RubricVersionRow({ index, item, onOpen, onClone, onDelete }: RubricVersionRowProps) {
   const invalidReason = `Tổng trọng số (${item.totalWeight}%) chưa đạt 100% hoặc còn nhóm chưa có tiêu chí`
 
@@ -44,8 +45,16 @@ export function RubricVersionRow({ index, item, onOpen, onClone, onDelete }: Rub
         <RubricStatusBadge status={item.status} label={item.statusLabel} />
       </td>
 
-      <td className="px-3 text-center text-[12.5px] text-slate-700">{item.effectiveFrom ?? '–'}</td>
-      <td className="px-3 text-center text-[12.5px] text-slate-700">{item.effectiveTo ?? '–'}</td>
+      <td className="px-3 text-center text-[12.5px] text-slate-700">
+        {item.fromSemester ? (
+          formatSemesterShort(item.fromSemester)
+        ) : (
+          <span className="italic text-slate-400">{formatSemesterRange(null, null)}</span>
+        )}
+      </td>
+
+      {/* "Đến kỳ" null = chưa xác định → để trống */}
+      <td className="px-3 text-center text-[12.5px] text-slate-700">{formatSemesterShort(item.toSemester)}</td>
 
       <td className="px-3 text-center">
         {item.semesterCount > 0 ? (

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { EvaluationTemplateDetail, RubricTreeGroup } from '@/features/department/score_management/types'
+import type {
+  EvaluationTemplateDetail,
+  RubricSemesterOption,
+  RubricTreeGroup,
+} from '@/features/department/score_management/types'
 import {
-  beDateToApiDate,
-  formatApiDate,
+  beDateSortKey,
   formatBeDate,
   formatBeDateTime,
   renumberTree,
@@ -12,11 +15,19 @@ import {
   toRubricRole,
   toRubricStatus,
   toSaveRubricBody,
+  toSemesterRubricAssignment,
 } from '@/features/department/score_management/utils/rubricMapper'
 import {
-  createEffectiveFromSchema,
+  formatSemesterRange,
+  formatSemesterShort,
+  getFromSemesterOptions,
+  getToSemesterOptions,
+  keepValidToSemester,
+} from '@/features/department/score_management/utils/rubricHelpers'
+import {
   getScheduledSaveBlockReason,
   saveRubricSchema,
+  semesterRangeSchema,
   sumWeight,
 } from '@/features/department/score_management/utils/rubricSchema'
 
@@ -24,8 +35,8 @@ const detailDto: EvaluationTemplateDetail = {
   publicId: 't-1',
   name: 'Rubric CNTT 2026',
   type: 'EXAMINER',
-  effectiveFrom: '01-01-2026',
-  effectiveTo: null,
+  fromSemester: { publicId: 's-1', name: 'HK1 2025-2026' },
+  toSemester: null,
   displayStatus: 'ACTIVE',
   displayStatusName: 'Đang áp dụng',
   version: 3,
@@ -36,7 +47,8 @@ const detailDto: EvaluationTemplateDetail = {
   canEdit: false,
   canApply: false,
   applyBlockedReason: null,
-  canChangeEffectiveFrom: false,
+  canChangeFromSemester: false,
+  canChangeToSemester: true,
   canCancelApply: false,
   canDelete: false,
   createdByName: 'Nguyễn Văn A',
@@ -80,15 +92,32 @@ describe('rubricMapper', () => {
     expect(formatBeDate(null)).toBeNull()
     expect(formatBeDate('2026-12-01')).toBeNull()
     expect(formatBeDateTime('21-12-2025 14:05:30')).toBe('21/12/2025 14:05')
-    expect(beDateToApiDate('01-12-2026')).toBe('2026-12-01')
-    expect(formatApiDate('2026-12-01')).toBe('01/12/2026')
+    expect(beDateSortKey('01-12-2026')).toBe('20261201')
+    expect(beDateSortKey('31-01-2026') < beDateSortKey('01-02-2026')).toBe(true)
+    expect(beDateSortKey(null)).toBe('')
+  })
+
+  it('học kỳ chưa có rubric: BE bỏ field → model đưa về null', () => {
+    expect(toSemesterRubricAssignment({ evaluationType: 'ADVISOR', evaluationTypeName: 'Hướng dẫn' })).toEqual({
+      role: 'supervisor',
+      roleLabel: 'Hướng dẫn',
+      templatePublicId: null,
+      templateName: null,
+      status: null,
+      statusLabel: null,
+      fromSemester: null,
+      toSemester: null,
+    })
   })
 
   it('dựng cây theo displayOrder và đánh mã 1, 1.1', () => {
     const detail = toRubricDetail(detailDto)
     expect(detail.role).toBe('reviewer')
     expect(detail.status).toBe('active')
-    expect(detail.effectiveFrom).toBe('01/01/2026')
+    expect(detail.fromSemester).toEqual({ publicId: 's-1', name: 'HK1 2025-2026' })
+    expect(detail.toSemester).toBeNull()
+    expect(detail.canChangeFromSemester).toBe(false)
+    expect(detail.canChangeToSemester).toBe(true)
     expect(detail.version).toBe(3)
     expect(detail.groups.map((g) => [g.code, g.name])).toEqual([
       ['1', 'Thái độ'],
@@ -162,8 +191,9 @@ describe('rubricSchema', () => {
     expect(zero.error?.issues[0].message).toBe('Trọng số tiêu chí phải lớn hơn 0%')
   })
 
-  it('tính tổng và chặn lưu rubric Sắp áp dụng chưa hợp lệ', () => {
+  it('tính tổng và chặn lưu rubric đã áp dụng chưa hợp lệ', () => {
     expect(sumWeight([{ criteria: [{ weight: 0.1 }, { weight: 0.2 }] }])).toBe(0.3)
+    expect(getScheduledSaveBlockReason([])).toBe('Rubric đã áp dụng phải có ít nhất một nhóm tiêu chí')
     expect(getScheduledSaveBlockReason([{ criteria: [{ weight: 90 }] }])).toBe('Tổng trọng số (90%) phải bằng 100%')
     expect(getScheduledSaveBlockReason([{ criteria: [{ weight: 100 }] }, { criteria: [] }])).toBe(
       'Mỗi nhóm tiêu chí phải có ít nhất một tiêu chí',
@@ -171,22 +201,49 @@ describe('rubricSchema', () => {
     expect(getScheduledSaveBlockReason([{ criteria: [{ weight: 60 }, { weight: 40 }] }])).toBeNull()
   })
 
-  it('ngày áp dụng không được ở quá khứ', () => {
-    const schema = createEffectiveFromSchema('2026-11-16')
-    expect(schema.safeParse({ effectiveFrom: '2026-11-16' }).success).toBe(true)
-    expect(schema.safeParse({ effectiveFrom: '2026-11-15' }).error?.issues[0].message).toBe(
-      'Ngày áp dụng không được ở quá khứ',
+  it('khoảng kỳ: "Từ kỳ" bắt buộc, "Đến kỳ" null = chưa xác định', () => {
+    expect(semesterRangeSchema.safeParse({ fromSemesterId: 's-1', toSemesterId: null }).success).toBe(true)
+    expect(semesterRangeSchema.safeParse({ fromSemesterId: 's-1', toSemesterId: 's-2' }).success).toBe(true)
+    expect(semesterRangeSchema.safeParse({ fromSemesterId: '', toSemesterId: null }).error?.issues[0].message).toBe(
+      'Vui lòng chọn Từ kỳ',
     )
-    expect(schema.safeParse({ effectiveFrom: '' }).error?.issues[0].message).toBe('Vui lòng chọn ngày áp dụng')
   })
 })
 
-describe('formatEffectiveRange', () => {
-  it('hiển thị khoảng áp dụng theo trạng thái', async () => {
-    const { formatEffectiveRange } = await import('@/features/department/score_management/utils/rubricHelpers')
-    expect(formatEffectiveRange(null, null, 'draft')).toBe('Chưa áp dụng')
-    expect(formatEffectiveRange('25/11/2026', null, 'upcoming')).toBe('Từ 25/11/2026')
-    expect(formatEffectiveRange('01/01/2026', null, 'active')).toBe('01/01/2026 – nay')
-    expect(formatEffectiveRange('01/01/2026', '24/11/2026', 'archived')).toBe('01/01/2026 – 24/11/2026')
+describe('rubricHelpers – khoảng học kỳ', () => {
+  function semester(
+    publicId: string,
+    startDate: string,
+    statusCode: RubricSemesterOption['statusCode'],
+  ): RubricSemesterOption {
+    return { publicId, name: publicId.toUpperCase(), startDate, endDate: '', status: '', statusCode }
+  }
+  // Cố ý xếp lộn xộn để kiểm tra so sánh theo ngày (dd-MM-yyyy), không theo thứ tự mảng
+  const semesters = [
+    semester('hk2', '01-02-2026', 'ONGOING'),
+    semester('hk1', '01-09-2025', 'COMPLETED'),
+    semester('hk3', '01-09-2026', 'UPCOMING'),
+  ]
+
+  it('hiển thị khoảng kỳ', () => {
+    expect(formatSemesterRange(null, null)).toBe('Chưa áp dụng')
+    expect(formatSemesterRange({ publicId: 'a', name: 'HK1' }, null)).toBe('HK1 → Chưa xác định')
+    expect(formatSemesterRange({ publicId: 'a', name: 'HK1' }, { publicId: 'b', name: 'HK2' })).toBe('HK1 → HK2')
+    expect(formatSemesterShort({ publicId: 'a', name: 'Học kỳ 1 năm học 2026-2027' })).toBe('2026-2027 - Học kỳ 1')
+    expect(formatSemesterShort({ publicId: 'a', name: 'HK hè' })).toBe('HK hè')
+    expect(formatSemesterShort(null)).toBe('')
+  })
+
+  it('"Từ kỳ" bỏ kỳ đã kết thúc, trừ kỳ đang lưu', () => {
+    expect(getFromSemesterOptions(semesters).map((s) => s.publicId)).toEqual(['hk2', 'hk3'])
+    expect(getFromSemesterOptions(semesters, 'hk1').map((s) => s.publicId)).toEqual(['hk2', 'hk1', 'hk3'])
+  })
+
+  it('"Đến kỳ" chỉ gồm kỳ bắt đầu từ "Từ kỳ" trở đi', () => {
+    expect(getToSemesterOptions(semesters, null)).toEqual([])
+    expect(getToSemesterOptions(semesters, 'hk2').map((s) => s.publicId)).toEqual(['hk2', 'hk3'])
+    expect(keepValidToSemester(semesters, 'hk3', 'hk2')).toBeNull()
+    expect(keepValidToSemester(semesters, 'hk2', 'hk3')).toBe('hk3')
+    expect(keepValidToSemester(semesters, 'hk2', null)).toBeNull()
   })
 })

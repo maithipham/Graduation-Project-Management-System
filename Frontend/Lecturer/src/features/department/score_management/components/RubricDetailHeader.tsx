@@ -1,7 +1,7 @@
 import { Calculator, Calendar, UserRound } from 'lucide-react'
 import { cn } from '@/shared/utils/cn'
 import type { RubricDetail, RubricStatus } from '../types'
-import { RUBRIC_DETAIL_STATUS_LABEL, formatEffectiveRange } from '../utils/rubricHelpers'
+import { RUBRIC_DETAIL_STATUS_LABEL, formatSemesterRange } from '../utils/rubricHelpers'
 
 interface RubricDetailHeaderProps {
   detail: RubricDetail
@@ -18,7 +18,7 @@ const STATUS_PILL_CLASS: Record<RubricStatus, string> = {
   archived: 'bg-slate-100 text-slate-600 border-slate-200',
 }
 
-/** Header popup chi tiết: tên (sửa được khi canEdit), trạng thái, thời gian áp dụng, người tạo / sửa */
+/** Header popup chi tiết: tên (sửa được khi canEdit), trạng thái, khoảng kỳ áp dụng, người tạo / sửa */
 export function RubricDetailHeader({ detail, name, readOnly, onNameChange }: RubricDetailHeaderProps) {
   return (
     <div className="flex items-start gap-3 border-b border-slate-200 bg-slate-50/80 px-6 py-4 pr-14">
@@ -57,7 +57,7 @@ export function RubricDetailHeader({ detail, name, readOnly, onNameChange }: Rub
             <Calendar className="h-3.5 w-3.5 text-slate-400" />
             Áp dụng:{' '}
             <span className="font-semibold text-slate-700">
-              {formatEffectiveRange(detail.effectiveFrom, detail.effectiveTo, detail.status)}
+              {formatSemesterRange(detail.fromSemester, detail.toSemester)}
             </span>
           </span>
 
