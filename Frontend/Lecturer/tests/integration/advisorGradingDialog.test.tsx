@@ -236,9 +236,9 @@ describe('AdvisorGradingDialog', () => {
     expect(await screen.findByText(/^Đã cập nhật điểm hướng dẫn\./)).toBeInTheDocument()
   })
 
-  it('C4 lỗi khóa chấm (3128) → hiện lỗi trong popup, không toast.error', async () => {
+  it('C4 lỗi khóa chấm (3168) → hiện lỗi trong popup, không toast.error', async () => {
     serviceMock.getSheet.mockResolvedValue(sheet())
-    serviceMock.saveDraft.mockRejectedValue(new ApiError('Đã khóa chấm', 3128))
+    serviceMock.saveDraft.mockRejectedValue(new ApiError('Đã khóa chấm', 3168))
     renderDialog()
     await userEvent.type(await screen.findByLabelText('Điểm Nội dung'), '5')
     await userEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }))

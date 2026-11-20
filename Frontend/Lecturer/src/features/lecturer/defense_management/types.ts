@@ -208,6 +208,7 @@ export interface ExaminerEvaluation {
   gradingCloseAt: string | null
   gradingOpen: boolean
   editable: boolean
+  defenseEditing: boolean // trong buổi bảo vệ: chỉ sửa điểm + nộp lại, không đổi quyết định / câu hỏi / file
   sheet: EvaluationSheetDetail
 }
 
@@ -372,9 +373,9 @@ export interface DefenseScoreEntry {
   teacherName: string
   score?: number // chỉ có khi SUBMITTED và người xem được thấy
   status: ScoreEntryStatus
-  validForFinal?: boolean
+  deviated?: boolean // true = lệch >= 1.5: chỉ cảnh báo, điểm vẫn được tính
   deviation?: number
-  invalidStep?: DefenseScoreGroup
+  deviationStep?: DefenseScoreGroup
   mine?: boolean
 }
 
@@ -385,14 +386,40 @@ export interface DefenseScoreBoard {
   updatedAt: string
   defenseStatus: DefenseStatus
   advisor: DefenseScoreEntry | null
+  coAdvisor: DefenseScoreEntry | null // GV đồng hướng dẫn (null nếu không có)
   examiners: DefenseScoreEntry[]
   council: DefenseScoreEntry[]
   submittedCouncilCount: number
   councilScore: number | null
   finalScore: number | null
   result: DefenseScoreResult | null // null khi bị ẩn (Ủy viên, chưa đủ 5/5)
-  allInvalidGroup: DefenseScoreGroup | null
+  hasDeviation: boolean // có điểm lệch >= 1.5 (chỉ cảnh báo, vẫn được Hoàn tất bảo vệ)
   scoreHidden: boolean
+}
+
+// POST /defense-assignment/{id}/defense-score/trial – bảng thử điểm của Chủ tịch / Thư ký (không lưu)
+export interface DefenseScoreTrialRequest {
+  advisorScores: number[] // GVHD chính, rồi GV đồng hướng dẫn (nếu có)
+  examinerScores: number[] // GVPB 1, 2
+  councilScores: number[] // 5 thành viên Hội đồng
+}
+
+export interface DefenseScoreTrialEntry {
+  score: number
+  deviated: boolean | null
+  deviation: number | null
+}
+
+export interface DefenseScoreTrialResult {
+  advisors: DefenseScoreTrialEntry[]
+  examiners: DefenseScoreTrialEntry[]
+  council: DefenseScoreTrialEntry[]
+  advisorScore: number
+  examinerScore: number
+  councilScore: number
+  finalScore: number
+  result: DefenseScoreResult
+  hasDeviation: boolean
 }
 
 // GET /defense-council/{councilPublicId}/defense-score

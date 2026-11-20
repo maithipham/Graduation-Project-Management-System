@@ -106,24 +106,24 @@ describe('useScoreWeights', () => {
     expect(result.current.data?.version).toBe(5)
   })
 
-  it('W2 lỗi 3129 (đã bị xóa) → tải lại danh sách', async () => {
-    serviceMock.getDetail.mockRejectedValue(new ApiError('Không tìm thấy cấu hình', 3129, undefined, 404))
+  it('W2 lỗi 3169 (đã bị xóa) → tải lại danh sách', async () => {
+    serviceMock.getDetail.mockRejectedValue(new ApiError('Không tìm thấy cấu hình', 3169, undefined, 404))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useScoreWeightDetail('w-1'), { wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(invalidatedList(invalidateSpy)).toBe(true)
   })
 
-  it('W6 lỗi khoảng kỳ (3135) không tải lại danh sách', async () => {
-    serviceMock.getApplyPreview.mockRejectedValue(new ApiError('Khoảng kỳ không hợp lệ', 3135, undefined, 400))
+  it('W6 lỗi khoảng kỳ (3175) không tải lại danh sách', async () => {
+    serviceMock.getApplyPreview.mockRejectedValue(new ApiError('Khoảng kỳ không hợp lệ', 3175, undefined, 400))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useScoreWeightApplyPreview('w-1', 's-1', null), { wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(invalidatedList(invalidateSpy)).toBe(false)
   })
 
-  it('W6 lỗi 3132 (không còn là Nháp) → tải lại danh sách', async () => {
-    serviceMock.getApplyPreview.mockRejectedValue(new ApiError('Cấu hình không còn là bản nháp', 3132, undefined, 409))
+  it('W6 lỗi 3172 (không còn là Nháp) → tải lại danh sách', async () => {
+    serviceMock.getApplyPreview.mockRejectedValue(new ApiError('Cấu hình không còn là bản nháp', 3172, undefined, 409))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useScoreWeightApplyPreview('w-1', 's-1', null), { wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
@@ -136,8 +136,8 @@ describe('useScoreWeights', () => {
     expect(serviceMock.getApplyPreview).not.toHaveBeenCalled()
   })
 
-  it('W6b lỗi 3138 → tải lại danh sách', async () => {
-    serviceMock.getCancelApplyPreview.mockRejectedValue(new ApiError('Không ở trạng thái áp dụng', 3138, undefined, 409))
+  it('W6b lỗi 3178 → tải lại danh sách', async () => {
+    serviceMock.getCancelApplyPreview.mockRejectedValue(new ApiError('Không ở trạng thái áp dụng', 3178, undefined, 409))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useScoreWeightCancelPreview('w-1'), { wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
@@ -165,8 +165,8 @@ describe('useScoreWeights', () => {
     expect(toastMock.success).toHaveBeenCalledWith('Đã cập nhật cấu hình K66')
   })
 
-  it('sửa lỗi 3133 (người khác vừa sửa) → tải lại danh sách', async () => {
-    serviceMock.update.mockRejectedValue(new ApiError('Dữ liệu đã được cập nhật', 3133, undefined, 409))
+  it('sửa lỗi 3173 (người khác vừa sửa) → tải lại danh sách', async () => {
+    serviceMock.update.mockRejectedValue(new ApiError('Dữ liệu đã được cập nhật', 3173, undefined, 409))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useUpdateScoreWeight(), { wrapper })
     const body = { name: 'K66', advisorWeight: 50, examinerWeight: 25, councilWeight: 25, version: 3 }
@@ -177,8 +177,8 @@ describe('useScoreWeights', () => {
     expect(toastMock.success).not.toHaveBeenCalled()
   })
 
-  it('xóa lỗi 3139 (không phải dữ liệu cũ) → không tải lại danh sách', async () => {
-    serviceMock.remove.mockRejectedValue(new ApiError('Tổng trọng số không hợp lệ', 3139, undefined, 400))
+  it('xóa lỗi 3179 (không phải dữ liệu cũ) → không tải lại danh sách', async () => {
+    serviceMock.remove.mockRejectedValue(new ApiError('Tổng trọng số không hợp lệ', 3179, undefined, 400))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useDeleteScoreWeight(), { wrapper })
     await act(async () => {

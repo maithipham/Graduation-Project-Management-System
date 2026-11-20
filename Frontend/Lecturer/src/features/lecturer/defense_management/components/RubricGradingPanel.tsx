@@ -55,6 +55,8 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
   )
 
   const isLocked = !evaluation.editable || !evaluation.gradingOpen
+  // Trong buổi bảo vệ (điểm bị lệch): chỉ sửa điểm, nhận xét và nộp lại phiếu tới khi Hoàn tất bảo vệ
+  const defenseOnly = evaluation.defenseEditing
 
   // Form states
   const [criteriaScores, setCriteriaScores] = useState<Record<string, string>>(
@@ -262,7 +264,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
             <Download className="w-3.5 h-3.5" />
             <span>Báo cáo sinh viên</span>
           </a>
-        ) : (
+        ) : defenseOnly ? null : (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -286,6 +288,17 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
                 : `Chỉ chấm từ ${evaluation.gradingStartAt ? formatDate(evaluation.gradingStartAt, 'short') : ''} đến trước ${evaluation.gradingCloseAt ? formatDate(evaluation.gradingCloseAt, 'short') : ''}.`}
             </span>
           </div>
+        </div>
+      )}
+
+      {defenseOnly && !isLocked && (
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span>
+            <span className="font-bold">Đang trong buổi bảo vệ: </span>
+            chỉ sửa điểm, nhận xét và nộp lại phiếu (khi điểm bị lệch), được sửa tới khi Chủ tịch bấm Hoàn tất bảo vệ.
+            Không đổi được quyết định phản biện, câu hỏi hay file nhận xét.
+          </span>
         </div>
       )}
 
@@ -395,7 +408,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
           </label>
           <textarea
             rows={2}
-            disabled={isLocked}
+            disabled={isLocked || defenseOnly}
             value={question1}
             onChange={(e) => setQuestion1(e.target.value)}
             placeholder="Câu hỏi phản biện thứ nhất dành cho sinh viên..."
@@ -409,7 +422,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
           </label>
           <textarea
             rows={2}
-            disabled={isLocked}
+            disabled={isLocked || defenseOnly}
             value={question2}
             onChange={(e) => setQuestion2(e.target.value)}
             placeholder="Câu hỏi phản biện thứ hai dành cho sinh viên..."
@@ -519,7 +532,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
           <button
             type="button"
-            disabled={isLocked}
+            disabled={isLocked || defenseOnly}
             onClick={() => setDecision('APPROVED')}
             className={`p-3 rounded-xl border-2 text-left transition flex items-center justify-between cursor-pointer disabled:cursor-not-allowed ${decision === 'APPROVED'
                 ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
@@ -536,7 +549,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
 
           <button
             type="button"
-            disabled={isLocked}
+            disabled={isLocked || defenseOnly}
             onClick={() => setDecision('REJECTED')}
             className={`p-3 rounded-xl border-2 text-left transition flex items-center justify-between cursor-pointer disabled:cursor-not-allowed ${decision === 'REJECTED'
                 ? 'border-rose-600 bg-rose-50 text-rose-900 ring-2 ring-rose-500/20'
@@ -579,15 +592,18 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
       {/* Footer Buttons */}
       {!isLocked && (
         <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={saveMutation.isPending}
-            onClick={handleSaveDraftClick}
-          >
-            <Save className="w-3.5 h-3.5 mr-1.5" />
-            Lưu nháp
-          </Button>
+          {/* Trong buổi bảo vệ không lưu nháp: phiếu nháp sẽ không được tính điểm */}
+          {!defenseOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saveMutation.isPending}
+              onClick={handleSaveDraftClick}
+            >
+              <Save className="w-3.5 h-3.5 mr-1.5" />
+              Lưu nháp
+            </Button>
+          )}
 
           <Button
             type="button"

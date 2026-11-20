@@ -14,6 +14,7 @@ import type {
   DefenseMinutesRequest,
   DefenseRevisionReviewRequest,
   DefenseScoreBoard,
+  DefenseScoreTrialRequest,
 } from '../types'
 
 export const defenseEvaluationKeys = {
@@ -246,4 +247,12 @@ export function useDefenseScoreRealtime(
       void client.deactivate()
     }
   }, [idsKey, fullView, councilPublicId, queryClient])
+}
+
+/** Bảng thử điểm của Chủ tịch / Thư ký: chỉ tính, không lưu, không làm mới dữ liệu khác */
+export function useDefenseScoreTrial(defenseAssignmentPublicId: string) {
+  return useMutation({
+    mutationFn: (data: DefenseScoreTrialRequest) =>
+      defenseEvaluationService.trialScore(defenseAssignmentPublicId, data),
+  })
 }

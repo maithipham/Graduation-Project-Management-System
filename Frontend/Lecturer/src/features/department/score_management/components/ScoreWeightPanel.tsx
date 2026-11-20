@@ -54,7 +54,7 @@ export function ScoreWeightPanel({ tabs }: { tabs?: ReactNode }) {
     if (cancelPreview.isError) return `${base} ${getRubricErrorMessage(cancelPreview.error, '')}`.trim()
     const released = cancelPreview.data.releasedSemesters
     if (released.length === 0) return base
-    return `${base} Các học kỳ sẽ không còn cấu hình trọng số (điểm tổng kết bị trống): ${released
+    return `${base} Các học kỳ sẽ không còn cấu hình trọng số: ${released
       .map((semester) => semester.name)
       .join(', ')}.`
   }
@@ -75,14 +75,14 @@ export function ScoreWeightPanel({ tabs }: { tabs?: ReactNode }) {
       </div>
 
       <p className="text-[12.5px] text-slate-500">
-        Điểm tổng kết = điểm HD × w₁ + điểm PB × w₂ + điểm HĐ × w₃ (tổng 3 trọng số = 100%).
+        Trọng số 3 đầu điểm hiển thị cho sinh viên (tổng 3 trọng số = 100%). Điểm tổng kết tính theo QĐ1305, không theo trọng số.
       </p>
 
       {listQuery.isSuccess && !hasActive && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            Chưa có cấu hình trọng số nào đang áp dụng: điểm tổng kết của sinh viên học kỳ hiện tại sẽ để trống cho tới
+            Chưa có cấu hình trọng số nào đang áp dụng: sinh viên học kỳ hiện tại chưa thấy trọng số 3 đầu điểm cho tới
             khi bạn áp dụng một cấu hình.
           </span>
         </div>

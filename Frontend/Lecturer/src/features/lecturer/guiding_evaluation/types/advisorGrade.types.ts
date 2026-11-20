@@ -30,7 +30,7 @@ export interface AdvisorGradeDeadline {
   locked: boolean
 }
 
-/** Một dòng ở C1 – đề tài GV đang đăng nhập là GVHD chính */
+/** Một dòng ở C1 – đề tài GV đang đăng nhập là GVHD chính hoặc GV đồng hướng dẫn (mỗi người 1 phiếu) */
 export interface AdvisorGradeTopic {
   topicPublicId: string
   topicName: string
@@ -161,7 +161,7 @@ export const ADVISOR_GRADE_ERROR_CODES = {
   EVALUATION_CRITERIA_NOT_IN_TEMPLATE: 3121,
   EVALUATION_CRITERIA_DUPLICATED: 3122,
   /** Đã qua endDate mốc Tổ chức hội đồng bảo vệ của ngành SV */
-  ADVISOR_GRADING_LOCKED: 3128,
+  ADVISOR_GRADING_LOCKED: 3168,
   /** Dùng chung cho nhiều lỗi validate – hiển thị theo `message` */
   VALIDATION: 4000,
 } as const

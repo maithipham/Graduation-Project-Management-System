@@ -82,7 +82,7 @@ function refreshTopics(queryClient: QueryClient) {
 
 /**
  * Lỗi do phiếu / đề tài đổi trạng thái trong lúc đang nhập:
- * - 3117 / 3128 (đề tài không còn đủ điều kiện / đã khóa chấm) → tải lại phiếu (C3) + danh sách (C1),
+ * - 3117 / 3168 (đề tài không còn đủ điều kiện / đã khóa chấm) → tải lại phiếu (C3) + danh sách (C1),
  *   popup chuyển sang chỉ xem.
  * - 3118 (C4 gặp phiếu đã nộp ở tab khác) → tải lại phiếu + danh sách, popup chuyển sang nút "Nộp lại".
  * Không toast: request có `skipErrorToast`, popup tự hiện lỗi.

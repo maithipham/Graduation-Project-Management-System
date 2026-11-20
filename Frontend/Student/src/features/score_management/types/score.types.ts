@@ -12,7 +12,7 @@ export interface StudentScoreResponse {
   councilScore: number | null // trung bình 5 phiếu hội đồng; null = chưa đủ phiếu
   councilWeight: number | null
   finalScore: number | null // BE tính sẵn, FE không tính lại
-  weightConfigured: boolean // false = Trưởng ngành chưa cấu hình trọng số cho kỳ
+  weightConfigured: boolean // false = Trưởng ngành chưa cấu hình trọng số cho kỳ (chỉ ảnh hưởng cột trọng số, không ảnh hưởng điểm tổng kết)
 }
 
 // Một dòng của bảng điểm (dùng cho UI)

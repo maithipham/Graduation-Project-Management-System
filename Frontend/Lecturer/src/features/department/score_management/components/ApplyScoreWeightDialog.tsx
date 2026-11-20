@@ -73,7 +73,7 @@ function ApplyScoreWeightBody({
   const unchanged = isChange && fromId === initialFromId && toId === initialToId
   const waitingPreview = fromId !== null && (previewQuery.isPending || previewQuery.isError)
   const canConfirm = !mutation.isPending && !unchanged && !waitingPreview
-  // Lỗi khoảng kỳ (3131, 3134–3137, 4041…) của xem trước và của lúc lưu cùng hiện ngay dưới 2 ô chọn
+  // Lỗi khoảng kỳ (3171, 3174–3177, 4041…) của xem trước và của lúc lưu cùng hiện ngay dưới 2 ô chọn
   const rangeError =
     submitError ??
     (previewQuery.isError ? getRubricErrorMessage(previewQuery.error, 'Không xem trước được kỳ áp dụng') : null)
@@ -102,7 +102,7 @@ function ApplyScoreWeightBody({
       { publicId: config.publicId, body: parsed.data, name: config.name },
       {
         onSuccess: onClose,
-        // Request có skipErrorToast → lỗi hiện trong popup (message 3136 / 3137 do BE ghép, hiện nguyên văn)
+        // Request có skipErrorToast → lỗi hiện trong popup (message 3176 / 3177 do BE ghép, hiện nguyên văn)
         onError: (error) => setSubmitError(getRubricErrorMessage(error, 'Không lưu được kỳ áp dụng')),
       },
     )
@@ -184,8 +184,8 @@ function ApplyScoreWeightBody({
         )}
 
         <p className="text-[12px] text-slate-500">
-          Điểm tổng kết của sinh viên trong các học kỳ thuộc khoảng sẽ tính theo trọng số này. Khi đã có phiếu chấm
-          nộp chính thức, trọng số và "Từ kỳ" sẽ không sửa được nữa.
+          Trọng số này hiển thị cho sinh viên các học kỳ thuộc khoảng (điểm tổng kết tính theo QĐ1305, không theo trọng số).
+          Khi đã có phiếu chấm nộp chính thức, trọng số và "Từ kỳ" sẽ không sửa được nữa.
         </p>
       </div>
 

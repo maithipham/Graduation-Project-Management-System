@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Schema zod cho hộp thoại Tạo / Sửa trọng số: FE chặn sớm, BE vẫn kiểm tra lại (4000, 3139).
+// Schema zod cho hộp thoại Tạo / Sửa trọng số: FE chặn sớm, BE vẫn kiểm tra lại (4000, 3179).
 
 /** Đổi % sang số nguyên (×100) để cộng / so sánh không bị lỗi số thực (33.33 + 33.33 + 33.34) */
 function toHundredths(value: number): number {

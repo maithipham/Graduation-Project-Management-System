@@ -240,7 +240,7 @@ const LOCKING_ERROR_CODES: ReadonlySet<number> = new Set([
 ])
 
 /**
- * Đề tài đổi trạng thái hoặc đã khóa chấm trong lúc đang nhập (3117, 3128)
+ * Đề tài đổi trạng thái hoặc đã khóa chấm trong lúc đang nhập (3117, 3168)
  * → tải lại phiếu (C3) và danh sách (C1) để popup chuyển sang chế độ chỉ xem.
  */
 export function isAdvisorGradeLockingError(error: unknown): boolean {

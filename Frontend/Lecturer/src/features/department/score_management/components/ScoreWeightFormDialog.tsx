@@ -61,7 +61,7 @@ function EditScoreWeightLoader({ publicId, onClose }: { publicId: string; onClos
   }
 
   if (detailQuery.isError) {
-    // Interceptor đã toast lỗi; hook đã tải lại danh sách nếu cấu hình bị xóa (3129)
+    // Interceptor đã toast lỗi; hook đã tải lại danh sách nếu cấu hình bị xóa (3169)
     return (
       <div className="space-y-4 px-6 py-6">
         <p role="alert" className="text-[13px] font-semibold text-[#DC2626]">
@@ -98,7 +98,7 @@ interface ScoreWeightFormProps {
   /** null = tạo mới; có giá trị = dữ liệu W2 */
   editing: ScoreWeightConfig | null
   onClose: () => void
-  /** Sửa: tải lại W2 khi BE báo 3133 (người khác vừa cập nhật) */
+  /** Sửa: tải lại W2 khi BE báo 3173 (người khác vừa cập nhật) */
   onReload?: () => void
   isReloading?: boolean
 }
@@ -108,7 +108,7 @@ function ScoreWeightForm({ editing, onClose, onReload, isReloading = false }: Sc
   const createMutation = useCreateScoreWeight()
   const updateMutation = useUpdateScoreWeight()
   const mutation = isEdit ? updateMutation : createMutation
-  /** BE báo 3133 → hiện nút tải dữ liệu mới nhất */
+  /** BE báo 3173 → hiện nút tải dữ liệu mới nhất */
   const [conflict, setConflict] = useState(false)
 
   const {
@@ -149,7 +149,7 @@ function ScoreWeightForm({ editing, onClose, onReload, isReloading = false }: Sc
       examinerWeight: values.examinerWeight,
       councilWeight: values.councilWeight,
     }
-    // Request có skipErrorToast → lỗi BE (3130, 3133, 3139…) hiện trong hộp thoại
+    // Request có skipErrorToast → lỗi BE (3170, 3173, 3179…) hiện trong hộp thoại
     const onError = (error: unknown) => {
       setConflict(hasScoreWeightErrorCode(error, SCORE_WEIGHT_ERROR.VERSION_CONFLICT))
       setError('root.server', { message: getRubricErrorMessage(error, 'Không lưu được cấu hình trọng số') })
@@ -172,7 +172,7 @@ function ScoreWeightForm({ editing, onClose, onReload, isReloading = false }: Sc
           {isEdit ? 'Sửa cấu hình trọng số' : 'Tạo cấu hình trọng số'}
         </h2>
         <p className="mt-1 text-[12.5px] text-slate-500">
-          Điểm tổng kết = HD × w₁ + PB × w₂ + HĐ × w₃, tổng 3 trọng số bằng 100%.
+          Tổng 3 trọng số bằng 100%. Trọng số chỉ hiển thị cho sinh viên, điểm tổng kết tính theo QĐ1305.
         </p>
       </div>
 
@@ -217,7 +217,7 @@ function ScoreWeightForm({ editing, onClose, onReload, isReloading = false }: Sc
 
         {isApplied && !locked && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
-            Cấu hình đang áp dụng: điểm tổng kết của các học kỳ trong khoảng sẽ được tính lại.
+            Cấu hình đang áp dụng: trọng số hiển thị của các học kỳ trong khoảng sẽ được cập nhật.
           </p>
         )}
 

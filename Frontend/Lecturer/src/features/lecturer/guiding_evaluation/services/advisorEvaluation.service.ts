@@ -4,7 +4,7 @@ import type { AdvisorEvaluation, AdvisorEvaluationRequest } from '../types'
 
 const EP = API_ENDPOINTS.advisorEvaluation
 
-// GVHD chính: chấm phiếu hướng dẫn (ADVISOR) + nộp Phiếu theo dõi tiến độ
+// GVHD chính / GV đồng hướng dẫn: mỗi người chấm phiếu hướng dẫn (ADVISOR) của riêng mình; GVHD chính nộp Phiếu theo dõi tiến độ
 export const advisorEvaluationService = {
   // GET /report/advisor-evaluation/my (?semesterPublicId=, bỏ trống = học kỳ đang diễn ra)
   getMyEvaluations: async (semesterPublicId?: string): Promise<AdvisorEvaluation[]> => {

@@ -104,7 +104,7 @@ describe('useAdvisorGrade', () => {
   })
 
   it.each([
-    [3128, 'Đã khóa chấm'],
+    [3168, 'Đã khóa chấm'],
     [3118, 'Phiếu đã nộp'],
   ])('C4 lỗi %i → tải lại phiếu + danh sách, không toast', async (code, message) => {
     serviceMock.saveDraft.mockRejectedValue(new ApiError(message, code))

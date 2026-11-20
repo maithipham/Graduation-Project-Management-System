@@ -492,7 +492,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ board, item, evaluation
         </div>
 
         {/* Bảng điểm Hội đồng realtime */}
-        <DefenseScoreBoardCard board={scoreBoard} />
+        <DefenseScoreBoardCard board={scoreBoard} canTrial={Boolean(board?.canViewAllScores)} />
       </div>
 
       <div className="px-6 py-3.5 border-t border-slate-200 flex items-center justify-between gap-4 shrink-0">

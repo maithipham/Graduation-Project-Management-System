@@ -180,12 +180,12 @@ describe('ScoreWeightPanel', () => {
     )
   })
 
-  it('sửa lỗi 3133: hiện lỗi + nút tải lại, tải xong gửi version mới', async () => {
+  it('sửa lỗi 3173: hiện lỗi + nút tải lại, tải xong gửi version mới', async () => {
     serviceMock.getDetail
       .mockResolvedValueOnce(config({ version: 1 }))
       .mockResolvedValueOnce(config({ advisorWeight: 50, examinerWeight: 25, councilWeight: 25, version: 2 }))
     serviceMock.update
-      .mockRejectedValueOnce(new ApiError('Cấu hình đã được người khác cập nhật', 3133, undefined, 409))
+      .mockRejectedValueOnce(new ApiError('Cấu hình đã được người khác cập nhật', 3173, undefined, 409))
       .mockResolvedValueOnce(undefined)
     const { user } = renderPanel()
     await chooseAction(user, 'Trọng số nháp', 'Sửa')
@@ -214,7 +214,7 @@ describe('ScoreWeightPanel', () => {
 
   it('hủy áp dụng: W6b lỗi → khóa nút xác nhận', async () => {
     serviceMock.getCancelApplyPreview.mockRejectedValue(
-      new ApiError('Cấu hình không ở trạng thái áp dụng', 3138, undefined, 409),
+      new ApiError('Cấu hình không ở trạng thái áp dụng', 3178, undefined, 409),
     )
     const { user } = renderPanel()
     await chooseAction(user, 'Trọng số đang dùng', 'Hủy áp dụng')

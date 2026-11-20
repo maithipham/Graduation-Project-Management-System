@@ -41,9 +41,8 @@ export function ScoreResultCard({ item }: ScoreResultCardProps) {
           <div className="space-y-0.5">
             <div className="text-sm font-semibold text-slate-700">Chưa có điểm tổng kết</div>
             <div className="text-xs italic text-slate-500">
-              {item.weightConfigured
-                ? 'Chờ đủ điểm Hướng dẫn, Phản biện và Hội đồng.'
-                : 'Trưởng ngành chưa cấu hình trọng số điểm cho học kỳ này.'}
+              {/* Điểm tổng kết tính theo QĐ1305 khi có kết quả bảo vệ, không phụ thuộc cấu hình trọng số */}
+              Chờ đủ điểm Hướng dẫn, Phản biện và Hội đồng.
             </div>
           </div>
         )}

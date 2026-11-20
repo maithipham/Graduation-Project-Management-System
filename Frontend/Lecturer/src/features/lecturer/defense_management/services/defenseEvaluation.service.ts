@@ -10,6 +10,8 @@ import type {
   DefenseRevision,
   DefenseRevisionReviewRequest,
   DefenseScoreBoard,
+  DefenseScoreTrialRequest,
+  DefenseScoreTrialResult,
 } from '../types'
 
 const EP = API_ENDPOINTS.defenseEvaluation
@@ -50,6 +52,19 @@ export const defenseEvaluationService = {
   getScoreBoard: async (defenseAssignmentPublicId: string): Promise<DefenseScoreBoard> => {
     const res = await apiClient.get<ApiResponse<DefenseScoreBoard>>(
       EP.scoreBoard(defenseAssignmentPublicId),
+    )
+    return res.data.data
+  },
+
+  // POST /defense-assignment/{id}/defense-score/trial – bảng thử điểm (chỉ tính, không lưu)
+  trialScore: async (
+    defenseAssignmentPublicId: string,
+    data: DefenseScoreTrialRequest,
+  ): Promise<DefenseScoreTrialResult> => {
+    const res = await apiClient.post<ApiResponse<DefenseScoreTrialResult>>(
+      EP.trialScore(defenseAssignmentPublicId),
+      data,
+      { skipErrorToast: true },
     )
     return res.data.data
   },

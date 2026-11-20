@@ -243,6 +243,8 @@ export const API_ENDPOINTS = {
       `/defense-assignment/${defenseAssignmentPublicId}/council-evaluation`,
     scoreBoard: (defenseAssignmentPublicId: string) =>
       `/defense-score/${defenseAssignmentPublicId}`,
+    trialScore: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/defense-score/trial`,
     councilScoreBoards: (councilPublicId: string) =>
       `/defense-council/${councilPublicId}/defense-score`,
     minutes: (defenseAssignmentPublicId: string) =>

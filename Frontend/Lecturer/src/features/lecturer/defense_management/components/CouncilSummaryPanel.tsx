@@ -56,7 +56,6 @@ function canComplete(item: CouncilScoreSummaryItem): boolean {
     b.defenseStatus !== 'COMPLETED' &&
     b.result !== null &&
     b.result !== 'PENDING' &&
-    !b.allInvalidGroup &&
     item.minutesStatus === 'FINALIZED'
   )
 }
@@ -113,7 +112,7 @@ export const CouncilSummaryPanel: React.FC<CouncilSummaryPanelProps> = ({
 
   const handleExport = () => {
     const header = [
-      'STT', 'MSSV', 'Ho ten', 'Ten de tai', 'Diem GVHD', 'Diem GVPB 1', 'Diem GVPB 2',
+      'STT', 'MSSV', 'Ho ten', 'Ten de tai', 'Diem GVHD', 'Diem GVHD 2', 'Diem GVPB 1', 'Diem GVPB 2',
       ...memberColumns.map((m) => `"Diem HD (${ROLE_LABEL[m.role]} - ${m.fullName})"`),
       'Diem TB HD', 'Diem tong ket', 'Ket qua',
     ].join(',')
@@ -124,6 +123,7 @@ export const CouncilSummaryPanel: React.FC<CouncilSummaryPanelProps> = ({
         `"${it.studentName}"`,
         `"${(it.topicName ?? '').replace(/"/g, '""')}"`,
         csvScore(it.board.advisor),
+        csvScore(it.board.coAdvisor),
         csvScore(it.board.examiners[0]),
         csvScore(it.board.examiners[1]),
         ...memberColumns.map((_, idx) => csvScore(memberEntry(it, idx))),
@@ -260,6 +260,11 @@ export const CouncilSummaryPanel: React.FC<CouncilSummaryPanelProps> = ({
                   </td>
                   <td className="py-3 px-2 text-center text-blue-700 bg-blue-50/30">
                     <ScoreCell entry={b.advisor} />
+                    {b.coAdvisor && (
+                      <div className="mt-0.5" title={`GV đồng hướng dẫn: ${b.coAdvisor.teacherName}`}>
+                        <ScoreCell entry={b.coAdvisor} />
+                      </div>
+                    )}
                   </td>
                   {[0, 1].map((idx) => (
                     <td key={idx} className="py-3 px-2 text-center bg-purple-50/30 text-purple-900">

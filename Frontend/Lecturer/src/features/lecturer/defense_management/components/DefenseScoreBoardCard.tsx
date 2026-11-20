@@ -1,6 +1,7 @@
 import React from 'react'
-import { Radio } from 'lucide-react'
+import { AlertTriangle, Radio } from 'lucide-react'
 import type { DefenseScoreBoard, DefenseScoreEntry, DefenseScoreGroup } from '../types'
+import { DefenseScoreTrialPanel } from './DefenseScoreTrialPanel'
 
 const ROLE_LABEL: Record<string, string> = {
   CHAIRPERSON: 'Chủ tịch',
@@ -10,32 +11,27 @@ const ROLE_LABEL: Record<string, string> = {
 
 const STEP_LABEL: Record<DefenseScoreGroup, string> = {
   COUNCIL: 'Bước 1 – lệch so với TB 5 điểm Hội đồng',
-  EXAMINER: 'Bước 2 – lệch so với TB điểm Hội đồng hợp lệ',
-  ADVISOR: 'Bước 3 – lệch so với TB điểm PB + HĐ hợp lệ',
+  EXAMINER: 'Bước 2 – lệch so với TB 5 điểm Hội đồng',
+  ADVISOR: 'Bước 3 – lệch so với TB điểm PB + HĐ',
 }
 
-const GROUP_LABEL: Record<DefenseScoreGroup, string> = {
-  COUNCIL: 'Hội đồng',
-  EXAMINER: 'Phản biện',
-  ADVISOR: 'Hướng dẫn',
-}
-
-/** Ô điểm: điểm (gạch đỏ nếu bị loại) hoặc trạng thái khi chưa nộp / bị ẩn */
+/** Ô điểm: điểm (tô cam + biểu tượng cảnh báo nếu lệch >= 1.5, vẫn được tính) hoặc trạng thái khi chưa nộp / bị ẩn */
 export const ScoreCell: React.FC<{ entry: DefenseScoreEntry | null | undefined }> = ({ entry }) => {
   if (!entry) return <span className="text-slate-300">—</span>
   if (typeof entry.score === 'number') {
-    const invalid = entry.validForFinal === false
+    const deviated = entry.deviated === true
     return (
       <span
-        className={invalid ? 'line-through text-[#DC2626] font-bold' : 'font-extrabold'}
+        className={deviated ? 'inline-flex items-center gap-0.5 text-amber-700 font-extrabold' : 'font-extrabold'}
         title={
-          invalid
-            ? `Bị loại: lệch ${entry.deviation?.toFixed(2)} điểm${entry.invalidStep ? ` (${STEP_LABEL[entry.invalidStep]})` : ''}`
+          deviated
+            ? `Cảnh báo: lệch ${entry.deviation?.toFixed(2)} điểm${entry.deviationStep ? ` (${STEP_LABEL[entry.deviationStep]})` : ''} – vẫn được tính, người chấm có thể tự sửa phiếu`
             : entry.deviation !== undefined
-              ? `Hợp lệ, lệch ${entry.deviation.toFixed(2)} điểm`
+              ? `Lệch ${entry.deviation.toFixed(2)} điểm`
               : undefined
         }
       >
+        {deviated && <AlertTriangle className="w-3 h-3" aria-label="Điểm lệch" />}
         {entry.score.toFixed(1)}
       </span>
     )
@@ -46,13 +42,6 @@ export const ScoreCell: React.FC<{ entry: DefenseScoreEntry | null | undefined }
 }
 
 export function resultBadge(board: DefenseScoreBoard): React.ReactNode {
-  if (board.allInvalidGroup) {
-    return (
-      <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-        Nhóm {GROUP_LABEL[board.allInvalidGroup]} bị loại hết – cần chấm lại
-      </span>
-    )
-  }
   if (board.result === 'PASSED') {
     return (
       <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -78,10 +67,15 @@ export function resultBadge(board: DefenseScoreBoard): React.ReactNode {
  * BƯỚC 14 – Pha 1c: Bảng điểm Hội đồng của 1 sinh viên, cập nhật realtime qua WebSocket.
  * Điểm bị ẩn theo quy tắc (Ủy viên chưa đủ 5/5 phiếu) do BE quyết định.
  */
-export const DefenseScoreBoardCard: React.FC<{ board: DefenseScoreBoard | undefined }> = ({ board }) => {
+export const DefenseScoreBoardCard: React.FC<{
+  board: DefenseScoreBoard | undefined
+  // Chủ tịch / Thư ký (xem được mọi điểm): hiện bảng thử điểm
+  canTrial?: boolean
+}> = ({ board, canTrial = false }) => {
   if (!board) return null
   const rows: { label: string; sub?: string; entry: DefenseScoreEntry | null | undefined }[] = [
-    { label: 'GVHD', sub: board.advisor?.teacherName, entry: board.advisor },
+    { label: board.coAdvisor ? 'GVHD 1' : 'GVHD', sub: board.advisor?.teacherName, entry: board.advisor },
+    ...(board.coAdvisor ? [{ label: 'GVHD 2', sub: board.coAdvisor.teacherName, entry: board.coAdvisor }] : []),
     ...board.examiners.map((e) => ({ label: `GVPB ${e.order ?? ''}`, sub: e.teacherName, entry: e })),
     ...board.council.map((e) => ({
       label: `${e.role ? ROLE_LABEL[e.role] : 'Thành viên'}${e.mine ? ' (Bạn)' : ''}`,
@@ -101,7 +95,16 @@ export const DefenseScoreBoardCard: React.FC<{ board: DefenseScoreBoard | undefi
       </div>
       {board.scoreHidden && (
         <div className="px-4 py-2 text-[11px] text-slate-500 bg-amber-50/50 border-b border-slate-100">
-          Điểm của thành viên khác được hiển thị khi đủ 5/5 phiếu Hội đồng đã nộp.
+          Điểm của thành viên khác được hiển thị khi đủ 5/5 phiếu Hội đồng đã nộp hoặc khi bảo vệ đã hoàn tất.
+        </div>
+      )}
+      {board.hasDeviation && (
+        <div className="px-4 py-2 text-[11px] text-amber-800 bg-amber-50 border-b border-amber-100 flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            Có điểm lệch từ 1,5 điểm trở lên (đánh dấu cam). Điểm lệch vẫn được tính; người chấm có thể tự sửa và
+            nộp lại phiếu của mình trước khi Hoàn tất bảo vệ.
+          </span>
         </div>
       )}
       <table className="w-full text-xs">
@@ -126,6 +129,12 @@ export const DefenseScoreBoardCard: React.FC<{ board: DefenseScoreBoard | undefi
           </tr>
         </tbody>
       </table>
+      {/* Bảng thử điểm: khi đã đủ điểm và bảo vệ chưa hoàn tất; key theo version để nạp lại điểm mới nhất */}
+      {canTrial && board.result !== null && board.result !== 'PENDING' && board.defenseStatus !== 'COMPLETED' && (
+        <div className="p-3 border-t border-slate-200">
+          <DefenseScoreTrialPanel key={board.version} board={board} />
+        </div>
+      )}
     </div>
   )
 }

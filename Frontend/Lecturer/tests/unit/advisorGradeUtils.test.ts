@@ -208,8 +208,8 @@ describe('thời điểm khóa chấm và lý do chỉ xem', () => {
 })
 
 describe('phân loại lỗi', () => {
-  it('isAdvisorGradeLockingError chỉ nhận 3117 / 3128', () => {
-    for (const code of [3117, 3128]) {
+  it('isAdvisorGradeLockingError chỉ nhận 3117 / 3168', () => {
+    for (const code of [3117, 3168]) {
       expect(isAdvisorGradeLockingError(new ApiError('x', code)), String(code)).toBe(true)
     }
     for (const code of [3118, 3119, 3120, 4000, 2001]) {
@@ -220,7 +220,7 @@ describe('phân loại lỗi', () => {
 
   it('isAdvisorGradeAlreadySubmittedError chỉ nhận 3118', () => {
     expect(isAdvisorGradeAlreadySubmittedError(new ApiError('x', 3118))).toBe(true)
-    expect(isAdvisorGradeAlreadySubmittedError(new ApiError('x', 3128))).toBe(false)
+    expect(isAdvisorGradeAlreadySubmittedError(new ApiError('x', 3168))).toBe(false)
     expect(isAdvisorGradeAlreadySubmittedError(new Error('x'))).toBe(false)
   })
 })

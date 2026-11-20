@@ -32,7 +32,7 @@ export const scoreWeightService = {
     return res.data.data
   },
 
-  /** W4 – sửa tên + trọng số. Lỗi (4000, 3130, 3133, 3139…) hiện trong hộp thoại */
+  /** W4 – sửa tên + trọng số. Lỗi (4000, 3170, 3173, 3179…) hiện trong hộp thoại */
   async update(publicId: string, body: UpdateScoreWeightBody): Promise<void> {
     await apiClient.put<ApiResponse<null>>(WEIGHT.detail(publicId), body, { skipErrorToast: true })
   },
