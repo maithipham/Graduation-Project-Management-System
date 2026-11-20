@@ -136,4 +136,69 @@ export const API_ENDPOINTS = {
     majors: '/major',
     majorHead: (majorId: string) => `/major/${majorId}/head`,
   },
+  // Quản lý Hội đồng bảo vệ (Trưởng bộ môn / Admin)
+  defenseCouncil: {
+    // GET: danh sách tổng quan theo học kỳ và bộ môn (?semesterId=&majorId=)
+    base: '/defense-council',
+    // POST: tạo hàng loạt hội đồng bảo vệ
+    batch: '/defense-council/batch',
+    // PATCH: cập nhật hội đồng (phòng, thời gian bảo vệ)
+    detail: (councilPublicId: string) => `/defense-council/${councilPublicId}`,
+    // GET: danh sách giảng viên ứng viên (?semesterId=&majorId=&scope=&assignedOnly=&keyword=)
+    teacher: '/defense-council/teacher',
+    // PUT: lưu phân công thành viên hội đồng
+    member: (councilPublicId: string) => `/defense-council/${councilPublicId}/member`,
+    // GET: danh sách sinh viên đủ điều kiện (?semesterId=&majorId=&assigned=&page=&size=)
+    student: '/defense-council/student',
+    // POST: gán sinh viên vào hội đồng
+    assignment: (councilPublicId: string) => `/defense-council/${councilPublicId}/assignment`,
+    // DELETE: gỡ sinh viên khỏi hội đồng
+    removeAssignment: (councilPublicId: string, assignmentPublicId: string) =>
+      `/defense-council/${councilPublicId}/assignment/${assignmentPublicId}`,
+  },
+  // Bước 12: Phân công GVPB, lịch & chấm phản biện (Giảng viên)
+  examinerReview: {
+    myCouncils: '/defense-council/my',
+    councilBoard: (councilPublicId: string) => `/defense-council/${councilPublicId}/examiner`,
+    assignExaminers: (defenseAssignmentPublicId: string) => `/defense-assignment/${defenseAssignmentPublicId}/examiner`,
+    myAssignments: '/examiner-assignment/my',
+    schedule: (id: string) => `/examiner-assignment/${id}/schedule`,
+    evaluation: (id: string) => `/examiner-assignment/${id}/evaluation`,
+    decision: (id: string) => `/examiner-assignment/${id}/decision`,
+    reviewFile: (id: string) => `/examiner-assignment/${id}/review-file`,
+  },
+  // Bước 13: Lịch bảo vệ Hội đồng (Chủ tịch / Thư ký xếp ca)
+  defenseSchedule: {
+    councilSchedule: (councilPublicId: string) =>
+      `/defense-council/${councilPublicId}/defense-schedule`,
+    scheduleSlot: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/defense-slot`,
+    unscheduleSlot: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/defense-slot`,
+  },
+  // Bước 14: Chấm điểm Hội đồng, bảng điểm realtime, biên bản, hoàn tất bảo vệ, nộp lại báo cáo
+  defenseEvaluation: {
+    gradingBoard: (councilPublicId: string) =>
+      `/defense-council/${councilPublicId}/council-evaluation`,
+    councilEvaluation: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/council-evaluation`,
+    scoreBoard: (defenseAssignmentPublicId: string) =>
+      `/defense-score/${defenseAssignmentPublicId}`,
+    councilScoreBoards: (councilPublicId: string) =>
+      `/defense-council/${councilPublicId}/defense-score`,
+    minutes: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/defense-minutes`,
+    finalizeMinutes: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/defense-minutes/finalize`,
+    completion: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/completion`,
+    revisionDetail: (revisionPublicId: string) => `/defense-revision/${revisionPublicId}`,
+    revisionReview: (revisionPublicId: string) => `/defense-revision/${revisionPublicId}/review`,
+  },
+  // Chấm phiếu hướng dẫn (GVHD chính) + Phiếu theo dõi tiến độ
+  advisorEvaluation: {
+    my: '/report/advisor-evaluation/my',
+    detail: (topicPublicId: string) => `/report/advisor-evaluation/${topicPublicId}`,
+    progressReport: '/report/progress-report',
+  },
 } as const

@@ -11,13 +11,13 @@ import type {
 } from '../types'
 
 export const COUNCIL_QUERY_KEYS = {
-  all: ['defense-councils'] as const,
+  all: ['defense-council'] as const,
   list: (semesterId: number | string, majorId: number | string) =>
-    ['defense-councils', 'list', semesterId, majorId] as const,
+    ['defense-council', 'list', semesterId, majorId] as const,
   teachers: (params: CandidateTeacherParams) =>
-    ['defense-councils', 'teachers', params] as const,
+    ['defense-council', 'teachers', params] as const,
   students: (params: EligibleStudentParams) =>
-    ['defense-councils', 'students', params] as const,
+    ['defense-council', 'students', params] as const,
 }
 
 export function useDefenseCouncils(

@@ -102,7 +102,7 @@ describe('semesterConfigSchema validation', () => {
 })
 
 describe('semesterService endpoints', () => {
-  it('getAll: gửi GET /semesters', async () => {
+  it('getAll: gửi GET /semester', async () => {
     reply = {
       code: 1000,
       message: 'OK',
@@ -110,11 +110,11 @@ describe('semesterService endpoints', () => {
     }
 
     const data = await semesterService.getAll({ page: 0, size: 10 })
-    expect(sentUrl(requests[0])).toBe('/semesters?page=0&size=10')
+    expect(sentUrl(requests[0])).toBe('/semester?page=0&size=10')
     expect(data?.content).toEqual([])
   })
 
-  it('getCurrent: gửi GET /semesters/current', async () => {
+  it('getCurrent: gửi GET /semester/current', async () => {
     reply = {
       code: 1000,
       message: 'OK',
@@ -129,12 +129,12 @@ describe('semesterService endpoints', () => {
     }
 
     const current = await semesterService.getCurrent()
-    expect(sentUrl(requests[0])).toBe('/semesters/current')
+    expect(sentUrl(requests[0])).toBe('/semester/current')
     expect(current?.name).toBe('Học kỳ 1 năm học 2026-2027')
     expect(current?.statusCode).toBe('ONGOING')
   })
 
-  it('sync: gửi POST /semesters/sync', async () => {
+  it('sync: gửi POST /semester/sync', async () => {
     reply = {
       code: 1000,
       message: 'OK',
@@ -142,11 +142,11 @@ describe('semesterService endpoints', () => {
     }
 
     await semesterService.sync()
-    expect(sentUrl(requests[0])).toBe('/semesters/sync')
+    expect(sentUrl(requests[0])).toBe('/semester/sync')
     expect(requests[0].method?.toLowerCase()).toBe('post')
   })
 
-  it('update: gửi PUT /semesters/:id kèm cờ applyToFutureSemesters', async () => {
+  it('update: gửi PUT /semester/:id kèm cờ applyToFutureSemesters', async () => {
     reply = {
       code: 1000,
       message: 'OK',
@@ -158,7 +158,7 @@ describe('semesterService endpoints', () => {
       endDate: '2027-01-31',
       applyToFutureSemesters: true,
     })
-    expect(sentUrl(requests[0])).toBe('/semesters/sem-123')
+    expect(sentUrl(requests[0])).toBe('/semester/sem-123')
     expect(requests[0].method?.toLowerCase()).toBe('put')
     expect(JSON.parse(requests[0].data)).toEqual({
       startDate: '2026-09-01',
@@ -167,7 +167,7 @@ describe('semesterService endpoints', () => {
     })
   })
 
-  it('getConfig: gửi GET /semesters/config', async () => {
+  it('getConfig: gửi GET /semester/config', async () => {
     reply = {
       code: 1000,
       message: 'OK',
@@ -184,11 +184,11 @@ describe('semesterService endpoints', () => {
     }
 
     const config = await semesterService.getConfig()
-    expect(sentUrl(requests[0])).toBe('/semesters/config')
+    expect(sentUrl(requests[0])).toBe('/semester/config')
     expect(config?.term1StartMonth).toBe(9)
   })
 
-  it('updateConfig: gửi PUT /semesters/config', async () => {
+  it('updateConfig: gửi PUT /semester/config', async () => {
     reply = {
       code: 1000,
       message: 'OK',
@@ -206,7 +206,7 @@ describe('semesterService endpoints', () => {
       term2EndDay: 31,
     }
     await semesterService.updateConfig(newConfig)
-    expect(sentUrl(requests[0])).toBe('/semesters/config')
+    expect(sentUrl(requests[0])).toBe('/semester/config')
     expect(requests[0].method?.toLowerCase()).toBe('put')
     expect(JSON.parse(requests[0].data)).toEqual(newConfig)
   })

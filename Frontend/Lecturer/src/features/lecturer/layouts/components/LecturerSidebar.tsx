@@ -26,9 +26,16 @@ function getInitialOpenSubmenus(pathname: string): Record<string, boolean> {
   const initial: Record<string, boolean> = {
     '/lecturer/topic-assignment': true,
     '/lecturer/thesis-execution': true,
+    '/lecturer/defense-group': true,
   }
   for (const item of lecturerNavItems) {
-    if (item.children?.some((child) => child.to === pathname)) {
+    if (
+      item.children?.some(
+        (child) =>
+          child.to === pathname ||
+          (!child.end && pathname.startsWith(`${child.to}/`)),
+      )
+    ) {
       initial[item.to] = true
     }
   }
@@ -73,6 +80,9 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
         return (badges.supervisorRequests || 8) + (badges.topicProposals || 6)
       case 'thesisExecutionGroup':
         return badges.reports || 2
+      case 'defenseReviews':
+      case 'defenseGroup':
+        return 11
       default:
         return 0
     }
@@ -86,7 +96,11 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
   if (prevPath !== location.pathname) {
     setPrevPath(location.pathname)
     const activeParent = lecturerNavItems.find((item) =>
-      item.children?.some((child) => child.to === location.pathname),
+      item.children?.some(
+        (child) =>
+          child.to === location.pathname ||
+          (!child.end && location.pathname.startsWith(`${child.to}/`)),
+      ),
     )
     if (activeParent && !openSubmenus[activeParent.to]) {
       setOpenSubmenus((prev) => ({ ...prev, [activeParent.to]: true }))
@@ -130,9 +144,8 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
       `}</style>
       <aside
         id="sidebar"
-        className={`sidebar fixed inset-y-0 left-0 z-40 bg-[#1565C0] text-blue-100 border-r border-[#0D47A1] flex flex-col shadow-sm select-none transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          collapsed ? 'w-[72px]' : 'w-[260px]'
-        } ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        className={`sidebar fixed inset-y-0 left-0 z-40 bg-[#1565C0] text-blue-100 border-r border-[#0D47A1] flex flex-col shadow-sm select-none transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${collapsed ? 'w-[72px]' : 'w-[260px]'
+          } ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         style={{
           fontFamily:
             '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -146,9 +159,8 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
             to="/lecturer"
             end
             onClick={() => onMobileClose?.()}
-            className={`sidebar-brand h-16 flex items-center border-b border-white/10 shrink-0 transition-all duration-200 hover:bg-white/5 ${
-              collapsed ? 'justify-center px-0' : 'gap-3 px-4'
-            }`}
+            className={`sidebar-brand h-16 flex items-center border-b border-white/10 shrink-0 transition-all duration-200 hover:bg-white/5 ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'
+              }`}
             title="Trang chủ Cổng Giảng viên"
           >
             <div className="w-[38px] h-[38px] rounded-2xl bg-white p-1 flex items-center justify-center shrink-0 shadow-xs transition-transform duration-200 hover:scale-105 overflow-hidden">
@@ -210,11 +222,10 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
                     type="button"
                     onClick={() => handleAccordionToggle(item.to)}
                     title={collapsed ? item.label : undefined}
-                    className={`accordion-btn sb-item group relative w-full h-10 px-3 rounded-lg text-[13px] font-medium flex items-center justify-between transition-all duration-150 cursor-pointer select-none text-blue-100 hover:text-white hover:bg-white/10 ${
-                      collapsed
+                    className={`accordion-btn sb-item group relative w-full h-10 px-3 rounded-lg text-[13px] font-medium flex items-center justify-between transition-all duration-150 cursor-pointer select-none text-blue-100 hover:text-white hover:bg-white/10 ${collapsed
                         ? 'w-11 h-11 mx-auto justify-center p-0'
                         : ''
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0 text-white">
@@ -244,9 +255,8 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
                             transform: isAccordionOpen ? 'rotate(90deg)' : 'rotate(0deg)',
                             transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                           }}
-                          className={`accordion-chev w-4 h-4 text-blue-200/70 shrink-0 ${
-                            isAccordionOpen ? 'open' : ''
-                          }`}
+                          className={`accordion-chev w-4 h-4 text-blue-200/70 shrink-0 ${isAccordionOpen ? 'open' : ''
+                            }`}
                         />
                       </div>
                     )}
@@ -254,11 +264,10 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
 
                   {/* Nhóm menu con cấp 2 (Indent pl-3 chuẩn theo bản gốc gv_ui) */}
                   <div
-                    className={`accordion-body pl-3 mt-1 space-y-0.5 overflow-hidden transition-all duration-200 ease-in-out ${
-                      !collapsed && isAccordionOpen
+                    className={`accordion-body pl-3 mt-1 space-y-0.5 overflow-hidden transition-all duration-200 ease-in-out ${!collapsed && isAccordionOpen
                         ? 'max-h-72 opacity-100 open'
                         : 'max-h-0 opacity-0 py-0 pointer-events-none'
-                    }`}
+                      }`}
                   >
                     {item.children?.map((child) => {
                       const childBadgeCount = getBadgeCount(child.badgeKey)
@@ -267,12 +276,12 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
                         <NavLink
                           key={child.to}
                           to={child.to}
+                          end={child.end}
                           onClick={() => onMobileClose?.()}
                           className={({ isActive }) =>
-                            `nav-sub w-full flex items-center justify-between h-9 pl-6 pr-3 rounded-lg text-[12.5px] font-medium transition select-none ${
-                              isActive
-                                ? 'active bg-white/20 text-white font-semibold shadow-xs'
-                                : 'text-blue-200 hover:bg-white/10 hover:text-white'
+                            `nav-sub w-full flex items-center justify-between h-9 pl-6 pr-3 rounded-lg text-[12.5px] font-medium transition select-none ${isActive
+                              ? 'active bg-white/20 text-white font-semibold shadow-xs'
+                              : 'text-blue-200 hover:bg-white/10 hover:text-white'
                             }`
                           }
                         >
@@ -301,14 +310,12 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
                 onClick={() => onMobileClose?.()}
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
-                  `nav-item relative w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[13px] font-medium transition select-none ${
-                    collapsed
-                      ? 'w-11 h-11 mx-auto justify-center p-0'
-                      : ''
-                  } ${
-                    isActive
-                      ? 'active bg-white/20 text-white font-semibold shadow-xs'
-                      : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                  `nav-item relative w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[13px] font-medium transition select-none ${collapsed
+                    ? 'w-11 h-11 mx-auto justify-center p-0'
+                    : ''
+                  } ${isActive
+                    ? 'active bg-white/20 text-white font-semibold shadow-xs'
+                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -338,9 +345,8 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
             id="collapseBtn"
             type="button"
             onClick={onToggle}
-            className={`collapse-toggle group relative w-full flex items-center justify-between h-10 px-3 rounded-xl text-[13px] font-medium text-blue-100 hover:text-white hover:bg-white/10 active:bg-white/20 active:scale-[0.98] transition-all duration-200 cursor-pointer select-none ${
-              collapsed ? 'w-11 h-11 mx-auto justify-center p-0 rounded-xl' : ''
-            }`}
+            className={`collapse-toggle group relative w-full flex items-center justify-between h-10 px-3 rounded-xl text-[13px] font-medium text-blue-100 hover:text-white hover:bg-white/10 active:bg-white/20 active:scale-[0.98] transition-all duration-200 cursor-pointer select-none ${collapsed ? 'w-11 h-11 mx-auto justify-center p-0 rounded-xl' : ''
+              }`}
             title={collapsed ? 'Mở rộng menu (Ctrl+B)' : 'Thu gọn menu (Ctrl+B)'}
             aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           >

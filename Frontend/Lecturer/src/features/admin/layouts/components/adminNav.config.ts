@@ -12,6 +12,7 @@ export interface AdminSubNavItem {
   to: string
   label: string
   icon: LucideIcon
+  end?: boolean
 }
 
 export interface AdminNavItem {

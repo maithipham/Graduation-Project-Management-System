@@ -109,7 +109,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           // Kiểm tra xem mục con có đang active không
           const isChildActive = Boolean(
             hasChildren &&
-            item.children?.some((child) => location.pathname === child.to),
+            item.children?.some(
+              (child) =>
+                location.pathname === child.to ||
+                (!child.end && location.pathname.startsWith(`${child.to}/`)),
+            ),
           )
           const isAccordionOpen = openSubmenus[item.to] ?? isChildActive
 
@@ -167,6 +171,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                         <NavLink
                           key={child.to}
                           to={child.to}
+                          end={child.end}
                           onClick={() => onMobileClose?.()}
                           className={({ isActive }) =>
                             `relative h-9 w-full pl-6 pr-3 rounded-lg flex items-center gap-3 text-[12.5px] leading-5 transition-colors select-none ${isActive

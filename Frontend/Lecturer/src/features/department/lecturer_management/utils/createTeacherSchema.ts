@@ -1,11 +1,26 @@
 import { z } from 'zod'
 
 export const TLU_ORGANIZATION = 'Trường Đại học Thủy lợi'
-const MAX_LENGTH = 100
+// Khớp BE TeacherRowValidator: quá 255 ký tự (sau chuẩn hóa) coi như sai định dạng
+const MAX_LENGTH = 255
 const PHONE_PATTERN = /^0\d{9}$/
 const EMAIL_PATTERN = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/
+// Họ: các từ chỉ gồm chữ cái, cách nhau 1 khoảng trắng; Tên: 1 từ chỉ gồm chữ cái
+const FIRST_NAME_PATTERN = /^\p{Script=Latin}+( \p{Script=Latin}+)*$/u
+const LAST_NAME_PATTERN = /^\p{Script=Latin}+$/u
 // Tên trường: chữ, số, khoảng trắng và các dấu . , - & ( ) ' /
-const ORGANIZATION_PATTERN = /^[\p{L}\p{M}\p{N} .,\-&()'/]+$/u
+const ORGANIZATION_PATTERN = /^[\p{Script=Latin}\d.,&()'/-]+( [\p{Script=Latin}\d.,&()'/-]+)*$/u
+// Ký tự ẩn: zero-width space/joiner, word joiner, BOM (BE TextNormalizer cũng xóa)
+const INVISIBLE_CHARS = /[​-‍⁠﻿]/g
+
+const FIRST_NAME_INVALID = 'Họ không được chứa số và kí tự đặc biệt'
+const LAST_NAME_INVALID = 'Tên chỉ được chứa chữ cái'
+const EMAIL_DOMAIN_INVALID =
+  'Email giáo viên phải có đuôi @tlu.edu.vn (trong trường) hoặc @gmail.com (ngoài trường)'
+const ORGANIZATION_INVALID =
+  "Đơn vị công tác chỉ gồm chữ, số, khoảng trắng và các dấu . , - & ( ) ' / (tối đa 255 ký tự)"
+
+const withinMax = (value: string) => value.length <= MAX_LENGTH
 
 /**
  * Đuôi email giáo viên → trong / ngoài trường.
@@ -63,11 +78,13 @@ export function isValidOrganization(organization: string): boolean {
   )
 }
 
-/** Cắt khoảng trắng đầu cuối, gộp nhiều khoảng trắng giữa thành 1 */
+/** Giống BE TextNormalizer: xóa ký tự ẩn, gộp khoảng trắng, trim, chuẩn Unicode dựng sẵn (NFC) */
 function normalizeTeacherText(value: unknown): string {
   return String(value ?? '')
-    .trim()
+    .replace(INVISIBLE_CHARS, '')
     .replace(/\s+/g, ' ')
+    .trim()
+    .normalize('NFC')
 }
 
 /** Đọc chuỗi đã qua transform (nếu ô bị lỗi định dạng trước transform, lấy chuỗi người dùng gõ) */
@@ -99,22 +116,6 @@ export function isExternalTeacherCheck(params: {
   return false
 }
 
-export function isInternalTeacherValues(values: Record<string, unknown>): boolean {
-  const email = readText(values.email).toLowerCase()
-  if (email.endsWith('@tlu.edu.vn')) return true
-  if (email.endsWith('@gmail.com')) return false
-  const org = readText(values.organization)
-  return isTLU(org)
-}
-
-export function isExternalTeacherValues(values: Record<string, unknown>): boolean {
-  const email = readText(values.email).toLowerCase()
-  if (email.endsWith('@gmail.com')) return true
-  if (email.endsWith('@tlu.edu.vn')) return false
-  const org = readText(values.organization)
-  return org !== '' && !isTLU(org)
-}
-
 export const createTeacherSchema = z
   .object({
     teacherCode: z
@@ -132,8 +133,9 @@ export const createTeacherSchema = z
       .pipe(
         z
           .string()
-          .min(1, 'Họ và tên đệm không được để trống')
-          .max(MAX_LENGTH, 'Họ và tên đệm không được vượt quá 100 ký tự'),
+          .min(1, 'Họ không được để trống')
+          .refine(withinMax, FIRST_NAME_INVALID)
+          .regex(FIRST_NAME_PATTERN, FIRST_NAME_INVALID),
       ),
     lastName: z
       .string()
@@ -142,7 +144,8 @@ export const createTeacherSchema = z
         z
           .string()
           .min(1, 'Tên không được để trống')
-          .max(MAX_LENGTH, 'Tên không được vượt quá 100 ký tự'),
+          .refine(withinMax, LAST_NAME_INVALID)
+          .regex(LAST_NAME_PATTERN, LAST_NAME_INVALID),
       ),
     email: z
       .string()
@@ -151,11 +154,11 @@ export const createTeacherSchema = z
         z
           .string()
           .min(1, 'Email không được để trống')
-          .max(MAX_LENGTH, 'Email không được vượt quá 100 ký tự')
+          .refine(withinMax, 'Email không đúng định dạng')
           .regex(EMAIL_PATTERN, 'Email không đúng định dạng')
           .refine(
             (value) => TEACHER_EMAIL_RULES.some((rule) => value.endsWith(rule.domain)),
-            'Chỉ chấp nhận email @tlu.edu.vn hoặc @gmail.com',
+            EMAIL_DOMAIN_INVALID,
           ),
       ),
     phone: z
@@ -175,8 +178,8 @@ export const createTeacherSchema = z
         z
           .string()
           .min(1, 'Đơn vị công tác không được để trống')
-          .max(MAX_LENGTH, 'Đơn vị công tác không được vượt quá 100 ký tự')
-          .regex(ORGANIZATION_PATTERN, 'Đơn vị công tác chỉ được chứa chữ cái, số và dấu câu hợp lệ'),
+          .refine(withinMax, ORGANIZATION_INVALID)
+          .regex(ORGANIZATION_PATTERN, ORGANIZATION_INVALID),
       ),
     // Gửi tên hoặc mã ngành. Ngoài trường không bắt buộc (cho phép null/rỗng)
     majorId: z.union([z.string(), z.number()]).optional().nullable(),
@@ -218,13 +221,8 @@ export const createTeacherSchema = z
   )
   // Ngành học: Giáo viên trong trường bắt buộc phải chọn ngành. Giáo viên ngoài trường không bắt buộc (cho phép để trống)
   .refine(
-    (values) => {
-      if (isExternalTeacherValues(values)) return true
-      if (isInternalTeacherValues(values)) {
-        return readText(values.major) !== ''
-      }
-      return true
-    },
+    // Như BE: chỉ xét ngành khi email đã hợp lệ (đúng cú pháp + đúng đuôi)
+    (values) => readEmailRule(values)?.internal !== true || readText(values.major) !== '',
     {
       message: 'Ngành học không được để trống',
       path: ['major'],
@@ -239,10 +237,7 @@ export const createTeacherSchema = z
     { message: 'Ngành học không tồn tại trong hệ thống', path: ['major'], when: () => true },
   )
   .refine(
-    (values) => {
-      if (!isExternalTeacherValues(values)) return true
-      return readText(values.major) === ''
-    },
+    (values) => readEmailRule(values)?.internal !== false || readText(values.major) === '',
     {
       message: 'Giáo viên ngoài trường không được điền ngành',
       path: ['major'],

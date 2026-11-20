@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import type { UserRole } from '@/features/auth'
 import {
   LayoutDashboard,
   GraduationCap,
@@ -16,6 +17,8 @@ export interface DepartmentSubNavItem {
   to: string
   label: string
   icon: LucideIcon
+  roles?: UserRole[]
+  end?: boolean
 }
 
 export interface DepartmentNavItem {
@@ -24,6 +27,7 @@ export interface DepartmentNavItem {
   icon: LucideIcon
   end?: boolean
   children?: DepartmentSubNavItem[]
+  roles?: UserRole[]
 }
 
 export const departmentNavItems: DepartmentNavItem[] = [
@@ -64,6 +68,7 @@ export const departmentNavItems: DepartmentNavItem[] = [
     to: '/department/councils',
     label: 'Hội đồng bảo vệ',
     icon: Award,
+    roles: ['ADMIN', 'HEAD_OF_MAJOR'],
   },
   {
     to: '/department/schedule',

@@ -103,7 +103,7 @@ export function CouncilTable({ councils, isLoading, onViewDetail }: CouncilTable
                         {c.code}
                       </span>
                       <span className="font-bold text-slate-800 text-[13px]">
-                        {c.name || `Hội đồng ${c.code}`}
+                        {c.name || c.code}
                       </span>
                     </div>
                   </TableCell>
@@ -122,7 +122,7 @@ export function CouncilTable({ councils, isLoading, onViewDetail }: CouncilTable
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault()
-                          ;(e.target as HTMLInputElement).blur()
+                            ; (e.target as HTMLInputElement).blur()
                         }
                       }}
                       placeholder="Nhập phòng..."
@@ -132,11 +132,10 @@ export function CouncilTable({ councils, isLoading, onViewDetail }: CouncilTable
                   </TableCell>
                   <TableCell className="py-3.5 px-4 text-center">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${
-                        c.studentCount > 0
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${c.studentCount > 0
                           ? 'bg-sky-50 text-[#1565C0] border-sky-200'
                           : 'bg-slate-100 text-slate-500 border-slate-200'
-                      }`}
+                        }`}
                     >
                       {c.studentCount} SV
                     </span>
