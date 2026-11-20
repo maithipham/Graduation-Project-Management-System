@@ -47,7 +47,7 @@ export const CouncilExaminerPage: React.FC = () => {
   const validTabs: CouncilTab[] = ['members', 'assign', 'schedule', 'grading', 'summary']
   const activeTab: CouncilTab = validTabs.includes(tabParam as CouncilTab)
     ? (tabParam as CouncilTab)
-    : 'schedule' // Default to schedule tab as highlighted in the design
+    : 'members' // Mở chi tiết Hội đồng: mặc định vào tab Thành viên
 
   const handleSelectTab = (tab: CouncilTab) => {
     setSearchParams({ tab })

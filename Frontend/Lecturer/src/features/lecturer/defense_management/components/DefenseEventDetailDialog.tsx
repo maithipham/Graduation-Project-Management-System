@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui'
+import { extractMeetingUrl } from '../utils/defenseCalendar'
 
 export interface ScheduleEvent {
   id: string
@@ -72,6 +73,7 @@ export const DefenseEventDetailDialog: React.FC<
   if (!event) return null
 
   const isCouncil = event.type === 'council'
+  const meetingUrl = extractMeetingUrl(event.room)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,9 +130,22 @@ export const DefenseEventDetailDialog: React.FC<
               ) : (
                 <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
               )}
-              <span>
+              <span className="min-w-0">
                 Địa điểm:{' '}
-                <strong className="text-slate-900">{event.room}</strong>
+                {meetingUrl ? (
+                  // Phòng họp trực tuyến có link: bấm để mở link ở tab mới
+                  <a
+                    href={meetingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-[#1565C0] hover:underline break-all"
+                    title="Mở link phòng họp trực tuyến"
+                  >
+                    {event.room}
+                  </a>
+                ) : (
+                  <strong className="text-slate-900">{event.room}</strong>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">

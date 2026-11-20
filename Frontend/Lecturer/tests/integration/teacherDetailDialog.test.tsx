@@ -52,7 +52,7 @@ describe('TeacherDetailDialog', () => {
     expect(detail).toHaveBeenCalledWith('id-1')
     expect(valueOf('Đơn vị công tác')).toHaveTextContent('Trường Đại học Bách khoa Hà Nội')
     expect(valueOf('Ngành')).toHaveTextContent('—')
-    expect(valueOf('Hạn mức')).toHaveTextContent('—')
+    expect(valueOf('Học vị / Học hàm')).toHaveTextContent('—')
     expect(valueOf('Số điện thoại')).toHaveTextContent('—')
     expect(within(valueOf('Email') as HTMLElement).getByRole('link')).toHaveAttribute(
       'href',
@@ -61,16 +61,16 @@ describe('TeacherDetailDialog', () => {
     expect(screen.getByText('Đã tắt')).toBeInTheDocument()
   })
 
-  it('hạn mức 0 vẫn hiện "0" (không coi là chưa thiết lập)', async () => {
+  it('có học vị / học hàm thì hiện đúng giá trị; trạng thái đang hoạt động', async () => {
     vi.spyOn(teacherService, 'getTeacherDetail').mockResolvedValue({
       ...EXTERNAL_INACTIVE,
-      amount: 0,
+      academicTitle: 'TS.',
       status: true,
     })
     renderDialog('id-1')
 
     await screen.findByText('Trần Thị Bình')
-    expect(valueOf('Hạn mức')).toHaveTextContent(/^0$/)
+    expect(valueOf('Học vị / Học hàm')).toHaveTextContent(/^TS\.$/)
     expect(screen.getByText('Đang hoạt động')).toBeInTheDocument()
   })
 

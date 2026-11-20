@@ -28,6 +28,7 @@ async function fillValidForm(u: ReturnType<typeof userEvent.setup>) {
   await u.type(field('Email'), 'an.nv@tlu.edu.vn')
   await u.type(field('Số điện thoại'), '0987654321')
   await u.selectOptions(field('Ngành'), 'Kỹ thuật phần mềm')
+  await u.selectOptions(field('Học hàm / Học vị'), 'ThS.')
 }
 
 const successToasts = () =>

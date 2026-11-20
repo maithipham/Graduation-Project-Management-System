@@ -348,7 +348,7 @@ export const DefenseCouncilPage: React.FC = () => {
                   <td className="py-3.5 px-4 text-center">
                     <button
                       type="button"
-                      onClick={() => navigate(`/lecturer/defense/councils/${c.id}?tab=schedule`)}
+                      onClick={() => navigate(`/lecturer/defense/councils/${c.id}?tab=members`)}
                       className="h-8.5 px-3.5 rounded-xl bg-[#1565C0] hover:bg-[#0D47A1] text-white text-xs font-bold transition cursor-pointer shadow-2xs whitespace-nowrap"
                     >
                       Vào chi tiết

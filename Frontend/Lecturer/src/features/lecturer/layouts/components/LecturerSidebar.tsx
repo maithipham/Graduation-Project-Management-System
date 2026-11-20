@@ -31,7 +31,9 @@ function getInitialOpenSubmenus(pathname: string): Record<string, boolean> {
   for (const item of lecturerNavItems) {
     if (
       item.children?.some(
-        (child) => child.to === pathname || pathname.startsWith(child.to),
+        (child) =>
+          child.to === pathname ||
+          (!child.end && pathname.startsWith(`${child.to}/`)),
       )
     ) {
       initial[item.to] = true
@@ -94,7 +96,11 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
   if (prevPath !== location.pathname) {
     setPrevPath(location.pathname)
     const activeParent = lecturerNavItems.find((item) =>
-      item.children?.some((child) => child.to === location.pathname),
+      item.children?.some(
+        (child) =>
+          child.to === location.pathname ||
+          (!child.end && location.pathname.startsWith(`${child.to}/`)),
+      ),
     )
     if (activeParent && !openSubmenus[activeParent.to]) {
       setOpenSubmenus((prev) => ({ ...prev, [activeParent.to]: true }))
@@ -270,6 +276,7 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
                         <NavLink
                           key={child.to}
                           to={child.to}
+                          end={child.end}
                           onClick={() => onMobileClose?.()}
                           className={({ isActive }) =>
                             `nav-sub w-full flex items-center justify-between h-9 pl-6 pr-3 rounded-lg text-[12.5px] font-medium transition select-none ${isActive

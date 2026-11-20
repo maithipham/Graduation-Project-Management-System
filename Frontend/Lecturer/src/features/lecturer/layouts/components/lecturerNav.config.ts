@@ -27,6 +27,7 @@ export interface LecturerSubNavItem {
   label: string
   icon: LucideIcon
   badgeKey?: LecturerNavBadgeKey
+  end?: boolean
 }
 
 export interface LecturerNavItem {
@@ -100,6 +101,7 @@ export const lecturerNavItems: LecturerNavItem[] = [
         to: '/lecturer/defense',
         label: 'Lịch bảo vệ & phản biện',
         icon: FileText,
+        end: true,
       },
       {
         to: '/lecturer/defense/reviews',

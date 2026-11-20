@@ -18,6 +18,7 @@ export interface DepartmentSubNavItem {
   label: string
   icon: LucideIcon
   roles?: UserRole[]
+  end?: boolean
 }
 
 export interface DepartmentNavItem {

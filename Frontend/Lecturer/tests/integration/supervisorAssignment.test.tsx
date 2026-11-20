@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SupervisorAssignmentPage from '@/features/department/lecturer_management/pages/SupervisorAssignmentPage'
@@ -40,6 +40,24 @@ const MOCK_TEACHERS: TeacherListItem[] = [
     status: true,
   },
 ]
+
+/** GVHD kỳ này (bảng semester_advisor) — nguồn dữ liệu chính của trang */
+const advisor = (id: number, name: string, academicTitle: string, maxStudents: number, currentStudents: number) => ({
+  id: 100 + id,
+  semesterId: 'sem-curr',
+  maxStudents,
+  currentStudents,
+  teacherId: id,
+  name,
+  fullNameWithTitle: `${academicTitle} ${name}`,
+  academicTitle,
+  email: `gv${id}@tlu.edu.vn`,
+  isInternal: true,
+  majorName: 'Kỹ thuật phần mềm',
+  status: true,
+})
+
+const MOCK_ADVISORS = [advisor(1, 'Nguyễn Quốc Bảo', 'TS.', 5, 1), advisor(2, 'Bùi Hoàng Long', 'ThS.', 4, 0)]
 
 const MOCK_STUDENTS: StudentListItem[] = [
   {
@@ -89,6 +107,13 @@ function renderPage() {
       totalPages: 1,
     }),
   )
+  vi.spyOn(supervisorService, 'getAssignedAdvisors').mockResolvedValue(MOCK_ADVISORS)
+  vi.spyOn(supervisorService, 'getWorkspace').mockResolvedValue(null)
+  vi.spyOn(teacherService, 'getManagedMajor').mockResolvedValue({
+    publicId: 'm1',
+    code: '7480103',
+    name: 'Kỹ thuật phần mềm',
+  })
   vi.spyOn(studentService, 'getStudents').mockImplementation(async (params) =>
     toSpringPage({
       content: MOCK_STUDENTS,
@@ -147,10 +172,12 @@ describe('SupervisorAssignmentPage', () => {
     renderPage()
 
     await u.click(screen.getByRole('button', { name: /Phân công GVHD/ }))
-    expect(screen.getByText('Danh sách GVHD')).toBeInTheDocument()
-    expect(screen.getByText(/Chưa nhận GV/)).toBeInTheDocument()
-    expect(screen.getByText(/Đã nhận GV/)).toBeInTheDocument()
-    expect(screen.getByText('Giảng viên tiếp nhận')).toBeInTheDocument()
+    // Cột trái: 3 tab sinh viên; cột phải: danh sách giảng viên
+    expect(screen.getByRole('button', { name: /Đã nhận giảng viên/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Chưa nhận giảng viên/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Đã phân công/ })).toBeInTheDocument()
+    expect(screen.getByText('TÊN GIẢNG VIÊN')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Tìm theo tên giảng viên/)).toBeInTheDocument()
   })
 
   it('lấy danh sách GVHD từ endpoint GET /semesters/{semesterId}/advisors kèm hạn mức maxStudents từ bảng semester_advisor', async () => {
@@ -185,6 +212,7 @@ describe('SupervisorAssignmentPage', () => {
       .spyOn(supervisorService, 'updateLecturerQuota')
       .mockResolvedValue('Cập nhật hạn mức thành công')
 
+    renderPage()
     vi.spyOn(supervisorService, 'getAssignedAdvisors').mockResolvedValue([
       {
         id: 101,
@@ -209,9 +237,7 @@ describe('SupervisorAssignmentPage', () => {
       expect(screen.getByDisplayValue('8')).toBeInTheDocument()
     })
 
-    const quotaInput = screen.getByDisplayValue('8')
-    await u.clear(quotaInput)
-    await u.type(quotaInput, '10')
+    fireEvent.change(screen.getByDisplayValue('8'), { target: { value: '10' } })
 
     await waitFor(() => {
       expect(updateSpy).toHaveBeenCalledWith(

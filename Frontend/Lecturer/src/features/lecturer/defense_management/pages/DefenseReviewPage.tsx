@@ -19,6 +19,7 @@ import { Skeleton } from '@/shared/components/ui'
 import { formatDate } from '@/shared/utils'
 import { useLecturerCurrentSemester } from '@/features/lecturer/supervisor_registration'
 import { RubricGradingPanel } from '../components/RubricGradingPanel'
+import { MeetingLocation } from '../components/MeetingLocation'
 import { ScheduleCalendarView } from '../components/ScheduleCalendarView'
 import { ScheduleReviewDialog } from '../components/ScheduleReviewDialog'
 import { useMyExaminerAssignments } from '../hooks/useExaminerReview'
@@ -550,9 +551,10 @@ export const DefenseReviewPage: React.FC = () => {
                                   </div>
                                   <div className="text-[11px] text-slate-500 flex items-center gap-1">
                                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <span className="truncate max-w-[150px]">
-                                      {item.reviewLocation}
-                                    </span>
+                                    <MeetingLocation
+                                      location={item.reviewLocation}
+                                      className="truncate max-w-[150px]"
+                                    />
                                   </div>
                                 </div>
                               ) : (

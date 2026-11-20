@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Filter,
   Loader2,
-  Search,
   Sparkles,
   Users,
   X,
@@ -41,7 +40,6 @@ export const CouncilAssignPanel: React.FC<CouncilAssignPanelProps> = ({
   // Filters state
   const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'completed'>('all')
   const [teacherFilterId, setTeacherFilterId] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
 
   // Sync initial assignments from board.students
   useEffect(() => {
@@ -112,20 +110,8 @@ export const CouncilAssignPanel: React.FC<CouncilAssignPanelProps> = ({
       })
     }
 
-    // Search query filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim()
-      result = result.filter(
-        (s) =>
-          s.studentName.toLowerCase().includes(q) ||
-          s.studentCode.toLowerCase().includes(q) ||
-          (s.topicName && s.topicName.toLowerCase().includes(q)) ||
-          (s.supervisorName && s.supervisorName.toLowerCase().includes(q)),
-      )
-    }
-
     return result
-  }, [board.students, assignments, teacherFilterId, statusFilter, searchQuery])
+  }, [board.students, assignments, teacherFilterId, statusFilter])
 
   const activeTeacher = useMemo(() => {
     return teacherFilterId !== 'all'
@@ -295,9 +281,9 @@ export const CouncilAssignPanel: React.FC<CouncilAssignPanelProps> = ({
         {/* CỘT BÊN TRÁI: BẢNG PHÂN CÔNG SINH VIÊN                    */}
         {/* ========================================================= */}
         <div className="flex-1 min-w-0 flex flex-col gap-2.5 overflow-hidden">
-          {/* Filters Toolbar (Gọn gàng 1 dòng: Filter + Search + Action Buttons) */}
+          {/* Filters Toolbar (Gọn gàng 1 dòng: Filter + Action Buttons) */}
           <div className="bg-white border border-slate-200/90 rounded-xl px-3 py-2 shadow-2xs flex items-center justify-between gap-2.5 shrink-0">
-            {/* Left: Trạng thái + Lọc GV + Tìm kiếm */}
+            {/* Left: Trạng thái + Lọc GV */}
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="flex items-center gap-1 shrink-0">
                 <span className="text-[11.5px] font-semibold text-slate-500 hidden sm:inline">
@@ -339,17 +325,6 @@ export const CouncilAssignPanel: React.FC<CouncilAssignPanelProps> = ({
                   </button>
                 </div>
               )}
-
-              <div className="relative flex-1 min-w-[110px] max-w-[210px]">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm SV, đề tài..."
-                  className="w-full h-8 pl-7.5 pr-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#1565C0] text-xs outline-none transition"
-                />
-              </div>
             </div>
 
             {/* Right: Action Buttons (Tự động phân bổ & Xác nhận) */}

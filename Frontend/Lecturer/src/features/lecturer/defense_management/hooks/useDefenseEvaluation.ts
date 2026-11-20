@@ -183,9 +183,23 @@ export function useDefenseScoreRealtime(
     const ids = idsKey ? idsKey.split(',') : []
     if (ids.length === 0) return
 
-    const applyBoard = (board: DefenseScoreBoard) => {
-      const key = defenseEvaluationKeys.scoreBoard(board.defenseAssignmentPublicId)
+    // Bản tin realtime là bản chung (không có cờ "mine") → giữ cờ "phiếu của tôi" từ dữ liệu REST đang có
+    const keepMine = (incoming: DefenseScoreBoard, current: DefenseScoreBoard | undefined): DefenseScoreBoard => {
+      if (!current) return incoming
+      const mineNames = new Set(current.council.filter((e) => e.mine).map((e) => `${e.role}|${e.teacherName}`))
+      if (mineNames.size === 0) return incoming
+      return {
+        ...incoming,
+        council: incoming.council.map((e) =>
+          mineNames.has(`${e.role}|${e.teacherName}`) ? { ...e, mine: true } : e,
+        ),
+      }
+    }
+
+    const applyBoard = (incoming: DefenseScoreBoard) => {
+      const key = defenseEvaluationKeys.scoreBoard(incoming.defenseAssignmentPublicId)
       const current = queryClient.getQueryData<DefenseScoreBoard>(key)
+      const board = keepMine(incoming, current)
       if (!current || board.version >= current.version) {
         queryClient.setQueryData(key, board)
       }

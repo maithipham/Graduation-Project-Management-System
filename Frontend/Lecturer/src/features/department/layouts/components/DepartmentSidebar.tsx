@@ -131,7 +131,11 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
           // Kiểm tra xem mục con có đang active không
           const isChildActive =
             hasChildren &&
-            item.children?.some((child) => location.pathname === child.to)
+            item.children?.some(
+              (child) =>
+                location.pathname === child.to ||
+                (!child.end && location.pathname.startsWith(`${child.to}/`)),
+            )
 
           // Mục con đang hiện thì chỉ tô đậm mục con. Chỉ tô mục cha khi mục con bị ẩn
           // (sidebar thu gọn hoặc nhóm đang đóng), để người dùng vẫn biết mình đang ở nhóm nào
@@ -187,6 +191,7 @@ export const DepartmentSidebar: React.FC<DepartmentSidebarProps> = ({
                         <NavLink
                           key={child.to}
                           to={child.to}
+                          end={child.end}
                           onClick={() => onMobileClose?.()}
                           className={({ isActive }) =>
                             `relative h-9 w-full pl-6 pr-3 rounded-lg flex items-center gap-3 text-[12.5px] leading-5 transition-colors select-none ${isActive

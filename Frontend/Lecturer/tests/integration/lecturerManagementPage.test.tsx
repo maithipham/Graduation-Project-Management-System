@@ -6,54 +6,47 @@ import LecturerManagementPage from '@/features/department/lecturer_management/pa
 import { teacherService } from '@/features/department/lecturer_management/services/teacher.service'
 import type { TeacherListItem } from '@/features/department/lecturer_management/types'
 import { studentService } from '@/features/department/student_management/services/student.service'
-import { toSpringPage } from '@/shared/utils'
 
 const MAJORS = [{ publicId: 'm1', code: '7480103', name: 'Kỹ thuật phần mềm' }]
 
-// 25 giáo viên, mỗi trang 15 → có 2 trang
-const rows: TeacherListItem[] = Array.from({ length: 15 }, (_, i) => ({
-  id: i + 1,
-  teacherId: i + 1,
-  publicId: `id-${i}`,
-  name: `Giáo viên ${i + 1}`,
-  firstName: 'Giáo viên',
-  lastName: `${i + 1}`,
-  academicTitle: null,
-  email: `gv${i + 1}@tlu.edu.vn`,
-  majorName: 'Kỹ thuật phần mềm',
-  organization: 'Trường Đại học Thủy lợi',
-  isInternal: true,
-  unitType: 'INTERNAL',
-  isAssigned: false,
-  assignmentStatus: 'Chưa phân công',
-  status: true,
-}))
+const SEMESTER = {
+  publicId: 'sem-curr',
+  name: 'Học kỳ 1 năm học 2026-2027',
+  academicYear: '2026-2027',
+  term: 'Học kỳ 1',
+  startDate: '01-09-2026',
+  endDate: '15-01-2027',
+}
 
-function renderPage() {
-  const getTeachers = vi
-    .spyOn(teacherService, 'getTeachers')
-    .mockImplementation(async (params) =>
-      toSpringPage({ content: rows, number: params.page, size: params.size, totalElements: 25, totalPages: 2 }),
-    )
+// 20 giáo viên: GV 1–17 chưa phân công, GV 18–20 đã phân công. Trang 15 dòng → 2 trang (phân trang ở FE)
+const rows: TeacherListItem[] = Array.from({ length: 20 }, (_, i) => {
+  const assigned = i >= 17
+  return {
+    id: i + 1,
+    teacherId: i + 1,
+    publicId: `id-${i}`,
+    name: `Giáo viên ${i + 1}`,
+    firstName: 'Giáo viên',
+    lastName: `${i + 1}`,
+    academicTitle: null,
+    email: `gv${i + 1}@tlu.edu.vn`,
+    majorName: 'Kỹ thuật phần mềm',
+    organization: 'Trường Đại học Thủy lợi',
+    isInternal: true,
+    unitType: 'INTERNAL',
+    isAssigned: assigned,
+    assignmentStatus: assigned ? 'Đã phân công' : 'Chưa phân công',
+    status: true,
+  }
+})
+
+function renderPage(managedMajor: (typeof MAJORS)[number] | null = null) {
+  // GET /teacher/all: BE trả toàn bộ danh sách, FE tự phân trang
+  const getAll = vi.spyOn(teacherService, 'getAllTeachersList').mockResolvedValue(rows)
+  vi.spyOn(teacherService, 'getManagedMajor').mockResolvedValue(managedMajor)
   vi.spyOn(studentService, 'getMajors').mockResolvedValue(MAJORS)
-  vi.spyOn(studentService, 'getCurrentSemester').mockResolvedValue({
-    publicId: 'sem-curr',
-    name: 'Học kỳ 1 năm học 2026-2027',
-    academicYear: '2026-2027',
-    term: 'Học kỳ 1',
-    startDate: '01-09-2026',
-    endDate: '15-01-2027',
-  })
-  vi.spyOn(studentService, 'getSemesters').mockResolvedValue([
-    {
-      publicId: 'sem-curr',
-      name: 'Học kỳ 1 năm học 2026-2027',
-      academicYear: '2026-2027',
-      term: 'Học kỳ 1',
-      startDate: '01-09-2026',
-      endDate: '15-01-2027',
-    },
-  ])
+  vi.spyOn(studentService, 'getCurrentSemester').mockResolvedValue(SEMESTER)
+  vi.spyOn(studentService, 'getSemesters').mockResolvedValue([SEMESTER])
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -62,8 +55,8 @@ function renderPage() {
     </QueryClientProvider>,
   )
   /** Tham số của lần gọi API gần nhất */
-  const lastParams = () => getTeachers.mock.lastCall?.[0]
-  return { getTeachers, lastParams }
+  const lastParams = () => getAll.mock.lastCall?.[0]
+  return { getAll, lastParams }
 }
 
 beforeEach(() => {
@@ -71,12 +64,24 @@ beforeEach(() => {
 })
 
 describe('LecturerManagementPage — bộ lọc, phân trang, phân công GVHD', () => {
-  it('lần đầu (kỳ này): gửi page=0, size=15, isAssigned=false để chỉ hiện GV có thể phân công', async () => {
+  it('lần đầu: lấy GV của học kỳ hiện tại, mọi trạng thái; phân trang FE 15 dòng/trang', async () => {
     const { lastParams } = renderPage()
 
     await screen.findByText('Giáo viên 1')
-    expect(lastParams()).toEqual(
-      expect.objectContaining({ page: 0, size: 15, isAssigned: false }),
+    await waitFor(() => expect(lastParams()?.semesterId).toBe('sem-curr'))
+    expect(lastParams()?.isAssigned).toBeUndefined()
+    expect(screen.getByText('Giáo viên 15')).toBeInTheDocument()
+    expect(screen.queryByText('Giáo viên 16')).not.toBeInTheDocument()
+  })
+
+  it('TBM có ngành phụ trách: tự lọc theo ngành đó khi mở trang', async () => {
+    const { lastParams } = renderPage(MAJORS[0])
+
+    await screen.findByText('Giáo viên 1')
+    await waitFor(() =>
+      expect(lastParams()).toEqual(
+        expect.objectContaining({ majorId: 'm1', majorName: 'Kỹ thuật phần mềm' }),
+      ),
     )
   })
 
@@ -86,63 +91,53 @@ describe('LecturerManagementPage — bộ lọc, phân trang, phân công GVHD',
     await screen.findByText('Giáo viên 1')
 
     await u.selectOptions(screen.getByLabelText('Lọc theo đơn vị công tác'), 'Trong trường')
-    await waitFor(() =>
-      expect(lastParams()).toEqual(
-        expect.objectContaining({ unitType: 'INTERNAL' }),
-      ),
-    )
+    await waitFor(() => expect(lastParams()).toEqual(expect.objectContaining({ unitType: 'INTERNAL' })))
 
     await u.selectOptions(screen.getByLabelText('Lọc theo đơn vị công tác'), 'Ngoài trường')
-    await waitFor(() =>
-      expect(lastParams()).toEqual(
-        expect.objectContaining({ unitType: 'EXTERNAL' }),
-      ),
-    )
+    await waitFor(() => expect(lastParams()).toEqual(expect.objectContaining({ unitType: 'EXTERNAL' })))
 
     await u.selectOptions(await screen.findByLabelText('Lọc theo ngành'), 'Kỹ thuật phần mềm')
     await waitFor(() =>
       expect(lastParams()).toEqual(
-        expect.objectContaining({
-          majorName: 'Kỹ thuật phần mềm',
-          majorId: 'm1',
-        }),
+        expect.objectContaining({ majorName: 'Kỹ thuật phần mềm', majorId: 'm1' }),
       ),
     )
 
     await u.selectOptions(screen.getByLabelText('Lọc theo trạng thái phân công'), 'Chưa phân công')
-    await waitFor(() =>
-      expect(lastParams()).toEqual(
-        expect.objectContaining({
-          isAssigned: false,
-        }),
-      ),
-    )
+    await waitFor(() => expect(lastParams()).toEqual(expect.objectContaining({ isAssigned: false })))
   })
 
-  it('chọn Tất cả học kỳ → không gửi semesterId để lấy tất cả giáo viên luôn', async () => {
+  it('lọc "Đã phân công": chỉ hiện GV đã phân công', async () => {
+    const u = userEvent.setup()
+    renderPage()
+    await screen.findByText('Giáo viên 1')
+
+    await u.selectOptions(screen.getByLabelText('Lọc theo trạng thái phân công'), 'Đã phân công')
+
+    expect(await screen.findByText('Giáo viên 18')).toBeInTheDocument()
+    expect(screen.queryByText('Giáo viên 1')).not.toBeInTheDocument()
+  })
+
+  it('chọn Tất cả học kỳ → không gửi semesterId', async () => {
     const u = userEvent.setup()
     const { lastParams } = renderPage()
     await screen.findByText('Giáo viên 1')
 
     await u.selectOptions(screen.getByLabelText('Chọn học kỳ'), 'all')
-    await waitFor(() => {
-      expect(lastParams()?.semesterId).toBeUndefined()
-      expect(lastParams()?.isAssigned).toBeUndefined()
-    })
+    await waitFor(() => expect(lastParams()?.semesterId).toBeUndefined())
   })
 
   it('ô tìm kiếm: chờ ngừng gõ mới gọi API, bỏ khoảng trắng hai đầu', async () => {
     const u = userEvent.setup()
-    const { getTeachers, lastParams } = renderPage()
+    const { lastParams } = renderPage()
     await screen.findByText('Giáo viên 1')
+    await waitFor(() => expect(lastParams()?.semesterId).toBe('sem-curr'))
 
-    const initialCalls = getTeachers.mock.calls.length
-    const input = screen.getByLabelText('Tìm kiếm giáo viên')
-
-    await u.type(input, '  Bảo  ')
-    expect(getTeachers.mock.calls.length).toBe(initialCalls)
+    await u.type(screen.getByLabelText('Tìm kiếm giáo viên'), '  Bảo  ')
+    expect(lastParams()?.name).toBeUndefined()
 
     await waitFor(() => expect(lastParams()?.name).toBe('Bảo'), { timeout: 1500 })
+    expect(lastParams()?.keyword).toBe('Bảo')
   })
 
   it('nút "Phân công làm GVHD (x)" hiển thị số lượng được chọn và bật khi có chọn dòng', async () => {
@@ -153,15 +148,14 @@ describe('LecturerManagementPage — bộ lọc, phân trang, phân công GVHD',
     const assignButton = screen.getByRole('button', { name: /Phân công làm GVHD/i })
     expect(assignButton).toBeDisabled()
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    // Chọn dòng đầu tiên (checkboxes[0] là header select-all, checkboxes[1] là dòng 1)
-    await u.click(checkboxes[1])
+    // checkboxes[0] là header chọn tất cả, checkboxes[1] là dòng 1
+    await u.click(screen.getAllByRole('checkbox')[1])
 
     expect(assignButton).toBeEnabled()
     expect(assignButton).toHaveTextContent('Phân công làm GVHD (1)')
   })
 
-  it('"Xóa lọc" xóa bộ lọc và quay về trang đầu', async () => {
+  it('"Xóa lọc" xóa bộ lọc', async () => {
     const u = userEvent.setup()
     const { lastParams } = renderPage()
     await screen.findByText('Giáo viên 1')

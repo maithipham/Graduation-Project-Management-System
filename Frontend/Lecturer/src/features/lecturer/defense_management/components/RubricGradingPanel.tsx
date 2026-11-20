@@ -27,6 +27,7 @@ import {
   useSaveExaminerEvaluation,
   useUploadReviewFile,
 } from '../hooks/useExaminerReview'
+import { MeetingLocation } from './MeetingLocation'
 import type {
   ExaminerEvaluation,
   ExaminerEvaluationRequest,
@@ -327,7 +328,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
             {scheduleDisplay}
           </div>
           <div className="text-[11px] text-slate-500 truncate">
-            {assignment.reviewLocation || 'Chưa xếp phòng'}
+            <MeetingLocation location={assignment.reviewLocation} fallback="Chưa xếp phòng" />
           </div>
         </div>
       </div>

@@ -90,7 +90,7 @@ describe('createTeacherSchema', () => {
   it('ô trống báo "không được để trống"; email trống thì chưa báo lỗi ngành', () => {
     expect(firstErrors(EMPTY_CREATE_TEACHER_VALUES)).toEqual({
       teacherCode: 'Mã giảng viên không được để trống',
-      firstName: 'Họ và tên đệm không được để trống',
+      firstName: 'Họ không được để trống',
       lastName: 'Tên không được để trống',
       email: 'Email không được để trống',
       phone: 'Số điện thoại không được để trống',
@@ -111,7 +111,7 @@ describe('createTeacherSchema', () => {
         amount: '5.5',
       }),
     ).toEqual({
-      firstName: 'Họ chỉ được chứa chữ cái và khoảng trắng',
+      firstName: 'Họ không được chứa số và kí tự đặc biệt',
       lastName: 'Tên chỉ được chứa chữ cái',
       email: 'Email không đúng định dạng',
       phone: 'Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0',
@@ -172,7 +172,7 @@ describe('createTeacherSchema', () => {
 
   it('chuỗi dài quá 255 ký tự coi như sai định dạng', () => {
     expect(firstErrors({ ...VALID, firstName: 'A'.repeat(256) }).firstName).toBe(
-      'Họ chỉ được chứa chữ cái và khoảng trắng',
+      'Họ không được chứa số và kí tự đặc biệt',
     )
     expect(firstErrors({ ...EXTERNAL, organization: 'A'.repeat(256) }).organization).toBe(
       ORGANIZATION_INVALID,
