@@ -423,7 +423,7 @@ export function buildOutlineDocxBlob(blocks: DocxBlock[]): Blob {
 
 /** Tạo File .docx hoàn chỉnh để upload trực tiếp qua POST /outline/submit. */
 export function buildOutlineDocxFile(blocks: DocxBlock[], fileName: string): File {
-  const safeName = fileName?.trim() || 'De_cuong.docx'
+  const safeName = fileName?.trim() || 'Lop_MSSV_HoTen.docx'
   const blob = buildOutlineDocxBlob(blocks)
   return new File([blob], safeName, { type: DOCX_MIME_TYPE })
 }

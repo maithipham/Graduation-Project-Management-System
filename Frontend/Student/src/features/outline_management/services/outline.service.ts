@@ -10,6 +10,46 @@ import type {
 } from '../types/outline.types'
 
 export const OUTLINE_DRAFT_STORAGE_KEY = 'student_outline_draft_v1'
+export const OUTLINE_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // Nhỏ hơn 10 MB
+export const OUTLINE_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf'] as const
+export const OUTLINE_MAX_TITLE_LENGTH = 500
+
+/** Validate định dạng tên file chung: Tenlop_MaSV_HoVaTen.<ext> */
+export function isValidDocumentFileName(fileName: string): boolean {
+  const trimmed = fileName.trim()
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+  const fileNameOnly = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed
+  const dotIndex = fileNameOnly.lastIndexOf('.')
+  if (dotIndex <= 0 || dotIndex >= fileNameOnly.length - 1) {
+    return false
+  }
+  const baseName = fileNameOnly.slice(0, dotIndex).trim()
+  const parts = baseName.split('_')
+  return parts.length === 3 && parts.every((part) => part.trim().length > 0)
+}
+
+/** Kiểm tra file đề cương theo quy định Backend (.doc, .docx, .pdf, < 10 MB và Tenlop_MaSV_HoVaTen). */
+export function validateOutlineFile(file: File | null | undefined): string | null {
+  if (!file || file.size === 0 || !file.name.trim()) {
+    return 'Vui lòng chọn file đề cương cần tải lên.'
+  }
+  const dotIndex = file.name.lastIndexOf('.')
+  const extension = dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : ''
+  if (
+    !OUTLINE_ALLOWED_EXTENSIONS.includes(
+      extension as (typeof OUTLINE_ALLOWED_EXTENSIONS)[number],
+    )
+  ) {
+    return 'File đề cương chỉ hỗ trợ định dạng .doc, .docx hoặc .pdf.'
+  }
+  if (file.size >= OUTLINE_MAX_FILE_SIZE_BYTES) {
+    return 'Dung lượng file đề cương phải nhỏ hơn 10 MB.'
+  }
+  if (!isValidDocumentFileName(file.name)) {
+    return 'Tên file không đúng định dạng! Vui lòng đổi tên file theo định dạng Tenlop_MaSV_HoVaTen (VD: DHKTPM17A_22110001_NguyenVanAn.pdf)'
+  }
+  return null
+}
 
 export const OUTLINE_CONTENT_SECTIONS: OutlineSectionConfig[] = [
   {
@@ -141,14 +181,27 @@ export function loadSavedOutlineDraft(
   return base
 }
 
-export function buildDefaultDocxFileName(mssv: string, name: string): string {
-  const safeName = String(name || '')
+export function sanitizeFileNamePart(text: string, fallback: string): string {
+  const cleaned = String(text || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/gi, 'd')
-    .replace(/[^A-Za-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  return `De_cuong_${mssv || 'MSSV'}_${safeName || 'HoTen'}.docx`
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/[^A-Za-z0-9]+/g, '')
+    .trim()
+  return cleaned || fallback
+}
+
+/** Tạo tên file .docx mặc định theo chuẩn Tenlop_MaSV_HoVaTen.docx */
+export function buildDefaultDocxFileName(
+  mssv: string,
+  name: string,
+  className?: string,
+): string {
+  const safeClass = sanitizeFileNamePart(className || '', 'Lop')
+  const safeMssv = sanitizeFileNamePart(mssv, 'MSSV')
+  const safeName = sanitizeFileNamePart(name, 'HoVaTen')
+  return `${safeClass}_${safeMssv}_${safeName}.docx`
 }
 
 /** Kiểm tra URL tệp an toàn trước khi gắn vào href / iframe. */
@@ -165,11 +218,14 @@ export function extractOutlineFileName(fileUrl?: string | null): string {
   const segments = withoutQuery.split('/').filter(Boolean)
   const rawName = segments[segments.length - 1]
   if (!rawName) return fileUrl
+  let decoded = rawName
   try {
-    return decodeURIComponent(rawName)
+    decoded = decodeURIComponent(rawName)
   } catch {
-    return rawName
+    decoded = rawName
   }
+  // Loại bỏ tiền tố UUID do Backend CloudinaryService tự sinh (dạng UUID_)
+  return decoded.replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_/, '')
 }
 
 export const outlineService = {

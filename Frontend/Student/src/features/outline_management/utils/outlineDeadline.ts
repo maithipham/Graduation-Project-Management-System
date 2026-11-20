@@ -9,6 +9,11 @@ export interface OutlineDeadlineDisplay {
   lockedReason: string | null
 }
 
+export interface OutlineDeadlineDisplayOptions {
+  /** Nhãn mặc định khi BE chưa trả `deadlineName` (ví dụ khi `NOT_CONFIGURED`). */
+  fallbackName?: string
+}
+
 export interface OutlineSubmitState {
   canSubmit: boolean
   reason: string | null
@@ -18,22 +23,55 @@ export interface OutlineSubmitState {
 type OutlineDeadlineInput = Pick<
   StudentTopicOverviewResponse,
   'deadlineStartDate' | 'deadlineEndDate' | 'deadlineStatus'
->
+> & {
+  deadlineName?: string | null
+}
+
+/** Chuẩn hóa nhãn hiển thị tên mốc thời hạn từ BE. */
+export function formatOutlineDeadlineName(
+  deadlineName?: string | null,
+  fallbackName: string = 'Thời hạn nộp',
+): string {
+  const trimmed = deadlineName?.trim()
+  if (!trimmed) {
+    return fallbackName.trim() || 'Thời hạn nộp'
+  }
+  if (/^Hạn sinh viên chỉnh sửa\s*&\s*nộp lại đề cương$/i.test(trimmed)) {
+    return 'Hạn nộp đề cương'
+  }
+  return trimmed
+}
+
+function getDeadlineDisplayLabel(
+  overview?: OutlineDeadlineInput | null,
+  options?: OutlineDeadlineDisplayOptions,
+): string {
+  return formatOutlineDeadlineName(overview?.deadlineName, options?.fallbackName)
+}
+
+function toSentenceLowerPrefix(label: string): string {
+  if (!label) return 'thời hạn nộp'
+  return label.charAt(0).toLowerCase() + label.slice(1)
+}
 
 /**
- * Chuyển thông tin mốc thời hạn dùng chung (`SV_CHINH_SUA_NOP_LAI_DE_CUONG`) từ BE
- * sang nhãn hiển thị và cờ khóa thao tác thống nhất cho chốt tên, đổi tên và nộp đề cương.
+ * Chuyển thông tin mốc thời hạn từ BE (`CHOT_TEN_DE_TAI` khi chốt tên lần đầu,
+ * `SV_CHINH_SUA_NOP_LAI_DE_CUONG` khi đổi tên đề tài / nộp đề cương) sang nhãn hiển thị
+ * và lý do khóa theo `deadlineName` / `deadlineStatus`.
  */
 export function getOutlineDeadlineDisplay(
   overview?: OutlineDeadlineInput | null,
+  options?: OutlineDeadlineDisplayOptions,
 ): OutlineDeadlineDisplay {
+  const label = getDeadlineDisplayLabel(overview, options)
+  const lowerLabel = toSentenceLowerPrefix(label)
+
   if (!overview) {
     return {
       text: 'Chưa cấu hình thời hạn nộp',
       toneClassName: 'text-slate-500',
       isOpenForStudent: false,
-      lockedReason:
-        'Học kỳ hiện tại chưa được cấu hình thời hạn nộp đề cương và cập nhật tên đề tài.',
+      lockedReason: `Học kỳ hiện tại chưa được cấu hình ${lowerLabel}.`,
     }
   }
 
@@ -61,8 +99,8 @@ export function getOutlineDeadlineDisplay(
         toneClassName: 'text-amber-700',
         isOpenForStudent: false,
         lockedReason: end
-          ? `Đã hết hạn sinh viên nộp đề cương và cập nhật tên đề tài (đang gia hạn chấm cho giảng viên đến ${end}).`
-          : 'Đã hết hạn sinh viên nộp đề cương và cập nhật tên đề tài (đang gia hạn chấm cho giảng viên).',
+          ? `Đã hết ${lowerLabel} cho sinh viên (đang gia hạn chấm cho giảng viên đến ${end}).`
+          : `Đã hết ${lowerLabel} cho sinh viên (đang gia hạn chấm cho giảng viên).`,
       }
     case 'NOT_STARTED':
       return {
@@ -75,17 +113,15 @@ export function getOutlineDeadlineDisplay(
         toneClassName: 'text-slate-600',
         isOpenForStudent: false,
         lockedReason: start
-          ? `Chưa đến thời hạn nộp đề cương và cập nhật tên đề tài (Mở từ ${start}).`
-          : 'Chưa đến thời hạn nộp đề cương và cập nhật tên đề tài.',
+          ? `${label} chưa mở (Mở từ ${start}).`
+          : `Chưa đến ${lowerLabel}.`,
       }
     case 'CLOSED':
       return {
         text: end ? `Đã hết hạn (${end})` : 'Đã hết hạn',
         toneClassName: 'text-rose-700',
         isOpenForStudent: false,
-        lockedReason: end
-          ? `Thời hạn nộp đề cương và cập nhật tên đề tài đã kết thúc (${end}). Vui lòng liên hệ GVHD / Trưởng bộ môn.`
-          : 'Thời hạn nộp đề cương và cập nhật tên đề tài đã kết thúc. Vui lòng liên hệ GVHD / Trưởng bộ môn.',
+        lockedReason: null,
       }
     case 'NOT_CONFIGURED':
     case 'INACTIVE':
@@ -94,10 +130,19 @@ export function getOutlineDeadlineDisplay(
         text: 'Chưa cấu hình thời hạn nộp',
         toneClassName: 'text-slate-500',
         isOpenForStudent: false,
-        lockedReason:
-          'Học kỳ hiện tại chưa được cấu hình thời hạn nộp đề cương và cập nhật tên đề tài.',
+        lockedReason: `Học kỳ hiện tại chưa được cấu hình ${lowerLabel}.`,
       }
   }
+}
+
+const OUTLINE_STAGE_ORDER: Record<string, number> = {
+  STAGE_1_REGISTERING_ADVISOR: 0,
+  STAGE_1_ADVISOR_ASSIGNED: 1,
+  STAGE_2_TOPIC_CONFIRMED: 2,
+  STAGE_3_OUTLINE_APPROVED: 3,
+  STAGE_4_REPORT_APPROVED: 4,
+  STAGE_5_REVIEW_PASSED: 5,
+  STAGE_6_DEFENSE_COMPLETED: 6,
 }
 
 /**
@@ -106,7 +151,9 @@ export function getOutlineDeadlineDisplay(
 export function getOutlineSubmitState(
   outline?: ThesisOutlineResponse | null,
 ): OutlineSubmitState {
-  const deadlineDisplay = getOutlineDeadlineDisplay(outline)
+  const deadlineDisplay = getOutlineDeadlineDisplay(outline, {
+    fallbackName: 'Thời hạn nộp đề cương',
+  })
 
   if (!outline) {
     return {
@@ -125,9 +172,12 @@ export function getOutlineSubmitState(
   }
 
   if (outline.topicStatus === 'DISQUALIFIED') {
+    const detail = outline.disqualificationReason?.trim()
     return {
       canSubmit: false,
-      reason: 'Đề tài đã bị đình chỉ, không thể nộp đề cương.',
+      reason: detail
+        ? `Đề tài đã bị đình chỉ (${detail}), không thể nộp đề cương.`
+        : 'Đề tài đã bị đình chỉ, không thể nộp đề cương.',
       deadlineDisplay,
     }
   }
@@ -156,15 +206,18 @@ export function getOutlineSubmitState(
     }
   }
 
-  if (outline.currentStage !== 'STAGE_2_TOPIC_CONFIRMED') {
+  const stageRank = OUTLINE_STAGE_ORDER[outline.currentStage ?? ''] ?? -1
+  if (stageRank < OUTLINE_STAGE_ORDER.STAGE_2_TOPIC_CONFIRMED) {
     return {
       canSubmit: false,
-      reason: 'Cần hoàn thành chốt tên đề tài chính thức trước khi nộp đề cương.',
+      reason: null,
       deadlineDisplay,
     }
   }
 
-  if (!outline.reviewerPublicId) {
+  // Khi chưa nộp lần đầu (publicId === null), BE trả reviewerPublicId = null dù TBM đã phân công.
+  // Chỉ khóa nếu đã có bản ghi ThesisOutline nhưng chưa có GV nhận xét; khi nộp lần đầu BE sẽ kiểm tra lỗi 3079.
+  if (outline.publicId !== null && !outline.reviewerPublicId) {
     return {
       canSubmit: false,
       reason: 'Đang chờ Trưởng bộ môn phân công giảng viên nhận xét đề cương.',
@@ -185,4 +238,35 @@ export function getOutlineSubmitState(
     reason: null,
     deadlineDisplay,
   }
+}
+
+/** Kiểm tra một response từ BE đã được cấu hình mốc thời hạn hay chưa. */
+export function hasConfiguredDeadline(
+  overview?: OutlineDeadlineInput | null,
+): boolean {
+  if (!overview) return false
+  return (
+    overview.deadlineStatus !== 'NOT_CONFIGURED' ||
+    Boolean(overview.deadlineStartDate) ||
+    Boolean(overview.deadlineEndDate)
+  )
+}
+
+/**
+ * Kiểm tra xem mốc hạn chốt tên đề tài (`GET /topic/my-title-history`) có khác với
+ * mốc hạn nộp đề cương (`GET /outline/my-outline`) hay không để hiển thị đủ 2 hạn trên UI.
+ */
+export function hasDistinctTopicDeadline(
+  topicOverview?: OutlineDeadlineInput | null,
+  outlineData?: OutlineDeadlineInput | null,
+): boolean {
+  if (!hasConfiguredDeadline(topicOverview) || !outlineData) {
+    return false
+  }
+  return (
+    topicOverview?.deadlineName !== outlineData.deadlineName ||
+    topicOverview?.deadlineStartDate !== outlineData.deadlineStartDate ||
+    topicOverview?.deadlineEndDate !== outlineData.deadlineEndDate ||
+    topicOverview?.deadlineStatus !== outlineData.deadlineStatus
+  )
 }

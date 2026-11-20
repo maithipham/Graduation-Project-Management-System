@@ -99,6 +99,53 @@ export const API_ENDPOINTS = {
     base: '/semester',
     current: '/semester/current',
   },
+  // Báo cáo đồ án Final & Phiếu theo dõi tiến độ (GVHD / SV)
+  report: {
+    supervisorList: '/report/supervisor-list',
+    detail: (publicId: string) => `/report/${publicId}`,
+    review: (publicId: string) => `/report/${publicId}/review`,
+    submitProgressReport: '/report/progress-report',
+    deadlines: '/api/v1/deadlines',
+  },
+  // Quản lý & Thẩm định yêu cầu đổi / chốt tên đề tài (GVHD)
+  topicTitle: {
+    supervisorRequests: '/topic/title-request',
+    review: (publicId: string) => `/topic/title-request/${publicId}/review`,
+    historyByTopic: (topicPublicId: string) => `/topic/${topicPublicId}/title-history`,
+    deadlines: '/api/v1/deadlines',
+  },
+  // Quản lý & Thẩm định đề cương đồ án tốt nghiệp (GVHD / GVNX)
+  outline: {
+    supervisorList: '/outline/supervisor-list',
+    reviewList: '/outline/review-list',
+    detail: (publicId: string) => `/outline/${publicId}`,
+    review: (publicId: string) => `/outline/${publicId}/review`,
+    advisorFeedback: (publicId: string) => `/outline/${publicId}/advisor-feedback`,
+    deadlines: '/api/v1/deadlines',
+  },
+  /** Cấu hình rubric điểm (Trưởng bộ môn) – EvaluationTemplateController */
+  // Danh sách học kỳ cho ô chọn "Từ kỳ" / "Đến kỳ" dùng lại semester.base ở trên
+  departmentRubric: {
+    // GET: danh sách theo loại (?type=) · POST: tạo rubric Nháp
+    base: '/evaluation-template',
+    // GET: chi tiết · PUT: lưu tên + cây · DELETE: xóa Nháp
+    detail: (publicId: string) => `/evaluation-template/${publicId}`,
+    clone: (publicId: string) => `/evaluation-template/${publicId}/clone`,
+    applyPreview: (publicId: string) => `/evaluation-template/${publicId}/apply-preview`,
+    cancelApplyPreview: (publicId: string) => `/evaluation-template/${publicId}/cancel-apply-preview`,
+    apply: (publicId: string) => `/evaluation-template/${publicId}/apply`,
+    semesterRange: (publicId: string) => `/evaluation-template/${publicId}/semester-range`,
+    cancelApply: (publicId: string) => `/evaluation-template/${publicId}/cancel-apply`,
+    // GET: 3 rubric của học kỳ (chỉ xem, không còn PUT)
+    semester: (semesterPublicId: string) => `/semester/${semesterPublicId}/evaluation-template`,
+  },
+  /** Chấm điểm hướng dẫn (GVHD chính) – SupervisorGradeController */
+  advisorGrade: {
+    topics: '/advisor-grade/topic',
+    openSheet: (topicPublicId: string) => `/advisor-grade/topic/${topicPublicId}/sheet`,
+    sheet: (sheetPublicId: string) => `/advisor-grade/sheet/${sheetPublicId}`,
+    submit: (sheetPublicId: string) => `/advisor-grade/sheet/${sheetPublicId}/submit`,
+  },
   lecturer: {
     dashboard: '/lecturer/dashboard',
     topics: '/lecturer/topics',

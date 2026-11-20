@@ -1,15 +1,20 @@
-import { useLecturerPortalStore } from '@/features/lecturer/lecturer_portal_storage'
-import type { TopicProposalItem } from '../types/topicProposal.types'
+import { create } from 'zustand'
+import type { TopicProposalTabStatus } from '../types/topicProposal.types'
 
-export const useTopicProposalStore = () => {
-  const topicProposals = useLecturerPortalStore((s) => s.topicProposals)
-  const approveTopicProposal = useLecturerPortalStore((s) => s.approveTopicProposal)
-  const rejectTopicProposal = useLecturerPortalStore((s) => s.rejectTopicProposal)
-
-  return {
-    topicProposals: topicProposals as TopicProposalItem[],
-    approveTopicProposal,
-    rejectTopicProposal,
-  }
+interface TopicProposalUiState {
+  selectedSemesterId: string
+  tabStatus: TopicProposalTabStatus
+  searchQuery: string
+  setSelectedSemesterId: (id: string) => void
+  setTabStatus: (status: TopicProposalTabStatus) => void
+  setSearchQuery: (query: string) => void
 }
 
+export const useTopicProposalStore = create<TopicProposalUiState>((set) => ({
+  selectedSemesterId: '',
+  tabStatus: 'PENDING',
+  searchQuery: '',
+  setSelectedSemesterId: (id) => set({ selectedSemesterId: id }),
+  setTabStatus: (status) => set({ tabStatus: status }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+}))

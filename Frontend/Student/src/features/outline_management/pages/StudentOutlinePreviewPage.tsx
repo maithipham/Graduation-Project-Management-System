@@ -17,7 +17,10 @@ import { cn, formatDate } from '@/shared/utils'
 import { useMyOutline } from '../hooks/useOutlineManagement'
 import { useMyTopicOverview } from '../hooks/useTopicTitle'
 import { extractOutlineFileName, isSafeFileUrl } from '../services/outline.service'
-import { getOutlineDeadlineDisplay } from '../utils/outlineDeadline'
+import {
+  getOutlineDeadlineDisplay,
+  hasDistinctTopicDeadline,
+} from '../utils/outlineDeadline'
 
 export default function StudentOutlinePreviewPage() {
   const navigate = useNavigate()
@@ -37,7 +40,18 @@ export default function StudentOutlinePreviewPage() {
   const deadlineSource = outlineData ?? topicOverview
   const isMetaLoading = isOutlineLoading && isTopicLoading
   const isMetaError = isOutlineError && isTopicError
-  const deadlineDisplay = getOutlineDeadlineDisplay(deadlineSource)
+  const deadlineDisplay = getOutlineDeadlineDisplay(deadlineSource, {
+    fallbackName: 'Thời hạn nộp đề cương',
+  })
+  const showAdditionalTopicDeadline =
+    !isTopicLoading &&
+    !isTopicError &&
+    !isOutlineLoading &&
+    !isOutlineError &&
+    hasDistinctTopicDeadline(topicOverview, outlineData)
+  const topicDeadlineDisplay = getOutlineDeadlineDisplay(topicOverview, {
+    fallbackName: 'Thời hạn chốt tên đề tài',
+  })
 
   const fileUrl = searchParams.get('url') || outlineData?.outlineFile || ''
   const hasValidFileUrl = isSafeFileUrl(fileUrl)
@@ -217,6 +231,16 @@ export default function StudentOutlinePreviewPage() {
                 )}
               </span>
             </div>
+            {showAdditionalTopicDeadline && (
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-bold text-slate-700">
+                  {topicOverview?.deadlineName || 'Hạn chốt tên đề tài'}:
+                </span>
+                <span className={cn('col-span-2 font-semibold', topicDeadlineDisplay.toneClassName)}>
+                  {topicDeadlineDisplay.text}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <span className="font-bold text-slate-700">Trạng thái đề cương:</span>
               <span className="col-span-2 font-medium text-slate-800">
@@ -259,32 +283,44 @@ export default function StudentOutlinePreviewPage() {
             </div>
           )}
 
-          {/* Embedded PDF or File Download Link */}
+          {/* Embedded PDF or File Viewer */}
           <div className="mt-6 pt-5 border-t border-slate-200 flex-1 flex flex-col">
             {isOutlineLoading ? (
               <Skeleton className="h-96 w-full rounded-lg" />
-            ) : isPdfUrl ? (
-              <iframe
-                src={fileUrl}
-                title={fileName}
-                className="w-full flex-1 min-h-[520px] border border-slate-200 rounded-lg"
-              />
             ) : hasValidFileUrl ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center space-y-3">
-                <FileText size={32} className="text-[#1565C0] mx-auto" />
-                <p className="text-sm font-semibold text-slate-800">{fileName}</p>
-                <p className="text-xs text-slate-500">
-                  Trình duyệt không hỗ trợ xem trực tiếp định dạng tệp này. Vui lòng mở hoặc tải tệp về máy.
-                </p>
-                <a
-                  href={fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1565C0] text-white text-xs font-semibold hover:bg-[#0D47A1] transition-colors"
-                >
-                  <ExternalLink size={14} />
-                  <span>Mở tệp đề cương</span>
-                </a>
+              <div className="w-full flex-1 flex flex-col min-h-[560px]">
+                <iframe
+                  src={
+                    isPdfUrl
+                      ? fileUrl
+                      : `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`
+                  }
+                  title={fileName}
+                  className="w-full flex-1 min-h-[520px] border border-slate-200 rounded-lg bg-white"
+                />
+                <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500 px-1">
+                  <span>Trình xem tài liệu trực tuyến ({fileName})</span>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[#1565C0] hover:underline font-medium"
+                    >
+                      <ExternalLink size={12} />
+                      <span>Mở link gốc</span>
+                    </a>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 cursor-pointer"
+                    >
+                      <Download size={12} />
+                      <span>Tải về</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500 text-xs space-y-2">

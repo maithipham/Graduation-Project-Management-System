@@ -24,6 +24,9 @@ const TemplateManagementPage = lazy(
 const DefenseCouncilPage = lazy(
   () => import('@/features/department/council_management/pages/DefenseCouncilPage'),
 )
+const GradingConfigPage = lazy(
+  () => import('@/features/department/score_management/pages/GradingConfigPage'),
+)
 
 export const departmentRoutes: RouteObject = {
   path: 'department',
@@ -57,6 +60,8 @@ export const departmentRoutes: RouteObject = {
     { path: 'councils', element: withSuspense(<DefenseCouncilPage />) },
     // Tài liệu & Biểu mẫu (giao diện demo, chưa nối API)
     { path: 'documents-management', element: withSuspense(<TemplateManagementPage />) },
+    // Cấu hình điểm / Kho rubric (giao diện demo, chưa nối API)
+    { path: 'grading-config', element: withSuspense(<GradingConfigPage />) },
   ],
 }
 
