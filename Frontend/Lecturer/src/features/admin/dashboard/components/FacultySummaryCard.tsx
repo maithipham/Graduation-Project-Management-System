@@ -48,9 +48,6 @@ export const FacultySummaryCard: React.FC<FacultySummaryCardProps> = ({
                 Tên khoa
               </TableHead>
               <TableHead className="font-bold text-slate-600 text-xs uppercase">
-                Trưởng khoa
-              </TableHead>
-              <TableHead className="font-bold text-slate-600 text-xs uppercase">
                 Quy mô
               </TableHead>
               <TableHead className="font-bold text-slate-600 text-xs uppercase">
@@ -78,10 +75,6 @@ export const FacultySummaryCard: React.FC<FacultySummaryCardProps> = ({
                   >
                     {faculty.name}
                   </Link>
-                </TableCell>
-
-                <TableCell className="text-xs text-slate-600">
-                  {faculty.dean}
                 </TableCell>
 
                 <TableCell>

@@ -12,6 +12,7 @@ import {
   filterStudentAssignments,
   getConflictingStudents,
   hasAnySupervisorConflict,
+  isEligibleForCommenting,
 } from '../utils/commenting.mapper'
 
 interface UseCommentingAssignmentProps {
@@ -67,6 +68,13 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
     enabled: Boolean(semesterId && semesterId !== 'all'),
   })
 
+  // Đã phân công GVNX: luôn hiện. Chưa phân công: chỉ hiện khi đề tài đang thực hiện (IN_PROGRESS).
+  // Số SV "đang nhận" của từng GV vẫn tính trên toàn bộ rawStudents (khối lượng thật của GV).
+  const eligibleStudents = useMemo(
+    () => rawStudents.filter(isEligibleForCommenting),
+    [rawStudents],
+  )
+
   // Đồng bộ số lượng SV đang nhận xét giữa bảng sinh viên và danh sách giảng viên
   const lecturers = useMemo(() => {
     const countByLecturerId = new Map<number, number>()
@@ -102,8 +110,8 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
 
   // 7. Lọc danh sách sinh viên theo bộ lọc hiện tại
   const filteredStudents = useMemo(() => {
-    return filterStudentAssignments(rawStudents, filters)
-  }, [rawStudents, filters])
+    return filterStudentAssignments(eligibleStudents, filters)
+  }, [eligibleStudents, filters])
 
   // 8. Lọc & Sắp xếp danh sách giảng viên theo Category tab, Search keyword, Sort order
   const filteredLecturers = useMemo(() => {
@@ -157,11 +165,12 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
     return lecturers.find((l) => l.id === selectedLecturerId) || null
   }, [lecturers, selectedLecturerId])
 
-  // Lấy các đối tượng sinh viên đang được tích chọn (Checkboxes)
+  // Lấy các đối tượng sinh viên đang được tích chọn (Checkboxes), bỏ SV không còn đủ điều kiện sau khi tải lại
   const selectedStudents = useMemo(() => {
     const set = new Set(selectedIds)
-    return rawStudents.filter((s) => set.has(s.id))
-  }, [rawStudents, selectedIds])
+    return eligibleStudents.filter((s) => set.has(s.id))
+  }, [eligibleStudents, selectedIds])
+  const eligibleSelectedIds = useMemo(() => selectedStudents.map((s) => s.id), [selectedStudents])
 
   // Kiểm tra xung đột BR-05 (trùng GVHD) giữa giảng viên đang chọn và bất kỳ sinh viên nào được tích chọn
   const hasSelectedConflict = useMemo(() => {
@@ -176,11 +185,11 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
 
   // Thống kê số lượng
   const stats = useMemo(() => {
-    const total = rawStudents.length
-    const unassigned = rawStudents.filter((s) => s.status === 'UNASSIGNED').length
-    const assigned = rawStudents.filter((s) => s.status === 'ASSIGNED').length
+    const total = eligibleStudents.length
+    const unassigned = eligibleStudents.filter((s) => s.status === 'UNASSIGNED').length
+    const assigned = eligibleStudents.filter((s) => s.status === 'ASSIGNED').length
     return { total, unassigned, assigned }
-  }, [rawStudents])
+  }, [eligibleStudents])
 
   // Invalidate cache
   const invalidateQueries = () => {
@@ -191,7 +200,7 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
   // 9. Mutation: Phân công thủ công 1 giảng viên cho danh sách sinh viên được chọn
   const manualAssignMutation = useMutation({
     mutationFn: async (lecturer: CommentingLecturer) => {
-      if (!selectedIds.length) {
+      if (!eligibleSelectedIds.length) {
         throw new Error('Vui lòng chọn ít nhất một sinh viên')
       }
 
@@ -207,12 +216,12 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
       await commentingLecturerService.assignManual({
         commentingLecturerId: lecturer.id,
         commentingLecturerPublicId: lecturer.publicId,
-        studentOrTopicIds: selectedIds,
+        studentOrTopicIds: eligibleSelectedIds,
       })
     },
     onSuccess: (_, lecturer) => {
       toast.success(
-        `Đã phân công thành công ${selectedIds.length} sinh viên cho ${lecturer.displayName}`,
+        `Đã phân công thành công ${eligibleSelectedIds.length} sinh viên cho ${lecturer.displayName}`,
       )
       setSelectedIds([])
       invalidateQueries()
@@ -229,7 +238,7 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
       toast.error('Vui lòng chọn một giảng viên nhận xét ở bảng bên phải')
       return
     }
-    if (selectedIds.length === 0) {
+    if (eligibleSelectedIds.length === 0) {
       toast.error('Vui lòng tích chọn ít nhất một sinh viên ở bảng bên trái')
       return
     }
@@ -305,7 +314,7 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
   return {
     filters,
     setFilters,
-    selectedIds,
+    selectedIds: eligibleSelectedIds,
     selectedStudents,
     selectedLecturerId,
     setSelectedLecturerId,

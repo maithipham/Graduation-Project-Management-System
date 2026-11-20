@@ -36,8 +36,7 @@ export const FacultyListView: React.FC<FacultyListViewProps> = ({
       const matchSearch =
         !term ||
         f.code.toLowerCase().includes(term) ||
-        f.name.toLowerCase().includes(term) ||
-        f.dean.toLowerCase().includes(term)
+        f.name.toLowerCase().includes(term)
 
       const matchStatus = !selectedStatus || f.status === selectedStatus
       return matchSearch && matchStatus
@@ -138,9 +137,6 @@ export const FacultyListView: React.FC<FacultyListViewProps> = ({
               Tên khoa
             </TableHead>
             <TableHead className="font-bold text-slate-600 text-xs uppercase">
-              Trưởng khoa
-            </TableHead>
-            <TableHead className="font-bold text-slate-600 text-xs uppercase">
               Số chuyên ngành
             </TableHead>
             <TableHead className="font-bold text-slate-600 text-xs uppercase">
@@ -153,7 +149,7 @@ export const FacultyListView: React.FC<FacultyListViewProps> = ({
         <TableBody>
           {filteredFaculties.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center text-slate-400 text-sm">
+              <TableCell colSpan={6} className="h-32 text-center text-slate-400 text-sm">
                 Không tìm thấy khoa đào tạo phù hợp.
               </TableCell>
             </TableRow>
@@ -186,10 +182,6 @@ export const FacultyListView: React.FC<FacultyListViewProps> = ({
                   <span className="font-bold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">
                     {faculty.name}
                   </span>
-                </TableCell>
-
-                <TableCell className="text-slate-600 text-sm font-medium">
-                  {faculty.dean}
                 </TableCell>
 
                 <TableCell>

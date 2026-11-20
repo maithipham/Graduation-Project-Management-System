@@ -1,4 +1,62 @@
-import type { CouncilRole } from '../types'
+import type { CouncilMember, CouncilRole, DefenseCouncil } from '../types'
+
+/** 5 vị trí cố định của hội đồng: 1 Chủ tịch, 1 Thư ký, 3 Ủy viên */
+export type MemberSlotKey = 'chair' | 'secretary' | 'm1' | 'm2' | 'm3'
+export const MEMBER_SLOT_KEYS: MemberSlotKey[] = ['chair', 'secretary', 'm1', 'm2', 'm3']
+/** Giá trị mỗi vị trí là teacherId (null = còn trống) */
+export type MemberSlots = Record<MemberSlotKey, number | null>
+
+export const EMPTY_SLOTS: MemberSlots = { chair: null, secretary: null, m1: null, m2: null, m3: null }
+
+export function slotRole(slot: MemberSlotKey): CouncilRole {
+  if (slot === 'chair') return 'CHAIRPERSON'
+  if (slot === 'secretary') return 'SECRETARY'
+  return 'COUNCIL_MEMBER'
+}
+
+export function slotLabel(slot: MemberSlotKey): string {
+  return ROLE_CONFIG[slotRole(slot)].label
+}
+
+/** Chuyển danh sách thành viên từ BE sang 5 vị trí */
+export function membersToSlots(members: CouncilMember[] = []): MemberSlots {
+  const slots: MemberSlots = { ...EMPTY_SLOTS }
+  const memberSlots: MemberSlotKey[] = ['m1', 'm2', 'm3']
+  members.forEach((m) => {
+    if (m.role === 'CHAIRPERSON' && slots.chair === null) slots.chair = m.teacherId
+    else if (m.role === 'SECRETARY' && slots.secretary === null) slots.secretary = m.teacherId
+    else {
+      const empty = memberSlots.find((k) => slots[k] === null)
+      if (empty) slots[empty] = m.teacherId
+    }
+  })
+  return slots
+}
+
+export function slotsToPayload(slots: MemberSlots) {
+  return MEMBER_SLOT_KEYS.filter((k) => slots[k] !== null).map((k) => ({
+    teacherId: slots[k] as number,
+    role: slotRole(k),
+  }))
+}
+
+export function findSlotOf(slots: MemberSlots, teacherId: number): MemberSlotKey | null {
+  return MEMBER_SLOT_KEYS.find((k) => slots[k] === teacherId) ?? null
+}
+
+export function getMemberCount(council: DefenseCouncil): number {
+  return (council.members || []).length
+}
+
+export function isCouncilMembersComplete(council: DefenseCouncil): boolean {
+  return getMemberCount(council) >= 5
+}
+
+/** ISO datetime → 'YYYY-MM-DD' (dùng cho input type=date) */
+export function toDateInputValue(iso?: string | null): string {
+  if (!iso) return ''
+  return iso.slice(0, 10)
+}
 
 export function formatDefenseDateRange(startStr?: string | null, endStr?: string | null): string {
   if (!startStr && !endStr) return 'Chưa xếp ngày'

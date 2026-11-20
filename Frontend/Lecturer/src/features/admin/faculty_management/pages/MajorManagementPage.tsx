@@ -59,7 +59,6 @@ export default function MajorManagementPage() {
         backendId: f.id,
         code: f.code,
         name: f.name,
-        dean: f.headOfDepartment?.fullName || 'Chưa phân công',
         description: `Khoa ${f.name}`,
         status: f.statusCode === 'ACTIVE' ? 'active' : 'inactive',
         majors: [],
@@ -102,7 +101,6 @@ export default function MajorManagementPage() {
           body: {
             code: values.code,
             name: values.name,
-            headOfDepartmentId: values.headOfDepartmentId ? Number(values.headOfDepartmentId) : null,
             description: values.description,
             status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
           },
@@ -113,7 +111,6 @@ export default function MajorManagementPage() {
       await createFacultyMutation.mutateAsync({
         code: values.code,
         name: values.name,
-        headOfDepartmentId: values.headOfDepartmentId ? Number(values.headOfDepartmentId) : null,
         description: values.description,
         status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
       })

@@ -21,7 +21,6 @@ export interface Faculty {
   backendId?: string
   code: string
   name: string
-  dean: string
   description: string
   status: FacultyStatus
   majors: Major[]
@@ -39,8 +38,7 @@ export const facultySchema = z.object({
     .trim()
     .min(1, 'Vui lòng nhập tên khoa')
     .max(150, 'Tên khoa tối đa 150 ký tự'),
-  headOfDepartmentId: z.string().optional(),
-  dean: z.string().trim().optional(),
+  // Không còn trường Trưởng khoa: BE đã bỏ headOfDepartment khỏi entity Faculty
   description: z
     .string()
     .trim()
@@ -74,12 +72,6 @@ export const majorSchema = z.object({
 
 export type MajorFormValues = z.infer<typeof majorSchema>
 
-export interface HeadOfDepartmentResponseBE {
-  id: number
-  fullName: string
-  title: string
-}
-
 export interface HeadCandidateResponseBE {
   id: number // account id
   teacherId?: number
@@ -95,7 +87,6 @@ export interface FacultyResponseBE {
   publicId?: string
   code: string
   name: string
-  headOfDepartment?: HeadOfDepartmentResponseBE
   totalMajors: number
   status: string
   statusCode: ActiveStatusCode
@@ -106,7 +97,6 @@ export interface FacultyDetailResponseBE {
   publicId?: string
   code: string
   name: string
-  headOfDepartment?: HeadOfDepartmentResponseBE
   description: string
   status: string
   statusCode: ActiveStatusCode
@@ -116,7 +106,6 @@ export interface FacultyDetailResponseBE {
 export interface FacultyCreationRequestBE {
   code: string
   name: string
-  headOfDepartmentId?: number | null
   description?: string
   status?: ActiveStatusCode
 }
@@ -124,7 +113,6 @@ export interface FacultyCreationRequestBE {
 export interface FacultyUpdateRequestBE {
   code: string
   name: string
-  headOfDepartmentId?: number | null
   description?: string
   status: ActiveStatusCode
 }
@@ -173,7 +161,7 @@ export interface FacultyListParams {
   status?: string
   page?: number
   size?: number
-  sortBy?: 'code' | 'name' | 'headOfDepartment' | 'status' | 'id' | 'createdAt'
+  sortBy?: 'code' | 'name' | 'status' | 'id' | 'createdAt'
   sortDir?: 'ASC' | 'DESC' | 'asc' | 'desc'
 }
 

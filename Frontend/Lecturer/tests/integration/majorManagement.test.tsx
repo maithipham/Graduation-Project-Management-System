@@ -124,7 +124,6 @@ describe('FacultyDetailView — Hiển thị danh sách ngành & Trưởng bộ 
     id: 1,
     code: 'CNTT',
     name: 'Khoa Công nghệ thông tin',
-    dean: 'PGS. TS. Trần Văn Trưởng',
     description: 'Khoa đào tạo CNTT mũi nhọn',
     status: 'active',
     majors: [

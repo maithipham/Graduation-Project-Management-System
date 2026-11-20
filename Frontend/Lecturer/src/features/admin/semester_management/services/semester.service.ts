@@ -13,9 +13,11 @@ export const semesterService = {
    * Lấy danh sách học kỳ có phân trang và tìm kiếm
    */
   getAll: async (params?: { page?: number; size?: number; search?: string }) => {
+    // BE (SemesterController) lọc theo tham số `keyword`, không phải `search`
+    const { search, ...rest } = params ?? {}
     const res = await apiClient.get<ApiResponse<PageResponseBE<SemesterResponseBE>>>(
       API_ENDPOINTS.admin.semesters,
-      { params },
+      { params: { ...rest, keyword: search || undefined } },
     )
     return res.data.data
   },

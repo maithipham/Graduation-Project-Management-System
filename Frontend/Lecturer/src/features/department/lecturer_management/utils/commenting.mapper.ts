@@ -87,6 +87,8 @@ export function transformStudentAssignment(dto: StudentAssignmentApi): StudentAs
     topicId: dto.topicId,
     topicPublicId: dto.topicPublicId || String(dto.topicId),
     topicTitle: dto.topicTitle || 'Chưa đăng ký tên đề tài',
+    topicStatus: dto.topicStatus ?? null,
+    currentStage: dto.currentStage ?? null,
     supervisorId: dto.supervisorId ?? null,
     supervisorPublicId: dto.supervisorPublicId || '',
     supervisorName: dto.supervisorName || 'Chưa phân công',
@@ -99,6 +101,30 @@ export function transformStudentAssignment(dto: StudentAssignmentApi): StudentAs
     statusLabel: isAssigned ? 'Đã phân công' : 'Chưa phân công',
     isConflict: Boolean(isConflict),
   }
+}
+
+/**
+ * Sinh viên được hiện trên màn phân công GVNX:
+ * - Đã có GVNX: luôn hiện, bất kể trạng thái đề tài.
+ * - Chưa có GVNX: chỉ hiện khi đề tài đang thực hiện (topicStatus = IN_PROGRESS)
+ *   và đã chốt tên (currentStage từ STAGE_2_TOPIC_CONFIRMED trở lên).
+ * BE phải trả trường topicStatus, currentStage trong DTO; thiếu thì SV chưa phân công bị ẩn.
+ */
+const COMMENTING_ELIGIBLE_STAGES = new Set([
+  'STAGE_2_TOPIC_CONFIRMED',
+  'STAGE_3_OUTLINE_APPROVED',
+  'STAGE_4_REPORT_APPROVED',
+  'STAGE_5_REVIEW_PASSED',
+  'STAGE_6_DEFENSE_COMPLETED',
+])
+
+export function isEligibleForCommenting(student: StudentAssignment): boolean {
+  if (student.status === 'ASSIGNED') return true
+  return (
+    student.topicStatus === 'IN_PROGRESS' &&
+    student.currentStage != null &&
+    COMMENTING_ELIGIBLE_STAGES.has(student.currentStage)
+  )
 }
 
 /**

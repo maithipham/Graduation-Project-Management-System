@@ -3,7 +3,10 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ImportTeacherDialog } from '@/features/department/lecturer_management/components/ImportTeacherDialog'
-import { teacherService } from '@/features/department/lecturer_management/services/teacher.service'
+import {
+  DEFAULT_ACADEMIC_TITLES,
+  teacherService,
+} from '@/features/department/lecturer_management/services/teacher.service'
 import type { TeacherImportResponse } from '@/features/department/lecturer_management/types'
 import { studentService } from '@/features/department/student_management/services/student.service'
 import { useToastStore } from '@/shared/components/feedback/toast.store'
@@ -67,9 +70,17 @@ async function importFile(u: ReturnType<typeof userEvent.setup>, name = 'giao_vi
   await u.click(screen.getByRole('button', { name: 'Import' }))
 }
 
+// Kết quả import của BE không có Mã GV và Học hàm / Học vị → form sửa dòng bắt người dùng nhập 2 ô bắt buộc này
+async function fillRequiredRetryFields(u: ReturnType<typeof userEvent.setup>) {
+  await u.type(screen.getByLabelText(/^Mã giảng viên/), 'GV001')
+  await u.selectOptions(screen.getByLabelText(/^Học hàm \/ Học vị/), 'ThS.')
+}
+
 beforeEach(() => {
   useToastStore.getState().clearAll()
   vi.spyOn(studentService, 'getMajors').mockResolvedValue(MAJORS)
+  vi.spyOn(teacherService, 'getAcademicTitles').mockResolvedValue(DEFAULT_ACADEMIC_TITLES)
+  vi.spyOn(teacherService, 'getManagedMajor').mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -146,10 +157,17 @@ describe('ImportTeacherDialog — kết quả và sửa dòng lỗi', () => {
     const phone = screen.getByLabelText(/^Số điện thoại/)
     await u.clear(phone)
     await u.type(phone, '0922222222')
+    await fillRequiredRetryFields(u)
     await u.click(screen.getByRole('button', { name: /Gửi lại/ }))
 
     expect(await screen.findByText('Không còn dòng lỗi nào.')).toBeInTheDocument()
-    expect(create.mock.calls[0][0]).toMatchObject({ phone: '0922222222', major: '7480103', amount: null })
+    expect(create.mock.calls[0][0]).toMatchObject({
+      teacherCode: 'GV001',
+      academicTitle: 'ThS.',
+      phone: '0922222222',
+      major: '7480103',
+      amount: null,
+    })
     expect(within(screen.getByRole('tab', { name: /Thành công/ })).getByText('2')).toBeInTheDocument()
   })
 
@@ -164,6 +182,7 @@ describe('ImportTeacherDialog — kết quả và sửa dòng lỗi', () => {
     await importFile(u)
     await u.click(await screen.findByRole('button', { name: /Sửa/ }))
     await screen.findByRole('option', { name: 'Kỹ thuật phần mềm (mã 7480103)' })
+    await fillRequiredRetryFields(u)
     await u.click(screen.getByRole('button', { name: /Gửi lại/ }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Email đã tồn tại')

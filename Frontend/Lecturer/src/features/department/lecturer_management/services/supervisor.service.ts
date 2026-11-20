@@ -454,28 +454,20 @@ export const supervisorService = {
   // PUT /semesters/{semesterId}/advisor-assignments/approve: Phê duyệt sinh viên ở tab Đã nhận GV
   async approveRegistrations(semesterId: string, registrationPublicIds: string[]): Promise<void> {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    // Body khớp ApproveRegistrationsRequest: { registrationPublicIds: UUID[] }
     await apiClient.put<ApiResponse<void>>(
       API_ENDPOINTS.advisorAssignment.approve(cleanSemesterId),
-      {
-        registrationPublicIds,
-        registrationIds: registrationPublicIds,
-        studentPublicIds: registrationPublicIds,
-        ids: registrationPublicIds,
-      },
+      { registrationPublicIds },
     )
   },
 
   // PUT /semesters/{semesterId}/advisor-assignments/reject: Từ chối phân công ở tab Đã nhận GV
   async rejectRegistrations(semesterId: string, registrationPublicIds: string[]): Promise<void> {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
+    // Body khớp RejectRegistrationsRequest: { registrationPublicIds: UUID[] }
     await apiClient.put<ApiResponse<void>>(
       API_ENDPOINTS.advisorAssignment.reject(cleanSemesterId),
-      {
-        registrationPublicIds,
-        registrationIds: registrationPublicIds,
-        studentPublicIds: registrationPublicIds,
-        ids: registrationPublicIds,
-      },
+      { registrationPublicIds },
     )
   },
 
@@ -486,24 +478,10 @@ export const supervisorService = {
     teacherPublicId: string,
   ): Promise<void> {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
-    try {
-      await apiClient.post<ApiResponse<void>>(
-        API_ENDPOINTS.advisorAssignment.assign(cleanSemesterId),
-        {
-          studentPublicIds,
-          teacherPublicId,
-        },
-      )
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        await apiClient.post<ApiResponse<void>>(
-          `/semesters/${cleanSemesterId}/advisors/assign`,
-          { studentPublicIds, teacherPublicId },
-        )
-      } else {
-        throw err
-      }
-    }
+    await apiClient.post<ApiResponse<void>>(
+      API_ENDPOINTS.advisorAssignment.assign(cleanSemesterId),
+      { studentPublicIds, teacherPublicId },
+    )
   },
 
   // PUT /semesters/{semesterId}/advisor-assignments/students/{studentPublicId}/supervisor: Đổi GVHD 1
@@ -544,20 +522,10 @@ export const supervisorService = {
   // POST /api/advisors/finalize — Chốt danh sách GVHD chính thức cho học kỳ
   async finalizeSupervisors(semesterId: string): Promise<string> {
     const cleanSemesterId = semesterId && semesterId !== 'all' ? semesterId : 'current'
-    try {
-      const res = await apiClient.post<ApiResponse<null>>('/api/advisors/finalize', {
-        semesterId: cleanSemesterId,
-      })
-      return res.data?.message || 'Chốt danh sách giảng viên hướng dẫn thành công'
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        const res = await apiClient.post<ApiResponse<null>>('/api/supervisors/finalize', {
-          semesterId: cleanSemesterId,
-        })
-        return res.data?.message || 'Chốt danh sách giảng viên hướng dẫn thành công'
-      }
-      throw err
-    }
+    const res = await apiClient.post<ApiResponse<null>>(API_ENDPOINTS.advisor.finalize, {
+      semesterId: cleanSemesterId,
+    })
+    return res.data?.message || 'Chốt danh sách giảng viên hướng dẫn thành công'
   },
 
   async finalizeAdvisors(semesterId: string): Promise<string> {
@@ -589,24 +557,11 @@ export const supervisorService = {
       cleanParams.status = params.status
     }
 
-    let res: any
-    try {
-      res = await apiClient.get<Blob>('/api/advisors/export', {
-        params: cleanParams,
-        responseType: 'blob',
-        timeout: 2 * 60 * 1000,
-      })
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        res = await apiClient.get<Blob>('/api/supervisors/export', {
-          params: cleanParams,
-          responseType: 'blob',
-          timeout: 2 * 60 * 1000,
-        })
-      } else {
-        throw err
-      }
-    }
+    const res = await apiClient.get<Blob>(API_ENDPOINTS.advisor.export, {
+      params: cleanParams,
+      responseType: 'blob',
+      timeout: 2 * 60 * 1000,
+    })
 
     const filename = getFilenameFromDisposition(
       res.headers?.['content-disposition'],
@@ -630,7 +585,7 @@ export const supervisorService = {
     return this.exportSupervisors(params)
   },
   async downloadImportTemplate(): Promise<void> {
-    await downloadExcelTemplate('/api/advisors/import/template', 'mau_import_gvhd.xlsx', '/api/supervisors/import/template')
+    await downloadExcelTemplate(API_ENDPOINTS.advisor.template, 'mau_import_gvhd.xlsx')
   },
 
   // GET /semesters/{semesterId}/advisors: Lấy danh sách GVHD trong kỳ (từ bảng semester_advisor)

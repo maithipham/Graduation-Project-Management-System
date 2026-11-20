@@ -32,7 +32,6 @@ export const useFacultyStore = create<FacultyState>()(
           id: nextId,
           code: values.code.toUpperCase().trim(),
           name: values.name,
-          dean: values.dean || 'Chưa phân công',
           description: values.description || '',
           status: values.status,
           majors: [],
@@ -49,7 +48,6 @@ export const useFacultyStore = create<FacultyState>()(
                   ...f,
                   code: values.code.toUpperCase().trim(),
                   name: values.name,
-                  dean: values.dean ?? f.dean,
                   description: values.description ?? f.description,
                   status: values.status,
                 }

@@ -18,6 +18,9 @@ interface LecturerTableProps {
   totalPages: number
   onPageChange: (page: number) => void
   isLoading?: boolean
+  /** Ghi đè nội dung khi bảng trống (ví dụ học kỳ không được phép xem) */
+  emptyTitle?: string
+  emptyHint?: string
 }
 
 export const LecturerTable: React.FC<LecturerTableProps> = ({
@@ -29,6 +32,8 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
   totalPages,
   onPageChange,
   isLoading = false,
+  emptyTitle = 'Không tìm thấy giảng viên hướng dẫn phù hợp',
+  emptyHint = 'Vui lòng thử thay đổi từ khóa, ngành hoặc phạm vi học kỳ',
 }) => {
   const [selectedLecturer, setSelectedLecturer] = useState<Lecturer | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -73,10 +78,10 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                 <td colSpan={7} className="py-16 text-center text-slate-400">
                   <UserX className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                   <div className="text-xs font-semibold text-slate-600">
-                    Không tìm thấy giảng viên hướng dẫn phù hợp
+                    {emptyTitle}
                   </div>
                   <div className="text-[11px] text-slate-400 mt-0.5">
-                    Vui lòng thử thay đổi từ khóa, ngành hoặc phạm vi học kỳ
+                    {emptyHint}
                   </div>
                 </td>
               </tr>

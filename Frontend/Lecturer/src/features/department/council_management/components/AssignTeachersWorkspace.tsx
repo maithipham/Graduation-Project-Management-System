@@ -1,11 +1,28 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Search, Check, AlertCircle, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Check, Plus, Search, SearchX, Users } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
-import { useDebounce } from '@/shared/hooks'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { toast } from '@/shared/components/feedback/toast.store'
-import type { DefenseCouncil, CouncilRole, TeacherScope } from '../types'
+import type { CandidateTeacher, DefenseCouncil } from '../types'
 import { useCandidateTeachers, useUpdateCouncilMembers } from '../hooks/useDefenseCouncils'
-import { ROLE_CONFIG } from '../utils/councilFormatters'
+import {
+  MEMBER_SLOT_KEYS,
+  findSlotOf,
+  getMemberCount,
+  membersToSlots,
+  slotLabel,
+  slotsToPayload,
+  type MemberSlotKey,
+  type MemberSlots,
+} from '../utils/councilFormatters'
+import {
+  TEACHER_SCOPE_OPTIONS,
+  matchTeacherScope,
+  teacherScopeOrder,
+  type TeacherScopeFilter,
+} from '../utils/teacherScope'
+import { ReplaceMemberDrawer } from './ReplaceMemberDrawer'
+import { ReplaceWhenFullDialog } from './ReplaceWhenFullDialog'
 
 interface AssignTeachersWorkspaceProps {
   semesterId: number | string
@@ -13,6 +30,60 @@ interface AssignTeachersWorkspaceProps {
   councils: DefenseCouncil[]
   selectedCouncilId: string
   onSelectCouncil: (councilId: string) => void
+  onCreateCouncil: () => void
+}
+
+/** Bản nháp: 5 vị trí + các GV đã tích nhưng chưa chọn vai trò */
+interface MemberDraft {
+  key: string
+  slots: MemberSlots
+  pending: number[]
+}
+
+type RoleKey = 'chair' | 'secretary' | 'member'
+
+const ROLE_BUTTONS: Array<{ role: RoleKey; label: string; active: string; idle: string; title: string }> = [
+  {
+    role: 'chair',
+    label: 'Chủ tịch',
+    active: 'bg-[#1565C0] text-white font-bold shadow-xs',
+    idle: 'text-slate-600 hover:text-[#1565C0] hover:bg-white font-medium',
+    title: 'Chọn làm Chủ tịch hội đồng',
+  },
+  {
+    role: 'secretary',
+    label: 'Thư ký',
+    active: 'bg-purple-600 text-white font-bold shadow-xs',
+    idle: 'text-slate-600 hover:text-purple-700 hover:bg-white font-medium',
+    title: 'Chọn làm Thư ký hội đồng',
+  },
+  {
+    role: 'member',
+    label: 'Ủy viên',
+    active: 'bg-emerald-600 text-white font-bold shadow-xs',
+    idle: 'text-slate-600 hover:text-emerald-700 hover:bg-white font-medium',
+    title: 'Chọn làm Ủy viên hội đồng',
+  },
+]
+
+function councilKey(c?: DefenseCouncil) {
+  if (!c) return ''
+  const sig = (c.members || [])
+    .map((m) => `${m.teacherId}:${m.role}`)
+    .sort()
+    .join(',')
+  return `${c.publicId}|${sig}`
+}
+
+function slotToRoleKey(slot: MemberSlotKey | null): RoleKey | null {
+  if (!slot) return null
+  if (slot === 'chair') return 'chair'
+  if (slot === 'secretary') return 'secretary'
+  return 'member'
+}
+
+function draftCount(d: MemberDraft) {
+  return MEMBER_SLOT_KEYS.filter((k) => d.slots[k] !== null).length + d.pending.length
 }
 
 export function AssignTeachersWorkspace({
@@ -21,16 +92,14 @@ export function AssignTeachersWorkspace({
   councils,
   selectedCouncilId,
   onSelectCouncil,
+  onCreateCouncil,
 }: AssignTeachersWorkspaceProps) {
   const [subTab, setSubTab] = useState<'unassigned' | 'assigned'>('unassigned')
-  const [scope, setScope] = useState<TeacherScope>('ALL')
-  const [searchTerm, setSearchTerm] = useState('')
-  const debouncedKeyword = useDebounce(searchTerm.trim(), 350)
-
-  // Draft members map for current council: teacherId => CouncilRole
-  const [draftMembers, setDraftMembers] = useState<Map<number, CouncilRole>>(new Map())
-  // State phục vụ thay thế thành viên khi hội đồng PUBLISHED
-  const [replacingTeacherId, setReplacingTeacherId] = useState<number | null>(null)
+  const [scope, setScope] = useState<TeacherScopeFilter>('ALL')
+  const [search, setSearch] = useState('')
+  const [draftState, setDraftState] = useState<MemberDraft | null>(null)
+  const [replaceTarget, setReplaceTarget] = useState<MemberSlotKey | null>(null)
+  const [incomingTeacher, setIncomingTeacher] = useState<CandidateTeacher | null>(null)
 
   const updateMembersMutation = useUpdateCouncilMembers()
 
@@ -38,556 +107,457 @@ export function AssignTeachersWorkspace({
     () => councils.find((c) => c.publicId === selectedCouncilId) || councils[0],
     [councils, selectedCouncilId],
   )
-
   const isPublished = activeCouncil?.status === 'PUBLISHED'
 
-  // Sync draftMembers whenever activeCouncil changes
-  useEffect(() => {
-    if (activeCouncil) {
-      const map = new Map<number, CouncilRole>()
-        ; (activeCouncil.members || []).forEach((m) => {
-          map.set(m.teacherId, m.role)
-        })
-      setDraftMembers(map)
-      setReplacingTeacherId(null)
-    }
-  }, [activeCouncil])
+  // Bản nháp gắn với hội đồng + thành viên đã lưu; khi đổi hội đồng hoặc lưu xong thì làm mới
+  const activeKey = councilKey(activeCouncil)
+  const draft: MemberDraft =
+    draftState && draftState.key === activeKey
+      ? draftState
+      : { key: activeKey, slots: membersToSlots(activeCouncil?.members), pending: [] }
 
-  // Query candidate teachers
   const { data: teachers = [], isPending: teachersLoading } = useCandidateTeachers(
-    {
-      semesterId,
-      majorId,
-      scope,
-      assignedOnly: subTab === 'assigned',
-      keyword: debouncedKeyword,
-    },
+    { semesterId, majorId, scope: 'ALL', assignedOnly: false },
     Boolean(semesterId && majorId),
   )
 
-  // Calculations for limits
-  const draftRoles = Array.from(draftMembers.values())
-  const hasChairperson = draftRoles.includes('CHAIRPERSON')
-  const hasSecretary = draftRoles.includes('SECRETARY')
-  const memberCount = draftRoles.filter((r) => r === 'COUNCIL_MEMBER').length
-  const totalCount = draftMembers.size
-
-  // Helper to replace a member
-  const performReplace = (oldTeacherId: number, newTeacherId: number, role: CouncilRole) => {
-    setDraftMembers((prev) => {
-      const next = new Map(prev)
-      next.delete(oldTeacherId)
-      next.set(newTeacherId, role)
-      return next
+  // teacherId → tên hội đồng đang tham gia (trong kỳ hiện tại)
+  const busyMap = useMemo(() => {
+    const map = new Map<number, string>()
+    councils.forEach((c) =>
+      (c.members || []).forEach((m) => map.set(m.teacherId, c.name || c.code)),
+    )
+    teachers.forEach((t) => {
+      if (t.assignedCouncilName && !map.has(t.teacherId)) map.set(t.teacherId, t.assignedCouncilName)
     })
-    setReplacingTeacherId(null)
-    const target = teachers.find((t) => t.teacherId === newTeacherId)
-    toast.success(`Đã thay thế vị trí ${ROLE_CONFIG[role].label} bằng ${target?.fullName || 'giảng viên mới'}!`)
+    return map
+  }, [councils, teachers])
+
+  const savedCouncilMemberCount = activeCouncil ? getMemberCount(activeCouncil) : 0
+  const savedSlots = membersToSlots(activeCouncil?.members)
+  const hasChanges =
+    draft.pending.length > 0 || MEMBER_SLOT_KEYS.some((k) => draft.slots[k] !== savedSlots[k])
+  const currentDraftCount = draftCount(draft)
+
+  // GV đang thuộc hội đồng KHÁC (không phải hội đồng đang chọn) → hiện nhãn "HĐ: ..."
+  // Lịch bảo vệ dùng chung giữa các hội đồng nên không kiểm tra trùng lịch
+  const otherCouncilMap = useMemo(() => {
+    const map = new Map<number, { publicId: string; name: string }>()
+    if (!activeCouncil) return map
+    councils.forEach((c) => {
+      if (c.publicId === activeCouncil.publicId) return
+      ;(c.members || []).forEach((m) => {
+        if (!map.has(m.teacherId)) map.set(m.teacherId, { publicId: c.publicId, name: c.name || c.code })
+      })
+    })
+    return map
+  }, [councils, activeCouncil])
+
+  // Danh sách GV chưa gán vào hội đồng ĐANG CHỌN (lọc + đếm)
+  const q = search.trim().toLowerCase()
+  const activeMemberIds = new Set((activeCouncil?.members || []).map((m) => m.teacherId))
+  const unassignedTeachers = teachers.filter((t) => !activeMemberIds.has(t.teacherId))
+  const searched = unassignedTeachers.filter(
+    (t) =>
+      !q ||
+      t.fullName.toLowerCase().includes(q) ||
+      (t.departmentName || '').toLowerCase().includes(q),
+  )
+  const scopeCounts: Record<TeacherScopeFilter, number> = {
+    ALL: searched.length,
+    IN_MAJOR: searched.filter((t) => t.scope === 'IN_MAJOR').length,
+    OUT_MAJOR: searched.filter((t) => t.scope === 'OUT_MAJOR').length,
+    EXTERNAL: searched.filter((t) => t.scope === 'EXTERNAL').length,
+  }
+  const visibleTeachers = searched
+    .filter((t) => matchTeacherScope(t, scope))
+    .sort(
+      (a, b) =>
+        teacherScopeOrder(a) - teacherScopeOrder(b) || a.fullName.localeCompare(b.fullName, 'vi'),
+    )
+  const assignedTeacherCount = savedCouncilMemberCount
+
+  const top5 = visibleTeachers.slice(0, 5)
+  const isInDraft = (id: number) => findSlotOf(draft.slots, id) !== null || draft.pending.includes(id)
+  const isTop5Checked = top5.length > 0 && top5.every((t) => isInDraft(t.teacherId))
+
+  const updateDraft = (fn: (d: MemberDraft) => MemberDraft) => setDraftState(fn(draft))
+
+  const saveSlots = (slots: MemberSlots, onDone?: () => void) => {
+    if (!activeCouncil) return
+    updateMembersMutation.mutate(
+      { councilPublicId: activeCouncil.publicId, data: { members: slotsToPayload(slots) } },
+      { onSuccess: () => onDone?.() },
+    )
   }
 
-  // Handle role click
-  const handleRoleClick = (teacherId: number, role: CouncilRole) => {
-    if (!activeCouncil) return
-
-    // Đang ở chế độ thay thế 1 thành viên cụ thể
-    if (replacingTeacherId && replacingTeacherId !== teacherId) {
-      const oldRole = draftMembers.get(replacingTeacherId)
-      if (oldRole) {
-        performReplace(replacingTeacherId, teacherId, oldRole)
+  // ---- Tab Chưa gán: tích chọn / chọn vai trò ----
+  const handleToggle = (t: CandidateTeacher, checked: boolean) => {
+    if (checked) {
+      if (isInDraft(t.teacherId)) return
+      if (currentDraftCount >= 5 || savedCouncilMemberCount >= 5) {
+        if (savedCouncilMemberCount >= 5) setIncomingTeacher(t)
+        else toast.warning('Hội đồng đã chọn đủ 5/5 thành viên. Vui lòng bỏ tích bớt trước khi chọn thêm!')
         return
       }
+      updateDraft((d) => ({ ...d, pending: [...d.pending, t.teacherId] }))
+    } else {
+      updateDraft((d) => {
+        const slots = { ...d.slots }
+        const slot = findSlotOf(slots, t.teacherId)
+        if (slot) slots[slot] = null
+        return { ...d, slots, pending: d.pending.filter((id) => id !== t.teacherId) }
+      })
     }
-
-    setDraftMembers((prev) => {
-      const next = new Map(prev)
-      const currentRole = next.get(teacherId)
-
-      // Toggle off if already has this role
-      if (currentRole === role) {
-        // Nghiệp vụ 3115: Hội đồng đã công bố không cho xóa trống một vị trí
-        if (isPublished) {
-          toast.warning(
-            'Hội đồng đã công bố không được để trống vị trí. Bạn chỉ có thể chọn giảng viên khác để thay thế.',
-          )
-          return prev
-        }
-        next.delete(teacherId)
-        return next
-      }
-
-      // Khi hội đồng đã PUBLISHED: Cho phép thay thế trực tiếp
-      if (isPublished) {
-        if (role === 'CHAIRPERSON' && hasChairperson && currentRole !== 'CHAIRPERSON') {
-          // Thay thế Chủ tịch hiện tại
-          for (const [id, r] of next.entries()) {
-            if (r === 'CHAIRPERSON') {
-              next.delete(id)
-              break
-            }
-          }
-          next.set(teacherId, 'CHAIRPERSON')
-          toast.info('Đã thay thế vị trí Chủ tịch.')
-          return next
-        }
-
-        if (role === 'SECRETARY' && hasSecretary && currentRole !== 'SECRETARY') {
-          // Thay thế Thư ký hiện tại
-          for (const [id, r] of next.entries()) {
-            if (r === 'SECRETARY') {
-              next.delete(id)
-              break
-            }
-          }
-          next.set(teacherId, 'SECRETARY')
-          toast.info('Đã thay thế vị trí Thư ký.')
-          return next
-        }
-
-        if (role === 'COUNCIL_MEMBER' && memberCount >= 3 && currentRole !== 'COUNCIL_MEMBER') {
-          toast.info(
-            'Vui lòng bấm nút "Thay thế" bên cạnh Ủy viên bạn muốn đổi ở danh sách thành viên bên phải.',
-          )
-          return prev
-        }
-
-        if (!currentRole && next.size >= 5) {
-          toast.warning(
-            'Hội đồng đã công bố có đủ 5 thành viên. Vui lòng bấm "Thay thế" ở danh sách bên phải để đổi giảng viên.',
-          )
-          return prev
-        }
-      }
-
-      // Check limits cho hội đồng bình thường (DRAFT)
-      const isNew = !currentRole
-      if (isNew && next.size >= 5) {
-        toast.warning('Hội đồng đã đủ tối đa 5 thành viên!')
-        return prev
-      }
-
-      if (role === 'CHAIRPERSON' && hasChairperson && currentRole !== 'CHAIRPERSON') {
-        toast.warning('Hội đồng đã có 1 Chủ tịch!')
-        return prev
-      }
-
-      if (role === 'SECRETARY' && hasSecretary && currentRole !== 'SECRETARY') {
-        toast.warning('Hội đồng đã có 1 Thư ký!')
-        return prev
-      }
-
-      if (role === 'COUNCIL_MEMBER' && memberCount >= 3 && currentRole !== 'COUNCIL_MEMBER') {
-        toast.warning('Hội đồng đã đủ tối đa 3 Ủy viên!')
-        return prev
-      }
-
-      next.set(teacherId, role)
-      return next
-    })
   }
 
-  // Handle checkbox change
-  const handleCheckboxChange = (teacherId: number, checked: boolean) => {
-    if (!activeCouncil) return
+  const handleSetRole = (t: CandidateTeacher, role: RoleKey) => {
+    const id = t.teacherId
+    const existingSlot = findSlotOf(draft.slots, id)
+    const alreadyChecked = existingSlot !== null || draft.pending.includes(id)
 
-    if (replacingTeacherId && replacingTeacherId !== teacherId && checked) {
-      const oldRole = draftMembers.get(replacingTeacherId)
-      if (oldRole) {
-        performReplace(replacingTeacherId, teacherId, oldRole)
-        return
-      }
-    }
-
-    setDraftMembers((prev) => {
-      const next = new Map(prev)
-      if (!checked) {
-        // Nghiệp vụ 3115: Hội đồng đã công bố không cho xóa trống một vị trí
-        if (isPublished) {
-          toast.warning(
-            'Hội đồng đã công bố không được để trống vị trí. Bạn chỉ có thể chọn giảng viên khác để thay thế.',
-          )
-          return prev
-        }
-        next.delete(teacherId)
-        return next
-      }
-
-      if (isPublished && next.size >= 5) {
-        toast.warning(
-          'Hội đồng đã công bố có đủ 5 thành viên. Vui lòng bấm "Thay thế" ở danh sách bên phải để đổi giảng viên.',
-        )
-        return prev
-      }
-
-      // Auto assign first available role
-      if (next.size >= 5) {
-        toast.warning('Hội đồng đã đủ tối đa 5 thành viên!')
-        return prev
-      }
-
-      const roles = Array.from(next.values())
-      if (!roles.includes('CHAIRPERSON')) {
-        next.set(teacherId, 'CHAIRPERSON')
-      } else if (!roles.includes('SECRETARY')) {
-        next.set(teacherId, 'SECRETARY')
-      } else {
-        const mCount = roles.filter((r) => r === 'COUNCIL_MEMBER').length
-        if (mCount < 3) {
-          next.set(teacherId, 'COUNCIL_MEMBER')
-        } else {
-          toast.warning('Hội đồng đã đủ 5 thành viên quy chuẩn!')
-          return prev
-        }
-      }
-      return next
-    })
-  }
-
-  // Check all top teachers
-  const handleCheckAll = (checked: boolean) => {
-    if (!activeCouncil) return
-
-    if (!checked) {
-      if (isPublished) {
-        toast.warning('Hội đồng đã công bố không thể xóa trống vị trí.')
-        return
-      }
-      setDraftMembers(new Map())
+    if (!alreadyChecked && currentDraftCount >= 5) {
+      if (savedCouncilMemberCount >= 5) setIncomingTeacher(t)
+      else toast.warning('Hội đồng đã chọn đủ 5/5 thành viên. Vui lòng bỏ tích bớt thành viên trước khi chọn thêm!')
       return
     }
+    if (slotToRoleKey(existingSlot) === role) return
 
-    const next = new Map<number, CouncilRole>()
-    const topTeachers = teachers.slice(0, 5)
-    topTeachers.forEach((t, i) => {
-      if (i === 0) next.set(t.teacherId, 'CHAIRPERSON')
-      else if (i === 1) next.set(t.teacherId, 'SECRETARY')
-      else next.set(t.teacherId, 'COUNCIL_MEMBER')
-    })
-    setDraftMembers(next)
-    toast.info(`Đã gán nhanh ${topTeachers.length} giảng viên vào hội đồng.`)
-  }
+    const slots = { ...draft.slots }
+    let pending = draft.pending.filter((p) => p !== id)
 
-  const handleSaveMembers = () => {
-    if (!activeCouncil) return
-
-    const roles = Array.from(draftMembers.values())
-    const chairCount = roles.filter((r) => r === 'CHAIRPERSON').length
-    const secCount = roles.filter((r) => r === 'SECRETARY').length
-    const memCount = roles.filter((r) => r === 'COUNCIL_MEMBER').length
-
-    // Nghiệp vụ 3115: Hội đồng đã công bố chỉ được thay thế thành viên, phải gửi đủ 5 người (1 CT, 1 TK, 3 UV)
-    if (isPublished) {
-      if (draftMembers.size !== 5 || chairCount !== 1 || secCount !== 1 || memCount !== 3) {
+    if (role === 'chair' || role === 'secretary') {
+      const target: MemberSlotKey = role === 'chair' ? 'chair' : 'secretary'
+      const prev = slots[target]
+      if (existingSlot) slots[existingSlot] = null
+      // Người đang giữ vai trò này chuyển về trạng thái "đã tích, chưa chọn vai trò"
+      if (prev !== null && prev !== id) pending = [...pending, prev]
+      slots[target] = id
+    } else {
+      const emptyMember = (['m1', 'm2', 'm3'] as MemberSlotKey[]).find((k) => slots[k] === null)
+      if (!emptyMember) {
         toast.warning(
-          'Hội đồng đã công bố chỉ được thay thế thành viên, phải gửi đủ 5 người (1 CHAIRPERSON, 1 SECRETARY, 3 COUNCIL_MEMBER).',
+          'Hội đồng đã chọn đủ tối đa 3/3 Ủy viên! Hãy chọn Chủ tịch/Thư ký còn trống hoặc bỏ tích bớt Ủy viên.',
         )
         return
       }
+      if (existingSlot) slots[existingSlot] = null
+      slots[emptyMember] = id
     }
-
-    const membersPayload = Array.from(draftMembers.entries()).map(([teacherId, role]) => ({
-      teacherId,
-      role,
-    }))
-
-    updateMembersMutation.mutate({
-      councilPublicId: activeCouncil.publicId,
-      data: { members: membersPayload },
-    })
+    setDraftState({ ...draft, slots, pending })
   }
 
-  const isAllChecked =
-    teachers.length > 0 &&
-    teachers.slice(0, 5).every((t) => draftMembers.has(t.teacherId)) &&
-    draftMembers.size > 0
+  const handleToggleTop5 = (checked: boolean) => {
+    if (checked) {
+      const free = 5 - currentDraftCount
+      const toAdd = top5.filter((t) => !isInDraft(t.teacherId)).slice(0, Math.max(0, free))
+      if (toAdd.length === 0) {
+        toast.warning('Hội đồng đã chọn đủ 5/5 thành viên.')
+        return
+      }
+      updateDraft((d) => ({ ...d, pending: [...d.pending, ...toAdd.map((t) => t.teacherId)] }))
+      toast.info(`Đã tích chọn ${toAdd.length} giảng viên đầu danh sách vào hội đồng.`)
+    } else {
+      const ids = new Set(top5.map((t) => t.teacherId))
+      updateDraft((d) => {
+        const slots = { ...d.slots }
+        MEMBER_SLOT_KEYS.forEach((k) => {
+          if (slots[k] !== null && ids.has(slots[k]!) && savedSlots[k] !== slots[k]) slots[k] = null
+        })
+        return { ...d, slots, pending: d.pending.filter((id) => !ids.has(id)) }
+      })
+      toast.info('Đã bỏ chọn các giảng viên.')
+    }
+  }
 
-  const isSaveDisabled =
-    !activeCouncil ||
-    updateMembersMutation.isPending ||
-    (isPublished && (draftMembers.size !== 5 || !hasChairperson || !hasSecretary || memberCount !== 3))
+  const handleConfirmAssign = () => {
+    if (!activeCouncil) return
+    if (draft.pending.length > 0) {
+      toast.warning(
+        'Vui lòng chọn vai trò (Chủ tịch / Thư ký / Ủy viên) cho tất cả giảng viên đã tích trước khi gán!',
+      )
+      return
+    }
+    const filled = MEMBER_SLOT_KEYS.filter((k) => draft.slots[k] !== null).length
+    if (isPublished && filled !== 5) {
+      toast.warning(
+        'Hội đồng đã công bố chỉ được thay thế thành viên, phải đủ 5 người (1 Chủ tịch, 1 Thư ký, 3 Ủy viên).',
+      )
+      return
+    }
+    saveSlots(draft.slots, () => setDraftState(null))
+  }
+
+  // ---- Tab Đã gán: đổi vai trò / thay thế ----
+  const handleChangeRole = (fromSlot: MemberSlotKey, target: RoleKey) => {
+    const slots = { ...savedSlots }
+    const id = slots[fromSlot]
+    if (id === null || slotToRoleKey(fromSlot) === target) return
+
+    if (target === 'chair' || target === 'secretary') {
+      const targetSlot: MemberSlotKey = target
+      const prev = slots[targetSlot]
+      slots[targetSlot] = id
+      slots[fromSlot] = prev
+    } else {
+      const emptyMember = (['m1', 'm2', 'm3'] as MemberSlotKey[]).find((k) => slots[k] === null)
+      if (emptyMember) {
+        slots[emptyMember] = id
+        slots[fromSlot] = null
+      } else {
+        const prev = slots.m1
+        slots.m1 = id
+        slots[fromSlot] = prev
+      }
+    }
+    if (isPublished && MEMBER_SLOT_KEYS.some((k) => slots[k] === null)) {
+      toast.warning('Hội đồng đã công bố không được để trống vị trí nào.')
+      return
+    }
+    saveSlots(slots)
+  }
+
+  const memberById = new Map((activeCouncil?.members || []).map((m) => [m.teacherId, m]))
+
+  if (councils.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+          <Users className="w-6 h-6" />
+        </div>
+        <h3 className="text-[15px] font-bold text-slate-800">Chưa có hội đồng nào trong kỳ này</h3>
+        <p className="text-[13px] text-slate-500 mt-1 mb-4">Vui lòng tạo hội đồng trước khi gán giảng viên.</p>
+        <Button
+          type="button"
+          onClick={onCreateCouncil}
+          className="h-9 px-4 rounded-lg bg-[#1565C0] text-white text-[13px] font-semibold hover:bg-[#0D47A1] inline-flex items-center gap-1.5"
+        >
+          <Plus className="w-4 h-4" /> Tạo hội đồng mới
+        </Button>
+      </div>
+    )
+  }
+
+  const subTabBtn = (value: 'unassigned' | 'assigned', label: string, count: number) => (
+    <button
+      type="button"
+      onClick={() => setSubTab(value)}
+      className={`h-8 rounded-lg text-[12.5px] inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${
+        subTab === value
+          ? 'bg-white text-[#1565C0] font-bold shadow-xs'
+          : 'text-slate-600 hover:text-slate-900 font-medium'
+      }`}
+    >
+      <span>{label}</span>
+      <span
+        className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${
+          subTab === value ? 'bg-blue-50 text-[#1565C0]' : 'bg-slate-100 text-slate-600'
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  )
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-      {/* CỘT TRÁI: DANH SÁCH GIẢNG VIÊN (8 CỘT) */}
-      <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden flex flex-col min-h-[560px]">
-        {/* Banner thay thế nếu đang chọn */}
-        {replacingTeacherId && (
-          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 text-amber-600 animate-spin" />
-              <span>
-                Đang thay thế vị trí{' '}
-                <strong className="text-amber-800">
-                  {ROLE_CONFIG[draftMembers.get(replacingTeacherId) || 'COUNCIL_MEMBER']?.label}
-                </strong>
-                . Hãy click vào giảng viên bên dưới để chọn thay thế.
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplacingTeacherId(null)}
-              className="px-2.5 py-1 bg-white border border-amber-300 rounded-md text-[11px] font-bold text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
-            >
-              Hủy thay thế
-            </button>
+      {/* TRÁI: DANH SÁCH GIẢNG VIÊN */}
+      <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-190px)] min-h-[520px]">
+        <div className="p-3 border-b border-slate-200 bg-slate-50/70 shrink-0 space-y-2.5">
+          <div className="grid grid-cols-2 bg-slate-200/60 p-1 rounded-xl gap-1">
+            {subTabBtn('unassigned', 'Chưa gán HĐ', unassignedTeachers.length)}
+            {subTabBtn('assigned', 'Đã gán HĐ', assignedTeacherCount)}
           </div>
-        )}
 
-        {/* Sub-tabs + Filter pills */}
-        <div className="p-3.5 border-b border-slate-200 bg-slate-50/70 space-y-3">
-          {/* Sub-tab: Chưa gán HĐ / Đã gán HĐ */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="grid grid-cols-2 bg-slate-200/70 p-1 rounded-xl gap-1 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setSubTab('unassigned')}
-                className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${subTab === 'unassigned'
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-              >
-                <span>Chưa gán HĐ</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSubTab('assigned')}
-                className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer ${subTab === 'assigned'
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-              >
-                <span>Đã gán HĐ</span>
-              </button>
-            </div>
+          {subTab === 'unassigned' && (
+            <div className="flex items-center gap-3 pt-0.5 flex-wrap">
+              <div className="inline-flex rounded-lg bg-slate-200/70 p-1 gap-1 text-[12px] font-semibold shrink-0 flex-wrap">
+                {TEACHER_SCOPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setScope(opt.value)}
+                    className={`h-7 px-2.5 rounded-md inline-flex items-center gap-1.5 transition cursor-pointer ${
+                      scope === opt.value
+                        ? 'bg-white text-[#1565C0] font-bold shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    <span className="text-[11px] opacity-75">({scopeCounts[opt.value]})</span>
+                  </button>
+                ))}
+              </div>
 
-            {/* Check all */}
-            {subTab === 'unassigned' && !isPublished && (
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 hover:text-[#1565C0]">
-                <span>Tích tất cả (Gán nhanh 5 TV)</span>
+              <div className="relative flex-1 min-w-[120px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Tìm giảng viên..."
+                  aria-label="Tìm giảng viên"
+                  className="w-full h-8 pl-8 pr-2.5 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-[#1565C0] bg-white transition"
+                />
+              </div>
+
+              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none font-semibold text-[12px] text-slate-700 hover:text-[#1565C0] shrink-0 mr-[13px]">
+                <span>Tích tất cả</span>
                 <input
                   type="checkbox"
-                  checked={isAllChecked}
-                  onChange={(e) => handleCheckAll(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer rounded border-slate-300 text-[#1565C0]"
+                  checked={isTop5Checked}
+                  onChange={(e) => handleToggleTop5(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer rounded border-slate-300 accent-[#1565C0]"
                 />
               </label>
-            )}
-          </div>
-
-          {/* Scope Pills + Search input */}
-          <div className="flex items-center justify-between gap-3 flex-wrap pt-0.5">
-            <div className="inline-flex rounded-lg bg-slate-200/70 p-1 gap-1 text-xs font-semibold shrink-0">
-              <button
-                type="button"
-                onClick={() => setScope('ALL')}
-                className={`h-7 px-2.5 rounded-md inline-flex items-center transition cursor-pointer ${scope === 'ALL'
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-              >
-                Tất cả
-              </button>
-              <button
-                type="button"
-                onClick={() => setScope('IN_MAJOR')}
-                className={`h-7 px-2.5 rounded-md inline-flex items-center transition cursor-pointer ${scope === 'IN_MAJOR'
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-              >
-                Trong bộ môn
-              </button>
-              <button
-                type="button"
-                onClick={() => setScope('OUT_MAJOR')}
-                className={`h-7 px-2.5 rounded-md inline-flex items-center transition cursor-pointer ${scope === 'OUT_MAJOR'
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-              >
-                Ngoài bộ môn
-              </button>
-              <button
-                type="button"
-                onClick={() => setScope('EXTERNAL')}
-                className={`h-7 px-2.5 rounded-md inline-flex items-center transition cursor-pointer ${scope === 'EXTERNAL'
-                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-              >
-                Ngoài trường
-              </button>
             </div>
-
-            {/* Search */}
-            <div className="relative flex-1 sm:w-64 sm:flex-initial">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm tên, bộ môn..."
-                className="w-full h-8 pl-8 pr-3 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Status bar */}
-        <div className="px-3.5 py-2 bg-blue-50/50 border-b border-blue-100/60 flex items-center justify-between text-xs font-semibold text-[#1565C0] flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5">
-            <AlertCircle className="w-4 h-4" />
-            <span>
-              Quy chuẩn 5 thành viên:{' '}
-              <strong className={hasChairperson ? 'text-emerald-700' : 'text-slate-500'}>
-                1 Chủ tịch
-              </strong>{' '}
-              •{' '}
-              <strong className={hasSecretary ? 'text-emerald-700' : 'text-slate-500'}>
-                1 Thư ký
-              </strong>{' '}
-              •{' '}
-              <strong className={memberCount === 3 ? 'text-emerald-700' : 'text-slate-500'}>
-                {memberCount}/3 Ủy viên
-              </strong>
-            </span>
-          </span>
-          {isPublished && (
-            <span className="text-amber-700 font-semibold text-[11px] bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200">
-              Hội đồng đã công bố: chỉ được thay thế thành viên
-            </span>
           )}
         </div>
 
-        {/* Teachers List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[580px]">
-          {teachersLoading ? (
-            <div className="py-16 text-center text-xs text-slate-400 font-semibold">
-              <div className="w-5 h-5 border-2 border-[#1565C0] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <span>Đang tải danh sách giảng viên...</span>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {subTab === 'assigned' ? (
+            <div className="p-0.5 space-y-2">
+              {MEMBER_SLOT_KEYS.map((slot) => {
+                const id = savedSlots[slot]
+                const m = id !== null ? memberById.get(id) : undefined
+                if (id === null) {
+                  return (
+                    <div
+                      key={slot}
+                      className="p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3"
+                    >
+                      <span className="text-[12.5px] font-medium text-slate-500">
+                        {slotLabel(slot)} (còn trống)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSubTab('unassigned')}
+                        title={`Gán giảng viên vào vị trí ${slotLabel(slot)}`}
+                        className="h-8 px-3.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1565C0] border border-blue-200 text-[12px] font-bold transition cursor-pointer shrink-0"
+                      >
+                        Gán
+                      </button>
+                    </div>
+                  )
+                }
+                return (
+                  <div
+                    key={slot}
+                    className="p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 transition flex items-center justify-between gap-3 shadow-2xs"
+                  >
+                    <div className="min-w-0 flex-1 select-none">
+                      <div className="font-bold text-[13px] text-slate-800 truncate">
+                        {m?.fullName || `Giảng viên #${id}`}
+                      </div>
+                      <div className="text-[11.5px] text-slate-500 truncate">{m?.departmentName}</div>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <select
+                        value={slotToRoleKey(slot) ?? 'member'}
+                        disabled={updateMembersMutation.isPending}
+                        onChange={(e) => handleChangeRole(slot, e.target.value as RoleKey)}
+                        aria-label={`Vai trò của ${m?.fullName || 'giảng viên'}`}
+                        title="Thay đổi vai trò trong hội đồng"
+                        className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-[#1565C0] text-[12px] font-semibold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                      >
+                        <option value="chair">Chủ tịch</option>
+                        <option value="secretary">Thư ký</option>
+                        <option value="member">Ủy viên</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setReplaceTarget(slot)}
+                        title="Thay thế giảng viên này trong hội đồng"
+                        className="h-8 px-3.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1565C0] border border-blue-200 text-[12px] font-bold transition cursor-pointer shrink-0"
+                      >
+                        Thay thế
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          ) : teachers.length === 0 ? (
-            <div className="py-16 text-center text-xs text-slate-400">
-              Không tìm thấy giảng viên nào phù hợp bộ lọc.
+          ) : teachersLoading ? (
+            Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)
+          ) : visibleTeachers.length === 0 ? (
+            <div className="py-12 px-4 text-center text-slate-500 text-[13px]">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-2">
+                <SearchX className="w-5 h-5" />
+              </div>
+              Không tìm thấy giảng viên phù hợp bộ lọc.
             </div>
           ) : (
-            teachers.map((t) => {
-              const assignedRole = draftMembers.get(t.teacherId)
-              const isChecked = Boolean(assignedRole)
-              const isOtherCouncil =
-                t.assignedCouncilName &&
-                activeCouncil &&
-                t.assignedCouncilName !== activeCouncil.code
-
-              // Limit disable rules: Cho phép click thay thế nếu đang chọn replacingTeacherId hoặc council đã PUBLISHED
-              const disableChair =
-                !isChecked && !isPublished && (hasChairperson || totalCount >= 5)
-              const disableSec =
-                !isChecked && !isPublished && (hasSecretary || totalCount >= 5)
-              const disableMem =
-                !isChecked &&
-                !isPublished &&
-                (memberCount >= 3 || totalCount >= 5) &&
-                (!replacingTeacherId || draftMembers.get(replacingTeacherId) !== 'COUNCIL_MEMBER')
-
-              const roleBtnBase =
-                'h-7 px-2.5 rounded-md text-[11.5px] font-semibold transition whitespace-nowrap'
+            visibleTeachers.map((t) => {
+              const slot = findSlotOf(draft.slots, t.teacherId)
+              const assignedRole = slotToRoleKey(slot)
+              const isChecked = slot !== null || draft.pending.includes(t.teacherId)
+              const chkId = `lec-chk-${t.teacherId}`
+              const other = otherCouncilMap.get(t.teacherId)
 
               return (
                 <div
                   key={t.teacherId}
-                  className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap ${isChecked
+                  className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap ${
+                    isChecked
                       ? 'border-[#1565C0]/60 bg-blue-50/40 shadow-2xs'
-                      : replacingTeacherId
-                        ? 'border-amber-300 bg-amber-50/30 hover:border-amber-400 hover:bg-amber-50/60'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
-                    }`}
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                  }`}
                 >
-                  <label
-                    htmlFor={`lec-chk-${t.teacherId}`}
-                    className="min-w-0 flex-1 cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-[13px] text-slate-800">{t.fullName}</span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-xs text-slate-600 font-medium">
-                        {t.academicTitle || 'GV'} • {t.departmentName}
-                      </span>
-                      {t.scope === 'IN_MAJOR' && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Trong bộ môn
-                        </span>
-                      )}
-                      {t.scope === 'OUT_MAJOR' && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          Ngoài bộ môn
-                        </span>
-                      )}
-                      {t.scope === 'EXTERNAL' && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                          Ngoài trường
-                        </span>
+                  <label htmlFor={chkId} className="min-w-0 flex-1 select-none cursor-pointer">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-nowrap">
+                      <span className="font-bold text-[13px] text-slate-800 shrink-0">{t.fullName}</span>
+                      {t.departmentName && (
+                        <>
+                          <span className="text-slate-300 shrink-0">·</span>
+                          <span
+                            className="text-[12px] text-slate-600 font-medium truncate"
+                            title={t.scope === 'EXTERNAL' ? `Trường / Đơn vị: ${t.departmentName}` : `Bộ môn: ${t.departmentName}`}
+                          >
+                            {t.departmentName}
+                          </span>
+                        </>
                       )}
                     </div>
-                    {isOtherCouncil && (
-                      <div className="mt-1 text-[11px] font-medium text-amber-700">
-                        Đang thuộc hội đồng: <strong>{t.assignedCouncilName}</strong>
+                    {other && (
+                      <div className="flex items-center gap-1.5 flex-wrap text-[11.5px] mt-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            onSelectCouncil(other.publicId)
+                          }}
+                          title={`Bấm để chuyển sang ${other.name} để sửa / gỡ giảng viên`}
+                          className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-[#1565C0] border border-blue-200 text-[10.5px] font-bold cursor-pointer transition"
+                        >
+                          HĐ: {other.name}
+                        </button>
                       </div>
                     )}
                   </label>
 
-                  {/* 3 Role buttons + Checkbox */}
-                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                  <div className="flex items-center gap-2.5 shrink-0 ml-auto">
                     <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleRoleClick(t.teacherId, 'CHAIRPERSON')}
-                        disabled={disableChair && assignedRole !== 'CHAIRPERSON'}
-                        className={`${roleBtnBase} ${assignedRole === 'CHAIRPERSON'
-                            ? 'bg-[#1565C0] text-white shadow-xs'
-                            : disableChair
-                              ? 'text-slate-300 cursor-not-allowed'
-                              : 'text-slate-600 hover:text-[#1565C0] hover:bg-white cursor-pointer'
+                      {ROLE_BUTTONS.map((rb) => (
+                        <button
+                          key={rb.role}
+                          type="button"
+                          onClick={() => handleSetRole(t, rb.role)}
+                          title={rb.title}
+                          className={`h-7 px-2.5 rounded-md text-[11.5px] transition whitespace-nowrap cursor-pointer ${
+                            assignedRole === rb.role ? rb.active : rb.idle
                           }`}
-                        title="Chủ tịch (Tối đa 1)"
-                      >
-                        Chủ tịch
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRoleClick(t.teacherId, 'SECRETARY')}
-                        disabled={disableSec && assignedRole !== 'SECRETARY'}
-                        className={`${roleBtnBase} ${assignedRole === 'SECRETARY'
-                            ? 'bg-purple-600 text-white shadow-xs'
-                            : disableSec
-                              ? 'text-slate-300 cursor-not-allowed'
-                              : 'text-slate-600 hover:text-purple-700 hover:bg-white cursor-pointer'
-                          }`}
-                        title="Thư ký (Tối đa 1)"
-                      >
-                        Thư ký
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRoleClick(t.teacherId, 'COUNCIL_MEMBER')}
-                        disabled={disableMem && assignedRole !== 'COUNCIL_MEMBER'}
-                        className={`${roleBtnBase} ${assignedRole === 'COUNCIL_MEMBER'
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : disableMem
-                              ? 'text-slate-300 cursor-not-allowed'
-                              : 'text-slate-600 hover:text-emerald-700 hover:bg-white cursor-pointer'
-                          }`}
-                        title="Ủy viên (Tối đa 3)"
-                      >
-                        Ủy viên
-                      </button>
+                        >
+                          {rb.label}
+                        </button>
+                      ))}
                     </div>
-
                     <input
-                      id={`lec-chk-${t.teacherId}`}
+                      id={chkId}
                       type="checkbox"
                       checked={isChecked}
-                      onChange={(e) => handleCheckboxChange(t.teacherId, e.target.checked)}
-                      className="w-4 h-4 cursor-pointer rounded border-slate-300 text-[#1565C0]"
+                      onChange={(e) => handleToggle(t, e.target.checked)}
+                      title={isChecked ? 'Bỏ tích để gỡ khỏi hội đồng' : 'Tích để chọn vào hội đồng'}
+                      className="w-4 h-4 shrink-0 cursor-pointer accent-[#1565C0]"
                     />
                   </div>
                 </div>
@@ -597,147 +567,89 @@ export function AssignTeachersWorkspace({
         </div>
       </div>
 
-      {/* CỘT PHẢI: DANH SÁCH HỘI ĐỒNG (4 CỘT) */}
-      <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden flex flex-col min-h-[560px]">
+      {/* PHẢI: DANH SÁCH HỘI ĐỒNG */}
+      <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-190px)] min-h-[520px]">
         <div className="p-3.5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2 shrink-0">
-          <div className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Danh sách hội đồng
-          </div>
-
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSaveMembers}
-            disabled={isSaveDisabled}
-            title={
-              isPublished && draftMembers.size !== 5
-                ? 'Hội đồng đã công bố yêu cầu đủ 5 thành viên (1 Chủ tịch, 1 Thư ký, 3 Ủy viên)'
-                : undefined
-            }
-            className="h-8 px-3 rounded-lg bg-[#1565C0] text-white text-xs font-semibold hover:bg-[#0D47A1] inline-flex items-center gap-1.5 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Check className="w-3.5 h-3.5" />
-            <span>Gán ({draftMembers.size}/5)</span>
-          </Button>
+          <div className="text-[13.5px] font-bold text-slate-800 truncate">Danh sách hội đồng</div>
+          {subTab === 'unassigned' && (
+            <Button
+              type="button"
+              onClick={handleConfirmAssign}
+              disabled={!hasChanges || updateMembersMutation.isPending}
+              className="h-9 px-4 rounded-lg bg-[#1565C0] text-white text-[12.5px] font-semibold hover:bg-[#0D47A1] shadow-sm inline-flex items-center gap-1.5 shrink-0"
+            >
+              <Check className="w-4 h-4" />
+              <span>
+                {updateMembersMutation.isPending ? 'Đang lưu...' : `Gán (${currentDraftCount}/5)`}
+              </span>
+            </Button>
+          )}
         </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[580px]">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
           {councils.map((c) => {
             const isSel = c.publicId === activeCouncil?.publicId
-            const cnt = isSel ? draftMembers.size : (c.members || []).length
-            const isFull = cnt >= 5
-            const councilIsPublished = c.status === 'PUBLISHED'
-
+            const cnt = getMemberCount(c)
+            const countColor =
+              cnt >= 5 ? 'text-emerald-700' : cnt > 0 ? 'text-amber-700' : 'text-rose-700'
             return (
-              <div
+              <button
                 key={c.publicId}
+                type="button"
                 onClick={() => onSelectCouncil(c.publicId)}
-                className={`p-3.5 rounded-xl border-2 transition cursor-pointer select-none ${isSel
-                    ? 'border-[#1565C0] bg-blue-50/40 shadow-xs'
+                className={`w-full text-left px-4 py-3 rounded-xl border-2 transition cursor-pointer select-none flex items-center justify-between gap-2.5 ${
+                  isSel
+                    ? 'border-[#1565C0] bg-blue-50/40 shadow-sm'
                     : 'border-slate-200 bg-white hover:border-[#1565C0]/60 hover:bg-slate-50/60'
-                  }`}
+                }`}
               >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span
-                    className={`font-bold text-sm truncate ${isSel ? 'text-[#0D47A1]' : 'text-slate-800'
-                      }`}
-                  >
-                    {c.code} — {c.name || c.code}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {councilIsPublished && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        ĐÃ CÔNG BỐ
-                      </span>
-                    )}
-                    {isFull ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        5/5 TV
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                        <AlertTriangle className="w-3 h-3 text-amber-600" />
-                        {cnt}/5 TV
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>{c.location || 'Chưa xếp phòng'}</span>
-                  <span>•</span>
-                  <span>{c.studentCount} SV</span>
-                </div>
-
-                {/* Danh sách thành viên chi tiết cho hội đồng đang chọn */}
-                {isSel && draftMembers.size > 0 && (
-                  <div
-                    className="mt-3 pt-2.5 border-t border-blue-200/60 space-y-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                      <span>Thành viên hiện tại</span>
-                      {councilIsPublished && (
-                        <span className="text-[10px] font-medium text-slate-500">
-                          Bấm "Thay thế" để đổi GV
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      {Array.from(draftMembers.entries()).map(([tId, role]) => {
-                        const memInfo =
-                          activeCouncil.members?.find((m) => m.teacherId === tId) ||
-                          teachers.find((t) => t.teacherId === tId)
-                        const isReplacing = replacingTeacherId === tId
-                        const roleCfg = ROLE_CONFIG[role] || {
-                          label: role,
-                          badgeClass: 'bg-slate-100 text-slate-700',
-                        }
-
-                        return (
-                          <div
-                            key={tId}
-                            className={`p-1.5 rounded-lg border text-xs flex items-center justify-between gap-1.5 ${isReplacing
-                                ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
-                                : 'bg-white/80 border-slate-200'
-                              }`}
-                          >
-                            <div className="min-w-0 flex-1 truncate">
-                              <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border mr-1.5 ${roleCfg.badgeClass}`}
-                              >
-                                {roleCfg.label}
-                              </span>
-                              <span className="font-semibold text-slate-800 text-[11.5px]">
-                                {memInfo?.fullName || `Giảng viên #${tId}`}
-                              </span>
-                            </div>
-                            {councilIsPublished && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setReplacingTeacherId(isReplacing ? null : tId)
-                                }
-                                className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition shrink-0 cursor-pointer ${isReplacing
-                                    ? 'bg-amber-600 text-white shadow-2xs'
-                                    : 'bg-slate-100 hover:bg-[#1565C0] hover:text-white text-slate-700 border border-slate-200'
-                                  }`}
-                              >
-                                {isReplacing ? 'Hủy' : 'Thay thế'}
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+                <span
+                  className={`font-bold text-[13.5px] truncate ${isSel ? 'text-[#0D47A1]' : 'text-slate-800'}`}
+                >
+                  {c.name || c.code}
+                </span>
+                <span className={`font-bold text-[12px] ${countColor} shrink-0`}>{cnt}/5 TV</span>
+              </button>
             )
           })}
         </div>
       </div>
+
+      {/* Drawer thay thế 1 thành viên */}
+      {activeCouncil && replaceTarget && (
+        <ReplaceMemberDrawer
+          council={activeCouncil}
+          slot={replaceTarget}
+          current={
+            savedSlots[replaceTarget] !== null
+              ? memberById.get(savedSlots[replaceTarget]!) ?? null
+              : null
+          }
+          teachers={teachers}
+          busyMap={busyMap}
+          isPending={updateMembersMutation.isPending}
+          onClose={() => setReplaceTarget(null)}
+          onConfirm={(teacherId) =>
+            saveSlots({ ...savedSlots, [replaceTarget]: teacherId }, () => setReplaceTarget(null))
+          }
+        />
+      )}
+
+      {/* Modal thay thế khi hội đồng đã đủ 5/5 */}
+      <ReplaceWhenFullDialog
+        council={activeCouncil ?? null}
+        incoming={incomingTeacher}
+        isPending={updateMembersMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setIncomingTeacher(null)
+        }}
+        onConfirm={(slot) => {
+          if (!incomingTeacher) return
+          saveSlots({ ...savedSlots, [slot]: incomingTeacher.teacherId }, () => {
+            setIncomingTeacher(null)
+            setDraftState(null)
+          })
+        }}
+      />
     </div>
   )
 }

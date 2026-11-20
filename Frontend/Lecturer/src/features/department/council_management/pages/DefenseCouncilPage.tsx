@@ -13,7 +13,13 @@ import { CreateCouncilDialog } from '../components/CreateCouncilDialog'
 import { CouncilDetailDialog } from '../components/CouncilDetailDialog'
 import { AssignTeachersWorkspace } from '../components/AssignTeachersWorkspace'
 import { AssignStudentsWorkspace } from '../components/AssignStudentsWorkspace'
-import type { DefenseCouncil } from '../types'
+type CouncilTab = 'list' | 'members' | 'students'
+
+const TABS: Array<{ value: CouncilTab; label: string }> = [
+  { value: 'list', label: 'Danh sách hội đồng' },
+  { value: 'members', label: 'Gán giảng viên vào hội đồng' },
+  { value: 'students', label: 'Gán sinh viên vào hội đồng' },
+]
 
 export default function DefenseCouncilPage() {
   const { data: user } = useMyInfo()
@@ -21,10 +27,10 @@ export default function DefenseCouncilPage() {
     ? user.roles.some((r) => r === 'ADMIN' || r === 'HEAD_OF_MAJOR')
     : true
 
-  const [activeTab, setActiveTab] = useState<'list' | 'members' | 'students'>('list')
+  const [activeTab, setActiveTab] = useState<CouncilTab>('list')
   const [selectedCouncilId, setSelectedCouncilId] = useState<string>('')
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false)
-  const [detailCouncil, setDetailCouncil] = useState<DefenseCouncil | null>(null)
+  const [detailCouncilId, setDetailCouncilId] = useState<string | null>(null)
 
   // Scope: Semester & Major
   const {
@@ -82,6 +88,15 @@ export default function DefenseCouncilPage() {
       setSelectedCouncilId(councils[0].publicId)
     }
   }, [councils, selectedCouncilId])
+
+  // Lấy hội đồng mới nhất từ cache để modal chi tiết luôn đúng dữ liệu sau khi sửa phòng/thành viên
+  const detailCouncil = councils.find((c) => c.publicId === detailCouncilId) ?? null
+
+  const openTabForCouncil = (tab: CouncilTab, councilId: string) => {
+    setDetailCouncilId(null)
+    setSelectedCouncilId(councilId)
+    setActiveTab(tab)
+  }
 
   const handleCreateSuccessAndAssign = (firstCouncilId?: string) => {
     if (firstCouncilId) {
@@ -153,77 +168,70 @@ export default function DefenseCouncilPage() {
       </div>
 
       {/* 3-TAB NAVIGATION BAR + NÚT TẠO HỘI ĐỒNG INLINE */}
-      <div className="flex items-center justify-between gap-3 w-full">
+      <div className="flex items-center justify-between gap-3 w-full flex-wrap md:flex-nowrap">
         <div
-          className="h-10 bg-[#E2E8F0] p-1 rounded-xl flex items-center gap-1 text-[13px] font-semibold flex-1 shadow-2xs border border-slate-300/70"
+          className="min-h-10 bg-[#E2E8F0] p-1 rounded-xl flex items-center gap-1 text-[13px] font-semibold flex-1 shadow-2xs border border-slate-300/70 overflow-x-auto"
           role="tablist"
         >
-          {/* Tab 1 */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('list')}
-            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${activeTab === 'list'
-                ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-          >
-            <span>Danh sách hội đồng</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${activeTab === 'list'
-                  ? 'bg-[#E3F2FD] text-[#1565C0]'
-                  : 'bg-slate-100 text-slate-600'
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.value
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.value)}
+                className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'bg-white text-[#1565C0] font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 font-medium'
                 }`}
-            >
-              {councils.length}
-            </span>
-          </button>
-
-          {/* Tab 2 */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('members')}
-            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${activeTab === 'members'
-                ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-          >
-            <span>Gán giảng viên vào hội đồng</span>
-            {incompleteCount > 0 ? (
-              <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700">
-                {incompleteCount} thiếu
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
-                Đủ 5/5
-              </span>
-            )}
-          </button>
-
-          {/* Tab 3 */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('students')}
-            className={`flex-1 h-[32px] px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${activeTab === 'students'
-                ? 'bg-white text-[#1565C0] font-bold shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-          >
-            <span>Gán sinh viên vào hội đồng</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-[#1565C0]">
-              {waitingStudentCount} SV chờ
-            </span>
-          </button>
+              >
+                <span>{tab.label}</span>
+                {tab.value === 'list' && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                      isActive ? 'bg-[#E3F2FD] text-[#1565C0]' : 'text-slate-500'
+                    }`}
+                  >
+                    {councils.length}
+                  </span>
+                )}
+                {tab.value === 'members' && incompleteCount > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[11px] bg-amber-100 text-amber-700 ${
+                      isActive ? 'font-bold' : 'font-semibold'
+                    }`}
+                  >
+                    {incompleteCount} thiếu
+                  </span>
+                )}
+                {tab.value === 'students' && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[11px] ${
+                      isActive ? 'font-bold bg-[#E3F2FD] text-[#1565C0]' : 'font-semibold text-slate-500'
+                    }`}
+                  >
+                    {waitingStudentCount} SV chờ
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
-        {/* Nút Tạo hội đồng */}
-        <Button
-          type="button"
-          onClick={() => setCreateDialogOpen(true)}
-          className="h-10 px-4 rounded-xl bg-[#1565C0] text-white text-[13px] font-semibold hover:bg-[#0D47A1] transition shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tạo hội đồng</span>
-        </Button>
+        {/* Nút Tạo hội đồng: chỉ hiện ở tab Danh sách */}
+        {activeTab === 'list' && (
+          <Button
+            type="button"
+            onClick={() => setCreateDialogOpen(true)}
+            className="h-10 px-4 rounded-xl bg-[#1565C0] text-white text-[13px] font-semibold hover:bg-[#0D47A1] transition shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tạo hội đồng</span>
+          </Button>
+        )}
       </div>
 
       {/* TAB 1: DANH SÁCH HỘI ĐỒNG */}
@@ -232,7 +240,8 @@ export default function DefenseCouncilPage() {
           <CouncilTable
             councils={councils}
             isLoading={councilsLoading}
-            onViewDetail={(c) => setDetailCouncil(c)}
+            onViewDetail={(c) => setDetailCouncilId(c.publicId)}
+            onCreate={() => setCreateDialogOpen(true)}
           />
         </section>
       )}
@@ -246,6 +255,7 @@ export default function DefenseCouncilPage() {
             councils={councils}
             selectedCouncilId={selectedCouncilId}
             onSelectCouncil={setSelectedCouncilId}
+            onCreateCouncil={() => setCreateDialogOpen(true)}
           />
         </section>
       )}
@@ -259,6 +269,7 @@ export default function DefenseCouncilPage() {
             councils={councils}
             selectedCouncilId={selectedCouncilId}
             onSelectCouncil={setSelectedCouncilId}
+            onCreateCouncil={() => setCreateDialogOpen(true)}
           />
         </section>
       )}
@@ -278,10 +289,14 @@ export default function DefenseCouncilPage() {
       {/* MODAL: CHI TIẾT HỘI ĐỒNG */}
       <CouncilDetailDialog
         council={detailCouncil}
+        semesterId={activeSemesterId}
+        majorId={activeMajorId}
         open={Boolean(detailCouncil)}
         onOpenChange={(open) => {
-          if (!open) setDetailCouncil(null)
+          if (!open) setDetailCouncilId(null)
         }}
+        onManageMembers={(id) => openTabForCouncil('members', id)}
+        onManageStudents={(id) => openTabForCouncil('students', id)}
       />
     </div>
   )

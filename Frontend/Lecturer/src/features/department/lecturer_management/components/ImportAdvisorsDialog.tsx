@@ -131,7 +131,7 @@ export function ImportAdvisorsDialog({
   }
 
   const handleDownloadSample = () => {
-    downloadExcelTemplate('/api/advisors/import/template', 'mau_import_gvhd.xlsx', '/api/supervisors/import/template')
+    downloadExcelTemplate('/api/advisors/import/template', 'mau_import_gvhd.xlsx')
   }
 
   return (

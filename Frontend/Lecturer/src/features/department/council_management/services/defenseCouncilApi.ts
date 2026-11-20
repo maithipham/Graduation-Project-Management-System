@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api'
 import type { ApiResponse, SpringPage } from '@/shared/types'
+import { toSpringPage, type RawSpringPage } from '@/shared/utils'
 import { DEFENSE_COUNCIL_ENDPOINTS } from '../constants/endpoints'
 import type {
   DefenseCouncil,
@@ -83,11 +84,12 @@ export const defenseCouncilApi = {
    * 6. GET /defense-council/student?semesterId={id}&majorId={id}&assigned={bool}&page={0-based}&size=20
    */
   async getStudents(params: EligibleStudentParams): Promise<SpringPage<EligibleStudent>> {
-    const res = await apiClient.get<ApiResponse<SpringPage<EligibleStudent>>>(
+    // BE bật PageSerializationMode.VIA_DTO → Page trả về dạng { content, page: { totalElements, ... } }
+    const res = await apiClient.get<ApiResponse<RawSpringPage<EligibleStudent>>>(
       DEFENSE_COUNCIL_ENDPOINTS.STUDENTS,
       { params },
     )
-    return res.data.data
+    return toSpringPage(res.data.data, { page: params.page ?? 0, size: params.size ?? 20 })
   },
 
   /**

@@ -18,10 +18,14 @@ export default function StudentLecturersPage() {
     selectedYear,
     selectedSemesterId,
     effectiveSemesterId,
+    effectiveSemesterViewState,
     isLoading: semestersLoading,
     onYearChange,
     onSemesterChange,
   } = useSemesterScope({ defaultToCurrent: true, allowAll: true })
+
+  // Chỉ xem được GVHD của học kỳ đang diễn ra; học kỳ đã kết thúc hoặc chưa bắt đầu thì không xem được
+  const canViewSemester = effectiveSemesterViewState === 'ONGOING'
 
   // 2. Query danh sách tất cả GVHD của học kỳ này từ Backend (từ bảng semester_advisors /semesters/{id}/advisors)
   const {
@@ -31,6 +35,7 @@ export default function StudentLecturersPage() {
     queryKey: ['semester-advisors', effectiveSemesterId],
     queryFn: () => lecturerService.getSemesterAdvisors(effectiveSemesterId),
     staleTime: 60 * 1000,
+    enabled: !!effectiveSemesterId && canViewSemester,
   })
 
   // 3. Query danh sách các ngành từ Backend (GET /major)
@@ -74,7 +79,7 @@ export default function StudentLecturersPage() {
     handleDepartmentChange,
     handleOriginChange,
     handlePageChange,
-  } = useLecturerFilters(lecturers)
+  } = useLecturerFilters(canViewSemester ? lecturers : [])
 
   return (
     <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
@@ -103,7 +108,14 @@ export default function StudentLecturersPage() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={handlePageChange}
-        isLoading={isLecturersLoading || semestersLoading}
+        isLoading={(canViewSemester && isLecturersLoading) || semestersLoading}
+        {...(!canViewSemester && {
+          emptyTitle:
+            effectiveSemesterViewState === 'COMPLETED'
+              ? 'Học kỳ này đã kết thúc'
+              : 'Học kỳ này chưa bắt đầu',
+          emptyHint: 'Chỉ xem được danh sách giảng viên hướng dẫn của học kỳ đang diễn ra',
+        })}
       />
     </div>
   )

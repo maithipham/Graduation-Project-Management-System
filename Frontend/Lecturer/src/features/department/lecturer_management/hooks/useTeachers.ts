@@ -83,8 +83,6 @@ export function useAcademicTitles() {
 export function useAvailableTeachers(params: {
   semesterId?: string
   keyword?: string
-  page?: number
-  size?: number
 }) {
   return useQuery({
     queryKey: departmentTeacherKeys.available(params),

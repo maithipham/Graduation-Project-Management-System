@@ -34,7 +34,10 @@ const MOCK_LECTURERS = [
   ),
 ]
 
-// Sinh viên: An chưa có GVNX, Bình đã có GVNX
+// Sinh viên: An chưa có GVNX, đề tài đang thực hiện, đã chốt tên (STAGE_2) → hiện;
+// Bình đã có GVNX → luôn hiện dù đề tài bị đình chỉ;
+// Cường chưa có GVNX và đề tài bị đình chỉ → không hiện;
+// Dũng chưa có GVNX, đang thực hiện nhưng chưa chốt tên (STAGE_1) → không hiện
 const MOCK_STUDENTS = [
   transformStudentAssignment({
     studentId: 1,
@@ -45,6 +48,8 @@ const MOCK_STUDENTS = [
     majorName: 'Kỹ thuật phần mềm',
     topicId: 101,
     topicTitle: 'Hệ thống Microservices',
+    topicStatus: 'IN_PROGRESS',
+    currentStage: 'STAGE_2_TOPIC_CONFIRMED',
     supervisorId: 20,
     supervisorName: 'TS. Nguyễn Quốc Bảo',
     commentingLecturerId: null,
@@ -58,11 +63,42 @@ const MOCK_STUDENTS = [
     majorName: 'Kỹ thuật phần mềm',
     topicId: 102,
     topicTitle: 'Kiến trúc Clean Architecture',
+    topicStatus: 'DISQUALIFIED',
     supervisorId: 21,
     supervisorName: 'ThS. Bùi Hoàng Long',
     commentingLecturerId: 10,
     commentingLecturerPublicId: 't-10',
     commentingLecturerName: 'TS. Vũ Thị Lan',
+  }),
+  transformStudentAssignment({
+    studentId: 3,
+    studentPublicId: 's-3',
+    studentCode: '2151060003',
+    studentName: 'Lê Văn Cường',
+    className: '62PM1',
+    majorName: 'Kỹ thuật phần mềm',
+    topicId: 103,
+    topicTitle: 'Đề tài bị đình chỉ',
+    topicStatus: 'DISQUALIFIED',
+    currentStage: 'STAGE_2_TOPIC_CONFIRMED',
+    supervisorId: 20,
+    supervisorName: 'TS. Nguyễn Quốc Bảo',
+    commentingLecturerId: null,
+  }),
+  transformStudentAssignment({
+    studentId: 4,
+    studentPublicId: 's-4',
+    studentCode: '2151060004',
+    studentName: 'Phạm Văn Dũng',
+    className: '62PM1',
+    majorName: 'Kỹ thuật phần mềm',
+    topicId: 104,
+    topicTitle: 'Đề tài chưa chốt tên',
+    topicStatus: 'IN_PROGRESS',
+    currentStage: 'STAGE_1_ADVISOR_ASSIGNED',
+    supervisorId: 20,
+    supervisorName: 'TS. Nguyễn Quốc Bảo',
+    commentingLecturerId: null,
   }),
 ]
 
@@ -108,6 +144,11 @@ describe('ReviewerAssignmentPage', () => {
     expect(await screen.findByText('Nguyễn Văn An')).toBeInTheDocument()
     expect(screen.getByText('Trần Thị Bình')).toBeInTheDocument()
     expect(screen.getByText('Tất cả (2)')).toBeInTheDocument()
+    // Đề tài không ở trạng thái thực hiện → không hiện
+    expect(screen.queryByText('Lê Văn Cường')).not.toBeInTheDocument()
+    // Chưa chốt tên đề tài (dưới STAGE_2) → không hiện
+    expect(screen.queryByText('Phạm Văn Dũng')).not.toBeInTheDocument()
+    expect(screen.getByText('Chưa phân công (1)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Phân công nhanh \(Chia đều\)/ })).toBeInTheDocument()
     expect(screen.getAllByText('TS. Vũ Thị Lan').length).toBeGreaterThan(0)
 

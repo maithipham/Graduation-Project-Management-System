@@ -86,39 +86,15 @@ export const teacherService = {
     return toSpringPage(res.data.data, params)
   },
 
-  // POST /api/advisors/assign hoặc /semesters/{semesterId}/advisors — Cấu hình danh sách giáo viên hướng dẫn
+  // POST /semesters/{semesterId}/advisors — Cấu hình danh sách giáo viên hướng dẫn trong kỳ.
+  // Body khớp AssignAdvisorsRequest: { teacherIds: Long[], maxStudentsPerTeacher? }
   async assignAdvisors(semesterId: string, body: AssignAdvisorsRequest): Promise<string> {
-    const payload: Record<string, any> = {
-      semesterId,
-      teacherIds: body.teacherIds,
-    }
+    const payload: AssignAdvisorsRequest = { teacherIds: body.teacherIds }
     if (body.maxStudentsPerTeacher !== undefined) {
       payload.maxStudentsPerTeacher = body.maxStudentsPerTeacher
     }
-
-    const cleanSemesterId = encodeURIComponent(semesterId)
-    // Backend AdvisorController nhận semesterId qua path variable hoặc query param @RequestParam("semesterId")
-    const urlWithParam = `/api/advisors/assign?semesterId=${cleanSemesterId}`
-    const pathUrl = TEACHER.advisors(semesterId)
-
-    try {
-      const res = await apiClient.post<ApiResponse<null>>(urlWithParam, payload)
-      return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        try {
-          const res = await apiClient.post<ApiResponse<null>>(pathUrl, payload)
-          return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
-        } catch (innerErr: any) {
-          if (innerErr?.response?.status === 404) {
-            const res = await apiClient.post<ApiResponse<null>>('/api/advisors', payload)
-            return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
-          }
-          throw innerErr
-        }
-      }
-      throw err
-    }
+    const res = await apiClient.post<ApiResponse<null>>(TEACHER.advisors(semesterId), payload)
+    return res.data.message || 'Cấu hình danh sách giáo viên hướng dẫn thành công'
   },
 
   // GET /teacher/{publicId} — publicId sai định dạng UUID hoặc không có → 404, code 3009 (Giáo viên không tồn tại)
@@ -167,17 +143,16 @@ export const teacherService = {
     return DEFAULT_ACADEMIC_TITLES
   },
 
-  // GET /teacher/available?semesterId=&keyword= — Danh sách giảng viên khả dụng chưa làm GVHD trong kỳ
+  // GET /teacher/available?semesterId=&keyword= — Danh sách giảng viên khả dụng chưa làm GVHD trong kỳ.
+  // BE trả List<TeacherResponse> (không phân trang)
   async getAvailableTeachers(params: {
     semesterId?: string
     keyword?: string
-    page?: number
-    size?: number
-  }): Promise<SpringPage<TeacherListItem>> {
-    const res = await apiClient.get<ApiResponse<RawSpringPage<TeacherListItem>>>(TEACHER.available, {
+  }): Promise<TeacherListItem[]> {
+    const res = await apiClient.get<ApiResponse<TeacherListItem[]>>(TEACHER.available, {
       params: compactParams(params),
     })
-    return toSpringPage(res.data.data, { page: params.page ?? 0, size: params.size ?? 15 })
+    return res.data.data ?? []
   },
 
   // POST /semesters/{semesterId}/advisors/import-excel — Import file Excel danh sách GVHD trong kỳ
@@ -207,35 +182,17 @@ export const teacherService = {
     return res.data.data
   },
 
-  // PUT /api/teachers/{id} — cập nhật thông tin giảng viên
+  // PUT /teacher/{id} — cập nhật thông tin giảng viên
   async updateTeacher(id: string | number, body: TeacherUpdateRequest): Promise<TeacherWriteResult> {
-    try {
-      const res = await apiClient.put<ApiResponse<unknown>>(`/api/teachers/${id}`, body, {
-        skipErrorToast: true,
-      })
-      return { code: res.data.code, message: res.data.message }
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        const res = await apiClient.put<ApiResponse<unknown>>(TEACHER.detail(String(id)), body, {
-          skipErrorToast: true,
-        })
-        return { code: res.data.code, message: res.data.message }
-      }
-      throw err
-    }
+    const res = await apiClient.put<ApiResponse<unknown>>(TEACHER.detail(String(id)), body, {
+      skipErrorToast: true,
+    })
+    return { code: res.data.code, message: res.data.message }
   },
 
-  // DELETE /api/teachers/{id} — xóa giảng viên
+  // DELETE /teacher/{id} — xóa giảng viên
   async deleteTeacher(id: string | number): Promise<string> {
-    try {
-      const res = await apiClient.delete<ApiResponse<unknown>>(`/api/teachers/${id}`)
-      return res.data.message || 'Xóa giảng viên thành công'
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        const res = await apiClient.delete<ApiResponse<unknown>>(TEACHER.detail(String(id)))
-        return res.data.message || 'Xóa giảng viên thành công'
-      }
-      throw err
-    }
+    const res = await apiClient.delete<ApiResponse<unknown>>(TEACHER.detail(String(id)))
+    return res.data.message || 'Xóa giảng viên thành công'
   },
 }

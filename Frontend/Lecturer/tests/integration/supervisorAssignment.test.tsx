@@ -76,7 +76,15 @@ const MOCK_STUDENTS: StudentListItem[] = [
   },
 ]
 
-function renderPage() {
+type AdvisorMock = ReturnType<typeof advisor>
+
+const ADVISOR_BAO_QUOTA_8: AdvisorMock = {
+  ...advisor(1, 'Nguyễn Quốc Bảo', 'TS.', 8, 2),
+  email: 'bao.nq@tlu.edu.vn',
+}
+
+/** advisors: dữ liệu GET /semesters/{semesterId}/advisors; truyền vào đây để không bị spy mặc định ghi đè */
+function renderPage(advisors: AdvisorMock[] = MOCK_ADVISORS) {
   vi.spyOn(studentService, 'getCurrentSemester').mockResolvedValue({
     publicId: 'sem-curr',
     name: 'Học kỳ 1 năm học 2026-2027',
@@ -107,7 +115,7 @@ function renderPage() {
       totalPages: 1,
     }),
   )
-  vi.spyOn(supervisorService, 'getAssignedAdvisors').mockResolvedValue(MOCK_ADVISORS)
+  vi.spyOn(supervisorService, 'getAssignedAdvisors').mockResolvedValue(advisors)
   vi.spyOn(supervisorService, 'getWorkspace').mockResolvedValue(null)
   vi.spyOn(teacherService, 'getManagedMajor').mockResolvedValue({
     publicId: 'm1',
@@ -181,24 +189,7 @@ describe('SupervisorAssignmentPage', () => {
   })
 
   it('lấy danh sách GVHD từ endpoint GET /semesters/{semesterId}/advisors kèm hạn mức maxStudents từ bảng semester_advisor', async () => {
-    vi.spyOn(supervisorService, 'getAssignedAdvisors').mockResolvedValue([
-      {
-        id: 101,
-        semesterId: 'sem-curr',
-        maxStudents: 8,
-        currentStudents: 2,
-        teacherId: 1,
-        name: 'Nguyễn Quốc Bảo',
-        fullNameWithTitle: 'TS. Nguyễn Quốc Bảo',
-        academicTitle: 'TS.',
-        email: 'bao.nq@tlu.edu.vn',
-        isInternal: true,
-        majorName: 'Kỹ thuật phần mềm',
-        status: true,
-      },
-    ])
-
-    renderPage()
+    renderPage([ADVISOR_BAO_QUOTA_8])
 
     await waitFor(() => {
       expect(screen.getByText('Nguyễn Quốc Bảo')).toBeInTheDocument()
@@ -212,26 +203,7 @@ describe('SupervisorAssignmentPage', () => {
       .spyOn(supervisorService, 'updateLecturerQuota')
       .mockResolvedValue('Cập nhật hạn mức thành công')
 
-    renderPage()
-    vi.spyOn(supervisorService, 'getAssignedAdvisors').mockResolvedValue([
-      {
-        id: 101,
-        semesterId: 'sem-curr',
-        maxStudents: 8,
-        currentStudents: 2,
-        teacherId: 1,
-        name: 'Nguyễn Quốc Bảo',
-        fullNameWithTitle: 'TS. Nguyễn Quốc Bảo',
-        academicTitle: 'TS.',
-        email: 'bao.nq@tlu.edu.vn',
-        isInternal: true,
-        majorName: 'Kỹ thuật phần mềm',
-        status: true,
-      },
-    ])
-
-    const u = userEvent.setup()
-    renderPage()
+    renderPage([ADVISOR_BAO_QUOTA_8])
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('8')).toBeInTheDocument()

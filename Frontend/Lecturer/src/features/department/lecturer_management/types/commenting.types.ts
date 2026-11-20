@@ -29,6 +29,10 @@ export interface StudentAssignmentApi {
   topicId: number
   topicPublicId?: string
   topicTitle?: string
+  /** Trạng thái đề tài (OFFICIAL | IN_PROGRESS | COMPLETED | DISQUALIFIED | CANCELLED) */
+  topicStatus?: string | null
+  /** Giai đoạn đề tài (STAGE_1_ADVISOR_ASSIGNED | STAGE_2_TOPIC_CONFIRMED | ... | STAGE_6_DEFENSE_COMPLETED) */
+  currentStage?: string | null
   supervisorId?: number
   supervisorPublicId?: string
   supervisorName?: string
@@ -78,6 +82,8 @@ export interface StudentAssignment {
   topicId: number
   topicPublicId: string
   topicTitle: string
+  topicStatus: string | null
+  currentStage: string | null
   supervisorId: number | null
   supervisorPublicId: string
   supervisorName: string

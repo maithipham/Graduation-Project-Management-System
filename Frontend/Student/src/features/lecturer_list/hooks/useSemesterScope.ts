@@ -5,6 +5,22 @@ import {
 } from '@/features/registration_management/hooks'
 import type { Semester } from '@/features/registration_management/types/semester.types'
 
+export type SemesterViewState = 'ONGOING' | 'UPCOMING' | 'COMPLETED'
+
+/** Học kỳ đang diễn ra / chưa bắt đầu / đã kết thúc (ưu tiên statusCode từ BE, nếu thiếu thì so theo ngày) */
+export function getSemesterViewState(
+  semester: Semester | undefined,
+  now: number = Date.now(),
+): SemesterViewState {
+  if (!semester) return 'ONGOING'
+  if (semester.statusCode) return semester.statusCode
+  const start = semester.startDate ? new Date(semester.startDate).getTime() : NaN
+  const end = semester.endDate ? new Date(semester.endDate).getTime() : NaN
+  if (!Number.isNaN(start) && now < start) return 'UPCOMING'
+  if (!Number.isNaN(end) && now > end) return 'COMPLETED'
+  return 'ONGOING'
+}
+
 export interface UseSemesterScopeOptions {
   /** Nếu true, khi khởi tạo sẽ chọn học kỳ hiện tại (default true) */
   defaultToCurrent?: boolean
@@ -110,8 +126,13 @@ export function useSemesterScope(options: UseSemesterScopeOptions = {}) {
     return activeSemester?.publicId || currentSemester?.publicId || ''
   }, [selectedSemesterId, activeSemesterId, termsOfYear, selectedYear, activeSemester, currentSemester])
 
+  const effectiveSemesterViewState = getSemesterViewState(
+    semesters.find((s) => s.publicId === effectiveSemesterId),
+  )
+
   return {
     semesters,
+    effectiveSemesterViewState,
     academicYears,
     termsOfYear,
     selectedYear,

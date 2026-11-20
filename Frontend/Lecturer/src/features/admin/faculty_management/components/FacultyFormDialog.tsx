@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import React, { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Dialog,
@@ -11,12 +11,9 @@ import {
 import { FormField } from '@/shared/components/ui/form-field'
 import { Input } from '@/shared/components/ui/input'
 import { Select } from '@/shared/components/ui/select'
-import { SearchableSelect } from '@/shared/components/ui/searchable-select'
 import { Textarea } from '@/shared/components/ui/textarea'
 import { Button } from '@/shared/components/ui/button'
 import { toast } from '@/shared/components/feedback/toast.store'
-import { useHeadCandidates } from '../hooks/useFaculties'
-import { useAccountStore } from '@/features/admin/account_management'
 import { isApiError } from '@/shared/types'
 import {
   facultySchema,
@@ -36,8 +33,6 @@ interface FacultyFormDialogProps {
 const emptyValues: FacultyFormValues = {
   code: '',
   name: '',
-  headOfDepartmentId: '',
-  dean: '',
   description: '',
   status: 'active',
 }
@@ -50,33 +45,9 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
   onSubmitSuccess,
 }) => {
   const isEdit = Boolean(editingFaculty)
-  const { data: candidates } = useHeadCandidates()
-  const accounts = useAccountStore((s) => s.accounts)
-
-  const candidateOptions = useMemo(() => {
-    // 1. Nếu BE trả về head candidates
-    if (candidates && candidates.length > 0) {
-      return candidates.map((c) => ({
-        value: String(c.id),
-        label: `${c.academicRank ? c.academicRank + ' ' : ''}${c.fullName}`,
-        description: c.email || undefined,
-      }))
-    }
-    // 2. Lấy thêm từ danh sách giảng viên trong hệ thống nếu có
-    const lecturers = accounts.filter((a) => a.role === 'Giảng viên')
-    if (lecturers.length > 0) {
-      return lecturers.map((lec) => ({
-        value: String(lec.id),
-        label: lec.name,
-        description: lec.email || lec.unit,
-      }))
-    }
-    return []
-  }, [candidates, accounts])
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     setError,
@@ -89,17 +60,9 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
   useEffect(() => {
     if (open) {
       if (editingFaculty) {
-        const matchedCandidate = candidates?.find(
-          (c) =>
-            editingFaculty.dean &&
-            (c.fullName === editingFaculty.dean ||
-              `${c.academicRank ? c.academicRank + ' ' : ''}${c.fullName}` === editingFaculty.dean),
-        )
         reset({
           code: editingFaculty.code,
           name: editingFaculty.name,
-          headOfDepartmentId: matchedCandidate ? String(matchedCandidate.id) : '',
-          dean: editingFaculty.dean,
           description: editingFaculty.description,
           status: editingFaculty.status,
         })
@@ -107,7 +70,7 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
         reset(emptyValues)
       }
     }
-  }, [open, editingFaculty, reset, candidates])
+  }, [open, editingFaculty, reset])
 
   const onSubmit = async (values: FacultyFormValues) => {
     const formattedCode = values.code.toUpperCase().trim()
@@ -128,22 +91,7 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
     }
 
     try {
-      const selectedCandidate = candidates?.find(
-        (c) => String(c.id) === String(values.headOfDepartmentId),
-      )
-      const deanName = selectedCandidate
-        ? `${selectedCandidate.academicRank ? selectedCandidate.academicRank + ' ' : ''}${selectedCandidate.fullName}`
-        : values.dean || ''
-
-      await onSubmitSuccess(
-        {
-          ...values,
-          code: formattedCode,
-          dean: deanName,
-          headOfDepartmentId: values.headOfDepartmentId || undefined,
-        },
-        editingFaculty?.id,
-      )
+      await onSubmitSuccess({ ...values, code: formattedCode }, editingFaculty?.id)
       toast.success(
         isEdit
           ? 'Cập nhật thông tin khoa thành công!'
@@ -158,13 +106,6 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
         }
         if (err.code === FACULTY_ERROR_CODES.FACULTY_NAME_EXIST) {
           setError('name', { message: err.message }, { shouldFocus: true })
-          return
-        }
-        if (
-          err.code === FACULTY_ERROR_CODES.HEAD_OF_DEPARTMENT_NOT_FOUND ||
-          err.code === FACULTY_ERROR_CODES.ACCOUNT_NOT_HEAD_OF_DEPARTMENT
-        ) {
-          setError('headOfDepartmentId', { message: err.message })
           return
         }
         setError('root.server', { message: err.message })
@@ -222,32 +163,6 @@ export const FacultyFormDialog: React.FC<FacultyFormDialogProps> = ({
                 <Input
                   placeholder="Ví dụ: Công nghệ thông tin"
                   {...register('name')}
-                />
-              </FormField>
-            </div>
-
-            <div className="sm:col-span-2">
-              <FormField
-                label="Trưởng khoa"
-                error={errors.headOfDepartmentId?.message || errors.dean?.message}
-                hint="Không bắt buộc (có thể tìm kiếm và bổ nhiệm sau)"
-              >
-                <Controller
-                  control={control}
-                  name="headOfDepartmentId"
-                  render={({ field }) => (
-                    <SearchableSelect
-                      options={candidateOptions}
-                      value={field.value || ''}
-                      onChange={(val) => {
-                        field.onChange(val)
-                      }}
-                      placeholder="-- Chọn giảng viên làm trưởng khoa (tùy chọn) --"
-                      searchPlaceholder="Gõ tên hoặc email giảng viên..."
-                      emptyText="Chưa có giảng viên nào trong hệ thống"
-                      allowClear
-                    />
-                  )}
                 />
               </FormField>
             </div>

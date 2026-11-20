@@ -1,4 +1,24 @@
-export type CouncilRole = 'CHAIRPERSON' | 'SECRETARY' | 'COUNCIL_MEMBER'
+import { z } from 'zod'
+
+/** Form tạo hội đồng: số lượng + khoảng ngày bảo vệ chung */
+export const createCouncilFormSchema = z
+  .object({
+    quantity: z
+      .number({ error: 'Vui lòng nhập số lượng hội đồng' })
+      .int('Số lượng phải là số nguyên')
+      .min(1, 'Số lượng hội đồng tối thiểu là 1')
+      .max(20, 'Số lượng hội đồng tối đa là 20'),
+    startDate: z.string().min(1, 'Vui lòng chọn ngày bắt đầu bảo vệ'),
+    endDate: z.string().min(1, 'Vui lòng chọn ngày kết thúc bảo vệ'),
+  })
+  .refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
+    message: 'Ngày kết thúc không được nhỏ hơn ngày bắt đầu',
+    path: ['endDate'],
+  })
+
+export type CreateCouncilFormValues = z.infer<typeof createCouncilFormSchema>
+
+export type CouncilRole ='CHAIRPERSON' | 'SECRETARY' | 'COUNCIL_MEMBER'
 export type CouncilStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED'
 export type TeacherScope = 'ALL' | 'IN_MAJOR' | 'OUT_MAJOR' | 'EXTERNAL'
 

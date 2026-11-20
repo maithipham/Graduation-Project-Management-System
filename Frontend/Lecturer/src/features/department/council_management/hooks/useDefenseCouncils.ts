@@ -137,6 +137,40 @@ export function useAssignStudentsToCouncil() {
   })
 }
 
+/**
+ * Đổi hội đồng cho các sinh viên đã gán: gỡ khỏi hội đồng cũ rồi gán vào hội đồng mới.
+ */
+export function useReassignStudents() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      targetCouncilPublicId,
+      items,
+    }: {
+      targetCouncilPublicId: string
+      items: Array<{
+        sourceCouncilPublicId: string
+        assignmentPublicId: string
+        thesisTopicPublicId: string
+      }>
+    }) => {
+      for (const it of items) {
+        await defenseCouncilApi.removeStudentAssignment(
+          it.sourceCouncilPublicId,
+          it.assignmentPublicId,
+        )
+      }
+      await defenseCouncilApi.assignStudents(targetCouncilPublicId, {
+        thesisTopicPublicIds: items.map((it) => it.thesisTopicPublicId),
+      })
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: COUNCIL_QUERY_KEYS.all })
+    },
+  })
+}
+
 export function useRemoveStudentAssignment() {
   const queryClient = useQueryClient()
 
