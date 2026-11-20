@@ -12,35 +12,36 @@ import {
 import { isApiError } from '@/shared/types'
 import { cn } from '@/shared/utils/cn'
 import { useAdvisorGradeSheet, useSaveAdvisorGradeDraft, useSubmitAdvisorGradeSheet } from '../hooks/useAdvisorGrade'
-import type { AdvisorGradeDeadline, AdvisorGradeSheet, AdvisorGradeTopic } from '../types/advisorGrade.types'
+import type { AdvisorGradeSheet, AdvisorGradeTopic } from '../types/advisorGrade.types'
 import {
   canOpenAdvisorGradeSheet,
   computeAdvisorGradePreview,
   formatAdvisorGradeDateTime,
   getAdvisorGradeReadonlyMessage,
   getInitialScoreInputs,
+  getSheetLockAt,
   getSubmitBlockers,
+  isAdvisorGradeAlreadySubmittedError,
   isAdvisorGradeLockingError,
   parseScoreInput,
   toAdvisorGradeSheetBody,
   type AdvisorGradeScores,
 } from '../utils/advisorGrade.utils'
 
-// Popup phiếu chấm điểm hướng dẫn: mở phiếu (C2/C3), lưu nháp (C4), nộp phiếu (C5).
+// Popup phiếu chấm điểm hướng dẫn: mở phiếu (C2/C3), lưu nháp (C4), nộp / nộp lại phiếu (C5).
+// Phiếu đã nộp vẫn sửa được (nộp lại) cho đến khi qua endDate mốc Tổ chức hội đồng bảo vệ của ngành SV.
 // Lỗi C4/C5 hiện ngay trong popup (request có skipErrorToast), không dùng toast.error.
 
 interface AdvisorGradingDialogProps {
   /** Dòng C1 đang mở; `null` = popup đóng */
   topic: AdvisorGradeTopic | null
-  /** Hạn chấm ở C1, dùng khi phiếu chưa tải xong */
-  deadline: AdvisorGradeDeadline | null
   onClose: () => void
 }
 
-export function AdvisorGradingDialog({ topic, deadline, onClose }: AdvisorGradingDialogProps) {
+export function AdvisorGradingDialog({ topic, onClose }: AdvisorGradingDialogProps) {
   if (!topic || !canOpenAdvisorGradeSheet(topic)) return null
   // key: đổi đề tài → làm mới toàn bộ state của popup
-  return <AdvisorGradingDialogBody key={topic.topicPublicId} topic={topic} deadline={deadline} onClose={onClose} />
+  return <AdvisorGradingDialogBody key={topic.topicPublicId} topic={topic} onClose={onClose} />
 }
 
 interface Notice {
@@ -50,7 +51,7 @@ interface Notice {
 
 const SCORE_INPUT_ERROR = 'Điểm phải là số từ 0 đến 10, tối đa 1 chữ số thập phân'
 
-function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<AdvisorGradingDialogProps> & { topic: AdvisorGradeTopic }) {
+function AdvisorGradingDialogBody({ topic, onClose }: AdvisorGradingDialogProps & { topic: AdvisorGradeTopic }) {
   const sheetQuery = useAdvisorGradeSheet({
     topicPublicId: topic.topicPublicId,
     sheetPublicId: topic.sheetPublicId,
@@ -68,9 +69,10 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
   const [confirmClose, setConfirmClose] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
 
-  // Nạp lại form khi có phiếu mới / phiếu đổi trạng thái (vừa nộp, vừa bị khóa).
-  // Lưu nháp xong BE trả cùng trạng thái → giữ nguyên những gì đang nhập.
-  const formKey = sheet ? `${sheet.sheetPublicId}:${sheet.status}:${sheet.canEdit}` : null
+  // Nạp lại form khi có phiếu mới / phiếu đổi quyền sửa (vừa bị khóa → chỉ xem).
+  // Không đưa `status` vào key: lưu nháp, nộp, nộp lại hay gặp 3118 (phiếu đã nộp ở tab khác)
+  // đều còn sửa được → giữ nguyên những gì đang nhập.
+  const formKey = sheet ? `${sheet.sheetPublicId}:${sheet.canEdit}` : null
   const [loadedKey, setLoadedKey] = useState<string | null>(null)
   if (sheet && formKey !== loadedKey) {
     setLoadedKey(formKey)
@@ -119,10 +121,12 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
 
   function handleMutationError(error: unknown) {
     const message = isApiError(error) ? error.message : 'Không lưu được phiếu chấm. Vui lòng thử lại.'
-    setNotice({
-      tone: 'error',
-      text: isAdvisorGradeLockingError(error) ? `${message} Phiếu đã chuyển sang chế độ chỉ xem.` : message,
-    })
+    let text = message
+    if (isAdvisorGradeLockingError(error)) text = `${message} Phiếu đã chuyển sang chế độ chỉ xem.`
+    else if (isAdvisorGradeAlreadySubmittedError(error)) {
+      text = `${message} Điểm bạn đang nhập vẫn được giữ, bấm "Nộp lại" để cập nhật.`
+    }
+    setNotice({ tone: 'error', text })
   }
 
   function buildVariables(current: AdvisorGradeSheet) {
@@ -158,8 +162,20 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
 
   function handleConfirmSubmit() {
     if (!sheet) return
+    const isResubmit = sheet.status === 'SUBMITTED'
     submitSheet.mutate(buildVariables(sheet), {
-      onSuccess: () => setNotice({ tone: 'success', text: 'Đã nộp phiếu chấm. Phiếu đã được khóa.' }),
+      onSuccess: (submitted) => {
+        setDirty(false)
+        setSubmitAttempted(false)
+        setConfirmSubmit(false)
+        const lockAt = getSheetLockAt(submitted.deadline)
+        const editableUntil =
+          submitted.canEdit && lockAt ? ` Bạn vẫn sửa được đến ${formatAdvisorGradeDateTime(lockAt)}.` : ''
+        setNotice({
+          tone: 'success',
+          text: `${isResubmit ? 'Đã cập nhật điểm hướng dẫn.' : 'Đã nộp phiếu chấm.'}${editableUntil}`,
+        })
+      },
       onError: (error) => {
         setConfirmSubmit(false)
         handleMutationError(error)
@@ -174,10 +190,12 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
   }
 
   // ---- Hiển thị ----
-  const sheetDeadline = sheet?.deadline ?? deadline
-  const readonlyMessage = sheet && !sheet.canEdit ? getAdvisorGradeReadonlyMessage(sheet.readonlyReason, sheetDeadline) : null
+  const lockAt = getSheetLockAt(sheet?.deadline) ?? topic.lockAt
+  const readonlyMessage = sheet && !sheet.canEdit ? getAdvisorGradeReadonlyMessage(sheet.readonlyReason, lockAt) : null
   const isSubmitted = sheet?.status === 'SUBMITTED'
-  const headerScore = isSubmitted ? sheet?.advisorScore ?? null : preview.advisorScore
+  // Phiếu đã nộp và chưa sửa gì → điểm chính thức BE trả; đang sửa để nộp lại → điểm tạm tính
+  const showOfficialScore = isSubmitted && !dirty
+  const headerScore = showOfficialScore ? sheet?.advisorScore ?? null : preview.advisorScore
   const studentName = sheet?.student?.fullName ?? topic.studentName
   const studentCode = sheet?.student?.studentCode ?? topic.studentCode
 
@@ -213,7 +231,7 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
               </span>
               <span className="text-[11.5px] font-semibold text-blue-200">/10.0</span>
             </div>
-            <span className="mt-1 text-[11px] text-slate-400">{isSubmitted ? 'Điểm chính thức' : 'Điểm tạm tính'}</span>
+            <span className="mt-1 text-[11px] text-slate-400">{showOfficialScore ? 'Điểm chính thức' : 'Điểm tạm tính'}</span>
           </div>
         </div>
 
@@ -244,12 +262,16 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
                   </span>
                 </div>
               )}
-              {canEdit && sheetDeadline && (
-                <div className="mb-3 flex items-center gap-2 text-[12px] text-slate-500">
-                  <Info className="h-3.5 w-3.5 text-slate-400" />
+              {canEdit && (
+                <div className="mb-3 flex items-start gap-2 text-[12px] text-slate-500">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
                   <span>
-                    Hạn chấm: {formatAdvisorGradeDateTime(sheetDeadline.startDate)} –{' '}
-                    {formatAdvisorGradeDateTime(sheetDeadline.endDate)}. Điểm chỉ được ghi nhận khi nộp phiếu.
+                    {isSubmitted
+                      ? `Phiếu đã nộp${sheet.submittedAt ? ` lúc ${formatAdvisorGradeDateTime(sheet.submittedAt)}` : ''}${
+                          sheet.advisorScore === null ? '' : `, điểm chính thức ${sheet.advisorScore.toFixed(1)}`
+                        }. Sửa điểm rồi bấm "Nộp lại" để cập nhật.`
+                      : 'Điểm chỉ được ghi nhận khi nộp phiếu.'}
+                    {lockAt && ` Sửa được đến ${formatAdvisorGradeDateTime(lockAt)}.`}
                   </span>
                 </div>
               )}
@@ -409,14 +431,16 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
           ) : confirmSubmit && canEdit ? (
             <>
               <span className="mr-auto text-[12.5px] font-semibold text-amber-700">
-                Sau khi nộp sẽ không thể sửa phiếu. Xác nhận nộp?
+                {isSubmitted ? 'Nộp lại sẽ thay điểm hướng dẫn đã nộp.' : 'Nộp phiếu sẽ ghi nhận điểm hướng dẫn.'}
+                {lockAt && ` Bạn vẫn sửa được đến ${formatAdvisorGradeDateTime(lockAt)}.`} Xác nhận{' '}
+                {isSubmitted ? 'nộp lại' : 'nộp'}?
               </span>
               <Button variant="outline" disabled={submitSheet.isPending} onClick={() => setConfirmSubmit(false)}>
                 Quay lại
               </Button>
               <Button disabled={submitSheet.isPending} onClick={handleConfirmSubmit}>
                 <Send />
-                {submitSheet.isPending ? 'Đang nộp...' : 'Xác nhận nộp'}
+                {submitSheet.isPending ? 'Đang nộp...' : isSubmitted ? 'Xác nhận nộp lại' : 'Xác nhận nộp'}
               </Button>
             </>
           ) : (
@@ -426,13 +450,16 @@ function AdvisorGradingDialogBody({ topic, deadline, onClose }: Required<Advisor
               </Button>
               {canEdit && (
                 <>
-                  <Button variant="outline" disabled={isBusy} onClick={handleSaveDraft}>
-                    <FileDown />
-                    {saveDraft.isPending ? 'Đang lưu...' : 'Lưu nháp'}
-                  </Button>
+                  {/* Phiếu đã nộp không lưu nháp được (BE trả 3118) → chỉ còn "Nộp lại" */}
+                  {!isSubmitted && (
+                    <Button variant="outline" disabled={isBusy} onClick={handleSaveDraft}>
+                      <FileDown />
+                      {saveDraft.isPending ? 'Đang lưu...' : 'Lưu nháp'}
+                    </Button>
+                  )}
                   <Button disabled={isBusy} onClick={handleSubmitClick}>
                     <Send />
-                    Nộp phiếu
+                    {isSubmitted ? 'Nộp lại' : 'Nộp phiếu'}
                   </Button>
                 </>
               )}

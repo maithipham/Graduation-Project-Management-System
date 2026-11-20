@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
   confirmVariant?: 'destructive' | 'default'
   /** Đang gọi API → khóa nút, đổi chữ */
   isPending?: boolean
+  /** Chưa đủ điều kiện xác nhận (VD đang tải / lỗi xem trước) → khóa riêng nút xác nhận */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -21,6 +23,7 @@ export function ConfirmDialog({
   confirmLabel = 'Xóa',
   confirmVariant = 'destructive',
   isPending = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -35,7 +38,7 @@ export function ConfirmDialog({
           <Button type="button" variant="ghost" disabled={isPending} onClick={onCancel}>
             Hủy
           </Button>
-          <Button type="button" variant={confirmVariant} disabled={isPending} onClick={onConfirm}>
+          <Button type="button" variant={confirmVariant} disabled={isPending || confirmDisabled} onClick={onConfirm}>
             {isPending ? 'Đang xử lý...' : confirmLabel}
           </Button>
         </DialogFooter>

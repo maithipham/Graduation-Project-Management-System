@@ -132,7 +132,6 @@ export default function GuidingEvaluationPage() {
     () => new Map((advisorGradeQuery.data?.items ?? []).map((topic) => [topic.topicPublicId, topic])),
     [advisorGradeQuery.data],
   )
-  const advisorGradeDeadline = advisorGradeQuery.data?.deadline ?? null
   const [gradingTopic, setGradingTopic] = useState<AdvisorGradeTopic | null>(null)
 
   const handleAcademicYearChange = (academicYear: string) => {
@@ -619,7 +618,6 @@ export default function GuidingEvaluationPage() {
                         ) : (
                           <AdvisorGradeCell
                             topic={advisorGradeByTopic.get(item.topicPublicId)}
-                            deadline={advisorGradeDeadline}
                             isLoading={advisorGradeQuery.isPending}
                             onOpen={setGradingTopic}
                           />
@@ -723,7 +721,6 @@ export default function GuidingEvaluationPage() {
 
       <AdvisorGradingDialog
         topic={gradingTopic}
-        deadline={advisorGradeDeadline}
         onClose={() => setGradingTopic(null)}
       />
 

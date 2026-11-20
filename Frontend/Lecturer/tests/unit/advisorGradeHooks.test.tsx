@@ -47,7 +47,7 @@ describe('useAdvisorGrade', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('C1: gọi theo học kỳ; chưa bật thì chưa gọi', async () => {
-    serviceMock.getTopics.mockResolvedValue({ semesterId: 's1', deadline: null, summary: {}, items: [] })
+    serviceMock.getTopics.mockResolvedValue({ semesterId: 's1', summary: {}, items: [] })
     const { wrapper } = setup()
 
     const { rerender, result } = renderHook(
@@ -103,8 +103,11 @@ describe('useAdvisorGrade', () => {
     )
   })
 
-  it('C4 lỗi khóa phiếu (3066) → tải lại phiếu + danh sách, không toast', async () => {
-    serviceMock.saveDraft.mockRejectedValue(new ApiError('Đã hết hạn', 3066))
+  it.each([
+    [3128, 'Đã khóa chấm'],
+    [3118, 'Phiếu đã nộp'],
+  ])('C4 lỗi %i → tải lại phiếu + danh sách, không toast', async (code, message) => {
+    serviceMock.saveDraft.mockRejectedValue(new ApiError(message, code))
     const { wrapper, invalidateSpy } = setup()
     const { result } = renderHook(() => useSaveAdvisorGradeDraft(), { wrapper })
 
@@ -144,5 +147,17 @@ describe('useAdvisorGrade', () => {
     expect(toastMock.success).toHaveBeenCalledWith('Đã nộp phiếu chấm')
     expect(invalidatedKeys(invalidateSpy)).toEqual([advisorGradeKeys.topicLists()])
     expect(serviceMock.getSheet).not.toHaveBeenCalled()
+  })
+
+  it('C5 nộp lại phiếu đã nộp → toast "Đã cập nhật điểm hướng dẫn"', async () => {
+    const resubmitted = { sheetPublicId: 'sh1', status: 'SUBMITTED', advisorScore: 9 }
+    serviceMock.submit.mockResolvedValue(resubmitted)
+    const { wrapper, queryClient } = setup()
+    queryClient.setQueryData(advisorGradeKeys.sheet('t1'), { sheetPublicId: 'sh1', status: 'SUBMITTED', advisorScore: 8 })
+    const { result } = renderHook(() => useSubmitAdvisorGradeSheet(), { wrapper })
+
+    await act(() => result.current.mutateAsync({ topicPublicId: 't1', sheetPublicId: 'sh1', body }))
+    expect(queryClient.getQueryData(advisorGradeKeys.sheet('t1'))).toEqual(resubmitted)
+    expect(toastMock.success).toHaveBeenCalledWith('Đã cập nhật điểm hướng dẫn')
   })
 })

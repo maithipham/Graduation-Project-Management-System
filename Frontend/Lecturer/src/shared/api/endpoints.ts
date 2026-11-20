@@ -139,6 +139,18 @@ export const API_ENDPOINTS = {
     // GET: 3 rubric của học kỳ (chỉ xem, không còn PUT)
     semester: (semesterPublicId: string) => `/semester/${semesterPublicId}/evaluation-template`,
   },
+  /** Cấu hình trọng số điểm tổng kết HD / PB / HĐ (Trưởng bộ môn) – ScoreWeightConfigController */
+  departmentScoreWeight: {
+    // GET: danh sách · POST: tạo Nháp
+    base: '/score-weight-config',
+    // GET: chi tiết · PUT: sửa tên + trọng số · DELETE: xóa Nháp
+    detail: (publicId: string) => `/score-weight-config/${publicId}`,
+    applyPreview: (publicId: string) => `/score-weight-config/${publicId}/apply-preview`,
+    cancelApplyPreview: (publicId: string) => `/score-weight-config/${publicId}/cancel-apply-preview`,
+    apply: (publicId: string) => `/score-weight-config/${publicId}/apply`,
+    semesterRange: (publicId: string) => `/score-weight-config/${publicId}/semester-range`,
+    cancelApply: (publicId: string) => `/score-weight-config/${publicId}/cancel-apply`,
+  },
   /** Chấm điểm hướng dẫn (GVHD chính) – SupervisorGradeController */
   advisorGrade: {
     topics: '/advisor-grade/topic',

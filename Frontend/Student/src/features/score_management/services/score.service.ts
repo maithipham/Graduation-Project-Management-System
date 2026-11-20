@@ -1,45 +1,31 @@
-import type { StudentSemesterScoreCard } from '../types/score.types'
+import { apiClient, API_ENDPOINTS } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
+import type { StudentScoreResponse, StudentScoreRow } from '../types/score.types'
 
-export const STUDENT_RESULTS_DATA: StudentSemesterScoreCard[] = [
+// Chuyển response thành 3 dòng của bảng điểm
+export const toScoreRows = (s: StudentScoreResponse): StudentScoreRow[] => [
+  { key: 'advisor', label: 'Hướng dẫn', weight: s.advisorWeight, score: s.advisorScore },
   {
-    semesterKey: 'HK1 2026-2027',
-    courseName: 'Đồ án tốt nghiệp',
-    className: '21DH-CNTT1',
-    rows: [
-      {
-        type: 'Hướng dẫn',
-        component: 'Điểm hướng dẫn',
-        weight: 30,
-        score: 8.5,
-        comment: 'Hoàn thành tốt mục tiêu đề tài, tinh thần làm việc chủ động.',
-      },
-      {
-        type: 'Phản biện',
-        component: 'Điểm phản biện 1',
-        weight: 20,
-        score: 8.0,
-        comment: 'Cần làm rõ phần đánh giá hiệu năng và so sánh giải pháp.',
-      },
-      {
-        type: 'Phản biện',
-        component: 'Điểm phản biện 2',
-        weight: 20,
-        score: 8.5,
-        comment: 'Báo cáo trình bày rõ ràng, cấu trúc logic.',
-      },
-      {
-        type: 'Hội đồng',
-        component: 'Điểm cuối hội đồng',
-        weight: 30,
-        score: 8.0,
-        comment: 'Trả lời tốt các câu hỏi vấn đáp của hội đồng.',
-      },
-    ],
+    key: 'examiner',
+    label: 'Phản biện',
+    weight: s.examinerWeight,
+    score: s.examinerScore,
+    passed: s.examinerPassed,
   },
+  { key: 'council', label: 'Hội đồng', weight: s.councilWeight, score: s.councilScore },
 ]
 
-
-
 export const scoreService = {
-  getResults: (): StudentSemesterScoreCard[] => [...STUDENT_RESULTS_DATA],
+  // Không truyền semesterId = học kỳ hiện tại
+  getMyScore: async (semesterId?: string): Promise<StudentScoreResponse> => {
+    const res = await apiClient.get<ApiResponse<StudentScoreResponse>>(
+      API_ENDPOINTS.student.myScore,
+      {
+        params: semesterId ? { semesterId } : undefined,
+        // 3049 / 3022 là trạng thái bình thường → trang tự hiển thị, không toast đỏ
+        skipErrorToast: true,
+      },
+    )
+    return res.data.data
+  },
 }
