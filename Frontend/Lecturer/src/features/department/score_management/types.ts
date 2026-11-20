@@ -229,3 +229,54 @@ export interface SemesterRubricAssignment {
   fromSemester: SemesterRef | null
   toSemester: SemesterRef | null
 }
+
+// ============================================================================
+// Trọng số điểm tổng kết (tab thứ 4) – khớp DTO ScoreWeightConfigController
+// (đặc tả: readme.md/department/api_scoreWeightConfig.md)
+// ============================================================================
+
+/** Tab trên đầu trang Cấu hình điểm: 3 tab rubric + tab trọng số tổng kết */
+export type GradingConfigTab = RubricRole | 'weight'
+
+/** W1, W2 – một cấu hình trọng số (danh sách và chi tiết cùng một DTO) */
+export interface ScoreWeightConfig {
+  publicId: string
+  name: string
+  /** Trọng số % của điểm hướng dẫn / phản biện / hội đồng, tổng = 100 */
+  advisorWeight: number
+  examinerWeight: number
+  councilWeight: number
+  /** "Từ kỳ"; null = Nháp */
+  fromSemester: SemesterRef | null
+  /** "Đến kỳ"; null = chưa xác định kỳ kết thúc (hoặc Nháp) */
+  toSemester: SemesterRef | null
+  displayStatus: TemplateDisplayStatus
+  displayStatusName: string
+  /** Khóa lạc quan: gửi lại đúng số này khi sửa */
+  version: number
+  /** Một kỳ trong khoảng đã có phiếu chấm nộp chính thức → khóa trọng số và "Từ kỳ" */
+  hasSubmittedSheets: boolean
+  canEdit: boolean
+  canApply: boolean
+  canChangeFromSemester: boolean
+  canChangeToSemester: boolean
+  canCancelApply: boolean
+  canDelete: boolean
+  createdByName: string | null
+  updatedByName: string | null
+  createdAt: BeDateTime | null
+  updatedAt: BeDateTime | null
+}
+
+/** W3 – body POST /score-weight-config */
+export interface ScoreWeightBody {
+  name: string
+  advisorWeight: number
+  examinerWeight: number
+  councilWeight: number
+}
+
+/** W4 – body PUT /score-weight-config/{publicId} */
+export interface UpdateScoreWeightBody extends ScoreWeightBody {
+  version: number
+}

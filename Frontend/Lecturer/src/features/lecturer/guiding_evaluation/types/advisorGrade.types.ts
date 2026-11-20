@@ -8,22 +8,26 @@ export type AdvisorGradeSheetStatus = 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED'
 /** Trạng thái của phiếu đã tạo (C2, C3, C5) */
 export type AdvisorGradeSavedSheetStatus = Exclude<AdvisorGradeSheetStatus, 'NOT_STARTED'>
 
-/** Lý do không chấm / không sửa được. BE chỉ trả 1 lý do theo thứ tự ưu tiên */
+/**
+ * Lý do không chấm / không sửa được. BE chỉ trả 1 lý do theo thứ tự ưu tiên.
+ * Phiếu đã nộp KHÔNG còn là lý do chỉ xem (được nộp lại đến khi khóa chấm).
+ */
 export type AdvisorGradeReadonlyReason =
-  | 'SUBMITTED'
   | 'TOPIC_DISQUALIFIED'
   | 'TOPIC_CANCELLED'
   | 'TOPIC_NOT_READY'
-  | 'DEADLINE_NOT_CONFIGURED'
-  | 'DEADLINE_NOT_OPEN'
-  | 'DEADLINE_EXPIRED'
+  | 'GRADING_LOCKED'
   | 'TEMPLATE_NOT_ASSIGNED'
 
-/** Hạn chấm. Đúng `startDate` / `endDate` vẫn tính là trong hạn */
+/**
+ * Mốc Tổ chức hội đồng bảo vệ của ngành SV = thời điểm khóa chấm.
+ * Đúng `endDate` vẫn sửa được (`locked = false`).
+ */
 export interface AdvisorGradeDeadline {
-  startDate: string
+  startDate: string | null
   endDate: string
-  open: boolean
+  /** `true` = đã qua `endDate`, không chấm / sửa điểm được nữa */
+  locked: boolean
 }
 
 /** Một dòng ở C1 – đề tài GV đang đăng nhập là GVHD chính */
@@ -41,6 +45,9 @@ export interface AdvisorGradeTopic {
   totalCriteria: number | null
   /** Chỉ có khi `SUBMITTED` */
   advisorScore: number | null
+  /** Thời điểm khóa chấm (endDate mốc hội đồng của ngành SV). `null` = ngành chưa có mốc, chưa khóa */
+  lockAt: string | null
+  /** `true` = chấm / sửa được. Phiếu `SUBMITTED` chưa khóa vẫn `true` (nộp lại được) */
   canGrade: boolean
   readonlyReason: AdvisorGradeReadonlyReason | null
 }
@@ -54,7 +61,6 @@ export interface AdvisorGradeSummary {
 /** C1 – `AdvisorGradeTopicListResponse` (không phân trang) */
 export interface AdvisorGradeTopicList {
   semesterId: string
-  deadline: AdvisorGradeDeadline | null
   summary: AdvisorGradeSummary
   items: AdvisorGradeTopic[]
 }
@@ -117,9 +123,12 @@ export interface AdvisorGradeSheet {
   totalScore: number | null
   /** Điểm chính thức – chỉ có khi `SUBMITTED` */
   advisorScore: number | null
+  /** Lần nộp gần nhất (nộp lại thì cập nhật), `null` khi Nháp */
   submittedAt: string | null
   updatedAt: string
+  /** `null` = ngành chưa có mốc hội đồng hoặc mốc chưa có endDate (chưa khóa) */
   deadline: AdvisorGradeDeadline | null
+  /** Phiếu `SUBMITTED` chưa khóa vẫn `true` (nộp lại được) */
   canEdit: boolean
   readonlyReason: AdvisorGradeReadonlyReason | null
 }
@@ -143,9 +152,6 @@ export const ADVISOR_GRADE_ERROR_CODES = {
   SEMESTER_REQUIRED: 3022,
   SEMESTER_NOT_FOUND: 4041,
   THESIS_TOPIC_NOT_FOUND: 3049,
-  DEADLINE_NOT_CONFIGURED: 3064,
-  DEADLINE_NOT_OPEN: 3065,
-  DEADLINE_EXPIRED: 3066,
   SEMESTER_ADVISOR_TEMPLATE_NOT_ASSIGNED: 3116,
   EVALUATION_SHEET_NOT_FOUND: 3115,
   GRADING_TOPIC_NOT_ELIGIBLE: 3117,
@@ -154,6 +160,8 @@ export const ADVISOR_GRADE_ERROR_CODES = {
   EVALUATION_GENERAL_COMMENT_REQUIRED: 3120,
   EVALUATION_CRITERIA_NOT_IN_TEMPLATE: 3121,
   EVALUATION_CRITERIA_DUPLICATED: 3122,
+  /** Đã qua endDate mốc Tổ chức hội đồng bảo vệ của ngành SV */
+  ADVISOR_GRADING_LOCKED: 3128,
   /** Dùng chung cho nhiều lỗi validate – hiển thị theo `message` */
   VALIDATION: 4000,
 } as const

@@ -12,7 +12,12 @@
 | C2 | POST   | `/advisor-grade/topic/{topicPublicId}/sheet` | Mở phiếu chấm (chưa có thì tạo phiếu Nháp)      | `EvaluationSheetResponse`         |
 | C3 | GET    | `/advisor-grade/sheet/{sheetPublicId}`       | Xem chi tiết phiếu                              | `EvaluationSheetResponse`         |
 | C4 | PUT    | `/advisor-grade/sheet/{sheetPublicId}`       | Lưu nháp                                        | không có (`message`)              |
-| C5 | POST   | `/advisor-grade/sheet/{sheetPublicId}/submit`| Nộp phiếu (khóa vĩnh viễn)                      | `EvaluationSheetResponse` đã khóa |
+| C5 | POST   | `/advisor-grade/sheet/{sheetPublicId}/submit`| Nộp phiếu / nộp lại phiếu đã nộp (sửa điểm)     | `EvaluationSheetResponse` đã nộp  |
+
+> **Quy tắc thời gian (cập nhật 19/11/2026):**
+> - **Không có hạn mở chấm.** Đề tài `IN_PROGRESS` ở `STAGE_4_REPORT_APPROVED` hoặc `STAGE_5_REVIEW_PASSED` là chấm được ngay. BE không còn dùng mốc "nộp báo cáo & phiếu theo dõi".
+> - **Khóa chấm** khi đã qua `endDate` của mốc **Tổ chức hội đồng bảo vệ** (`TO_CHUC_HOI_DONG_BAO_VE`) theo **ngành của sinh viên**. Đúng `endDate` vẫn sửa được. Ngành chưa có mốc hoặc mốc chưa có `endDate` → chưa khóa.
+> - Phiếu đã nộp **được nộp lại** (C5) để sửa điểm cho đến khi khóa. Phiếu đã nộp **không lưu nháp được** (C4 → 3118).
 
 Chung cho cả 5 API:
 
@@ -48,14 +53,15 @@ Vào màn ─► C1 danh sách đề tài (tab + bảng)
           C2 mở phiếu (BE tạo phiếu Nháp nếu đủ điều kiện)
              │
              ▼
-     Popup phiếu chấm: canEdit = true  → cho nhập, nút "Lưu nháp" (C4) + "Nộp phiếu" (C5)
-                       canEdit = false → chỉ xem, hiện lý do theo readonlyReason
+     Popup phiếu chấm: canEdit = true, status = DRAFT     → cho nhập, nút "Lưu nháp" (C4) + "Nộp phiếu" (C5)
+                       canEdit = true, status = SUBMITTED → cho nhập, chỉ nút "Nộp lại" (C5), ẩn "Lưu nháp"
+                       canEdit = false                    → chỉ xem, hiện lý do theo readonlyReason
              │ C4 / C5 xong
              ▼
           gọi lại C1 (invalidate query) để cập nhật trạng thái, số liệu thống kê
 ```
 
-- Có thể **luôn gọi C2** khi bấm vào dòng cũng được: đã có phiếu thì C2 trả phiếu đó (kể cả đã hết hạn / đã nộp), không tạo phiếu mới. Bấm 2 lần hoặc mở 2 tab cũng an toàn.
+- Có thể **luôn gọi C2** khi bấm vào dòng cũng được: đã có phiếu thì C2 trả phiếu đó (kể cả đã khóa chấm / đã nộp), không tạo phiếu mới. Bấm 2 lần hoặc mở 2 tab cũng an toàn.
 - Dòng `sheetStatus = NOT_STARTED` và `canGrade = false` → **không gọi C2** (chắc chắn lỗi), disable nút và hiện lý do `readonlyReason`.
 
 ## 3. C1 – Danh sách đề tài cần chấm
@@ -76,11 +82,6 @@ Response:
   "code": 1000,
   "data": {
     "semesterId": "0193a1b2-0000-7000-8000-000000000001",
-    "deadline": {
-      "startDate": "2026-11-10T00:00:00",
-      "endDate": "2026-11-30T23:59:59",
-      "open": true
-    },
     "summary": { "notStarted": 3, "draft": 1, "submitted": 2 },
     "items": [
       {
@@ -96,6 +97,7 @@ Response:
         "gradedCount": 5,
         "totalCriteria": 9,
         "advisorScore": null,
+        "lockAt": "2027-06-15T23:59:59",
         "canGrade": true,
         "readonlyReason": null
       }
@@ -104,23 +106,25 @@ Response:
 }
 ```
 
+> **Đã bỏ** field `deadline` ở cấp danh sách (mỗi sinh viên có thể thuộc ngành khác nhau nên mốc khóa khác nhau). Thay bằng `lockAt` trên từng dòng.
+
 | Field            | Ý nghĩa                                                                                   |
 | ---------------- | ----------------------------------------------------------------------------------------- |
-| `deadline`       | Hạn chấm (mốc nộp báo cáo & phiếu theo dõi). `null` = Trưởng bộ môn chưa thiết lập         |
-| `deadline.open`  | `true` khi đang trong hạn. Đúng `startDate` / `endDate` vẫn tính là trong hạn               |
 | `summary`        | Đếm theo `sheetStatus`, dùng cho số trên tab                                               |
 | `sheetPublicId`  | `null` khi chưa có phiếu                                                                   |
 | `sheetStatus`    | `NOT_STARTED` / `DRAFT` / `SUBMITTED` (mục 8)                                              |
 | `gradedCount`    | Số tiêu chí đã có điểm                                                                     |
 | `totalCriteria`  | Tổng tiêu chí của rubric. `null` khi học kỳ chưa có rubric                                 |
 | `advisorScore`   | Điểm hướng dẫn (thang 10, 1 chữ số thập phân). **Chỉ có khi `SUBMITTED`**, còn lại `null`  |
-| `canGrade`       | `true` = bấm vào chấm / sửa được                                                           |
+| `lockAt`         | Thời điểm khóa chấm = `endDate` mốc Tổ chức hội đồng bảo vệ của ngành SV. `null` = ngành chưa có mốc (chưa khóa) |
+| `canGrade`       | `true` = bấm vào chấm / sửa được. Phiếu `SUBMITTED` chưa khóa vẫn `true` (còn nộp lại được) |
 | `readonlyReason` | Lý do không chấm được (mục 8), `null` khi `canGrade = true`                                |
 
 Ghi chú:
 
 - Chỉ có đề tài mà GV đang đăng nhập là **GVHD chính**.
 - BE đã sắp sẵn: `DRAFT` → `NOT_STARTED` còn chấm được → `NOT_STARTED` không chấm được → `SUBMITTED`; cùng nhóm thì theo mã SV. FE giữ nguyên thứ tự, không cần sort lại.
+- `canGrade` / `readonlyReason` / `lockAt` tính theo thời điểm gọi API. Màn mở lâu qua `lockAt` thì nên gọi lại C1.
 - Mapping tab của mock: `all` = `items`; `incomplete` = `sheetStatus !== 'SUBMITTED'`; `completed` = `sheetStatus === 'SUBMITTED'`.
 - Mock đang có cột **phiếu theo dõi** (`fileName`, `submitTrackingFile`, `verifyTrackingFileContent`). Bộ API này **không** xử lý file phiếu theo dõi; phần đó giữ nguyên mock hoặc chờ API khác.
 
@@ -138,16 +142,14 @@ POST /advisor-grade/topic/{topicPublicId}/sheet
 (không có body)
 ```
 
-- Đề tài **đã có phiếu** → trả phiếu đó luôn, không kiểm tra hạn / trạng thái (FE xem theo `canEdit`).
+- Đề tài **đã có phiếu** → trả phiếu đó luôn, không kiểm tra khóa chấm / trạng thái (FE xem theo `canEdit`).
 - **Chưa có phiếu** → BE kiểm tra theo thứ tự, sai ở bước nào trả lỗi bước đó:
 
 | Thứ tự | Điều kiện                                                          | Lỗi nếu sai                                   |
 | ------ | ------------------------------------------------------------------ | --------------------------------------------- |
-| 1      | Đề tài `IN_PROGRESS` và `currentStage = STAGE_4_REPORT_APPROVED`   | 409 / 3117 `GRADING_TOPIC_NOT_ELIGIBLE`       |
-| 2      | Đã thiết lập hạn chấm                                              | 400 / 3064 `DEADLINE_NOT_CONFIGURED`          |
-| 3      | Đã tới `startDate`                                                 | 403 / 3065 `DEADLINE_NOT_OPEN`                |
-| 4      | Chưa qua `endDate`                                                 | 403 / 3066 `DEADLINE_EXPIRED`                 |
-| 5      | Học kỳ đã có rubric phiếu hướng dẫn                                | 409 / 3116 `SEMESTER_ADVISOR_TEMPLATE_NOT_ASSIGNED` |
+| 1      | Đề tài `IN_PROGRESS` và `currentStage` là `STAGE_4_REPORT_APPROVED` hoặc `STAGE_5_REVIEW_PASSED` | 409 / 3117 `GRADING_TOPIC_NOT_ELIGIBLE` |
+| 2      | Chưa qua `endDate` mốc Tổ chức hội đồng bảo vệ của ngành SV (ngành chưa có mốc thì bỏ qua) | 403 / 3128 `ADVISOR_GRADING_LOCKED` |
+| 3      | Học kỳ đã có rubric phiếu hướng dẫn                                | 409 / 3116 `SEMESTER_ADVISOR_TEMPLATE_NOT_ASSIGNED` |
 
 Đủ điều kiện → tạo phiếu `DRAFT` (chưa có điểm) và trả `EvaluationSheetResponse` (mục 7).
 
@@ -164,9 +166,16 @@ Trả `EvaluationSheetResponse` (mục 7). Không tìm thấy hoặc phiếu kh�
 ## 6. C4 Lưu nháp / C5 Nộp phiếu
 
 ```
-PUT  /advisor-grade/sheet/{sheetPublicId}          → Lưu nháp
-POST /advisor-grade/sheet/{sheetPublicId}/submit   → Nộp phiếu
+PUT  /advisor-grade/sheet/{sheetPublicId}          → Lưu nháp (chỉ phiếu DRAFT)
+POST /advisor-grade/sheet/{sheetPublicId}/submit   → Nộp phiếu (DRAFT) / Nộp lại (SUBMITTED)
 ```
+
+| API | Phiếu `DRAFT` | Phiếu `SUBMITTED` |
+| --- | ------------- | ----------------- |
+| C4 Lưu nháp | Được | **Chặn** → 409 / 3118 |
+| C5 Nộp | Nộp lần đầu | **Nộp lại**: BE tính lại điểm, cập nhật `submittedAt` và điểm hướng dẫn |
+
+Cả C4 và C5 đều phải thỏa: đề tài còn đủ điều kiện (3117) và chưa khóa chấm (3128).
 
 Body (dùng chung):
 
@@ -196,15 +205,17 @@ Response:
 { "code": 1000, "message": "Lưu nháp thành công" }
 
 // C5
-{ "code": 1000, "message": "Nộp phiếu thành công", "data": { ...EvaluationSheetResponse, "status": "SUBMITTED", "canEdit": false } }
+{ "code": 1000, "message": "Nộp phiếu thành công", "data": { ...EvaluationSheetResponse, "status": "SUBMITTED", "canEdit": true } }
 ```
+
+> Sau khi nộp, `canEdit` vẫn `true` nếu chưa khóa chấm (còn nộp lại được); `canEdit = false` khi đã khóa hoặc đề tài không còn đủ điều kiện.
 
 C5 thêm 2 điều kiện so với C4:
 
 - Phải có điểm **mọi** tiêu chí → thiếu: 400 / 3119 `EVALUATION_SHEET_INCOMPLETE`.
 - Phải có nhận xét → thiếu: 400 / 3120 `EVALUATION_GENERAL_COMMENT_REQUIRED`.
 
-Sau khi nộp: phiếu **khóa vĩnh viễn** (không có API mở lại); BE ghi điểm hướng dẫn vào bảng điểm đồ án và gửi thông báo cho SV (không kèm điểm).
+Sau khi nộp: BE ghi điểm hướng dẫn vào bảng điểm đồ án và gửi thông báo cho SV (không kèm điểm): nộp lần đầu là "đã chấm điểm hướng dẫn", nộp lại là "đã cập nhật điểm hướng dẫn". Phiếu không quay về nháp; sửa điểm bằng nộp lại cho đến khi qua `endDate` mốc Tổ chức hội đồng bảo vệ.
 
 Lỗi của C4 / C5:
 
@@ -215,14 +226,15 @@ Lỗi của C4 / C5:
 | 400  | 4000 | `EVALUATION_SCORE_INVALID`             | "Điểm tiêu chí phải từ 0 đến 10, tối đa 1 chữ số thập phân"      |
 | 400  | 3122 | `EVALUATION_CRITERIA_DUPLICATED`       | Một tiêu chí gửi 2 lần                                           |
 | 400  | 3121 | `EVALUATION_CRITERIA_NOT_IN_TEMPLATE`  | `criteriaId` không thuộc rubric của phiếu                        |
-| 409  | 3118 | `EVALUATION_SHEET_ALREADY_SUBMITTED`   | Phiếu đã nộp                                                     |
-| 409  | 3117 | `GRADING_TOPIC_NOT_ELIGIBLE`           | Đề tài đã đổi trạng thái (bị đình chỉ, hủy, sang giai đoạn khác) |
-| 400/403 | 3064/3065/3066 | `DEADLINE_*`                 | Chưa thiết lập / chưa mở / đã hết hạn chấm                       |
+| 409  | 3118 | `EVALUATION_SHEET_ALREADY_SUBMITTED`   | (chỉ C4) "Phiếu đã nộp, không thể lưu nháp. Vui lòng nộp lại phiếu" |
+| 409  | 3117 | `GRADING_TOPIC_NOT_ELIGIBLE`           | Đề tài đã đổi trạng thái (bị đình chỉ, hủy, đã bảo vệ xong)      |
+| 403  | 3128 | `ADVISOR_GRADING_LOCKED`               | "Đã qua thời gian tổ chức hội đồng bảo vệ, không thể chấm hoặc sửa điểm hướng dẫn" |
 | 404  | 3115 | `EVALUATION_SHEET_NOT_FOUND`           | Sai `sheetPublicId`                                              |
 | 400  | 3119 | `EVALUATION_SHEET_INCOMPLETE`          | (chỉ C5) Chưa chấm đủ tiêu chí                                   |
 | 400  | 3120 | `EVALUATION_GENERAL_COMMENT_REQUIRED`  | (chỉ C5) Thiếu nhận xét                                          |
 
 > Mã `4000` dùng chung cho nhiều lỗi validate, FE hiển thị theo `message`, không phân biệt theo `code`.
+> Các API này **không còn** trả `DEADLINE_NOT_CONFIGURED` (3064), `DEADLINE_NOT_OPEN` (3065), `DEADLINE_EXPIRED` (3066).
 
 ## 7. `EvaluationSheetResponse` (C2, C3, C5)
 
@@ -274,7 +286,7 @@ Lỗi của C4 / C5:
   "advisorScore": null,
   "submittedAt": null,
   "updatedAt": "2026-11-17T10:00:00",
-  "deadline": { "startDate": "2026-11-10T00:00:00", "endDate": "2026-11-30T23:59:59", "open": true },
+  "deadline": { "startDate": "2027-06-01T08:00:00", "endDate": "2027-06-15T23:59:59", "locked": false },
   "canEdit": true,
   "readonlyReason": null
 }
@@ -292,10 +304,11 @@ Lỗi của C4 / C5:
 | `weight`, `maxScore`        | Đã bỏ số 0 thừa (`5.00` → `5`)                                                           |
 | `totalScore`                | Tổng có trọng số, 5 chữ số thập phân. **Chỉ có khi `SUBMITTED`**                          |
 | `advisorScore`              | `totalScore` làm tròn 1 chữ số (HALF_UP). **Chỉ có khi `SUBMITTED`** – đây là điểm chính thức |
-| `submittedAt`               | Thời điểm nộp, `null` khi Nháp                                                           |
+| `submittedAt`               | Thời điểm nộp gần nhất (nộp lại thì cập nhật), `null` khi Nháp                           |
 | `updatedAt`                 | Lần lưu gần nhất (chưa lưu lần nào thì là lúc tạo phiếu) – hiện "Đã lưu lúc ..."         |
-| `deadline`                  | Như C1, `null` = chưa thiết lập                                                          |
-| `canEdit` / `readonlyReason`| Có cho nhập không và lý do (mục 8)                                                        |
+| `deadline`                  | Mốc Tổ chức hội đồng bảo vệ của ngành SV. `null` = ngành chưa có mốc hoặc mốc chưa có `endDate` (chưa khóa) |
+| `deadline.locked`           | `true` khi đã qua `endDate` (đúng `endDate` vẫn `false`). **Thay cho** `deadline.open` cũ |
+| `canEdit` / `readonlyReason`| Có cho nhập không và lý do (mục 8). Phiếu `SUBMITTED` chưa khóa vẫn `canEdit = true`      |
 
 ## 8. Enum
 
@@ -315,14 +328,13 @@ BE chỉ trả **1 lý do** theo thứ tự ưu tiên từ trên xuống:
 
 | Giá trị                   | Nhãn gợi ý cho FE                                                      |
 | ------------------------- | ---------------------------------------------------------------------- |
-| `SUBMITTED`               | Phiếu đã nộp, chỉ xem                                                  |
 | `TOPIC_DISQUALIFIED`      | Đề tài bị đình chỉ                                                     |
 | `TOPIC_CANCELLED`         | Đề tài đã hủy                                                          |
-| `TOPIC_NOT_READY`         | Đề tài chưa được duyệt báo cáo hoặc đã qua giai đoạn chấm hướng dẫn    |
-| `DEADLINE_NOT_CONFIGURED` | Chưa thiết lập hạn chấm                                                |
-| `DEADLINE_NOT_OPEN`       | Chưa đến thời gian chấm (hiện kèm `deadline.startDate`)                |
-| `DEADLINE_EXPIRED`        | Đã hết hạn chấm (hiện kèm `deadline.endDate`)                          |
+| `TOPIC_NOT_READY`         | Đề tài chưa được duyệt báo cáo hoặc đã bảo vệ xong                     |
+| `GRADING_LOCKED`          | Đã qua thời gian tổ chức hội đồng bảo vệ, không thể chấm hoặc sửa điểm (hiện kèm `deadline.endDate` / `lockAt`) |
 | `TEMPLATE_NOT_ASSIGNED`   | Học kỳ chưa có rubric chấm hướng dẫn                                   |
+
+> **Đã bỏ** `SUBMITTED`, `DEADLINE_NOT_CONFIGURED`, `DEADLINE_NOT_OPEN`, `DEADLINE_EXPIRED`. Phiếu đã nộp không còn là lý do chỉ xem.
 
 ### `topic.status` / `topicStatus`
 
@@ -356,19 +368,17 @@ Kiểm tra ô nhập phía FE (BE vẫn kiểm tra lại):
 export type SheetStatus = 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED'
 
 export type GradingReadonlyReason =
-  | 'SUBMITTED'
   | 'TOPIC_DISQUALIFIED'
   | 'TOPIC_CANCELLED'
   | 'TOPIC_NOT_READY'
-  | 'DEADLINE_NOT_CONFIGURED'
-  | 'DEADLINE_NOT_OPEN'
-  | 'DEADLINE_EXPIRED'
+  | 'GRADING_LOCKED'
   | 'TEMPLATE_NOT_ASSIGNED'
 
+/** Mốc Tổ chức hội đồng bảo vệ của ngành SV (thời điểm khóa chấm) */
 export interface GradingDeadline {
-  startDate: string // ISO, vd "2026-11-10T00:00:00"
+  startDate: string | null // ISO, vd "2027-06-01T08:00:00"
   endDate: string
-  open: boolean
+  locked: boolean // true = đã qua endDate
 }
 
 export interface AdvisorGradeTopic {
@@ -384,13 +394,13 @@ export interface AdvisorGradeTopic {
   gradedCount: number
   totalCriteria: number | null
   advisorScore: number | null
+  lockAt: string | null // endDate mốc hội đồng của ngành SV; null = chưa có mốc
   canGrade: boolean
   readonlyReason: GradingReadonlyReason | null
 }
 
 export interface AdvisorGradeTopicList {
   semesterId: string
-  deadline: GradingDeadline | null
   summary: { notStarted: number; draft: number; submitted: number }
   items: AdvisorGradeTopic[]
 }
@@ -474,7 +484,7 @@ export const advisorGradeService = {
     await apiClient.put<ApiResponse<null>>(GRADE.sheet(sheetPublicId), body, { skipErrorToast: true })
   },
 
-  /** C5 – nộp phiếu, trả phiếu đã khóa */
+  /** C5 – nộp phiếu (DRAFT) hoặc nộp lại (SUBMITTED), trả phiếu đã nộp */
   async submit(sheetPublicId: string, body: EvaluationSheetBody): Promise<EvaluationSheet> {
     const res = await apiClient.post<ApiResponse<EvaluationSheet>>(GRADE.submit(sheetPublicId), body, {
       skipErrorToast: true,
@@ -499,11 +509,14 @@ function toSheetBody(sheet: EvaluationSheet, scores: Record<string, number | nul
 
 ## 12. Gợi ý UX
 
-- Bảng danh sách: nút **"Chấm"** khi `canGrade && sheetStatus !== 'SUBMITTED'`; **"Xem"** khi `SUBMITTED`; disable kèm tooltip `readonlyReason` khi `!canGrade && sheetStatus === 'NOT_STARTED'`. Cột tiến độ hiển thị `gradedCount / totalCriteria`, cột điểm hiển thị `advisorScore ?? '—'`.
-- Đầu màn: hiện hạn chấm từ `deadline` (`null` → "Chưa thiết lập hạn chấm"; `open = false` → nhãn "Chưa mở" / "Đã hết hạn" tùy so với ngày hiện tại).
-- Popup phiếu: disable mọi ô và ẩn 2 nút khi `canEdit = false`, hiện banner theo `readonlyReason`. Khi `SUBMITTED` hiện `advisorScore` và `submittedAt`.
-- Nút **"Nộp phiếu"**: kiểm tra FE trước (đủ điểm mọi tiêu chí, có nhận xét), rồi mở dialog xác nhận "Sau khi nộp sẽ không thể sửa". Nộp xong cập nhật popup bằng `data` trả về, không cần gọi lại C3.
-- Khi C4/C5 trả **3118 / 3117 / 3064–3066**: phiếu đã bị khóa hoặc hết hạn trong lúc đang nhập → báo lỗi rồi gọi lại C3 + C1 để chuyển sang chế độ chỉ xem.
+- Bảng danh sách: nút **"Chấm"** khi `canGrade && sheetStatus !== 'SUBMITTED'`; **"Sửa điểm"** khi `canGrade && sheetStatus === 'SUBMITTED'`; **"Xem"** khi `!canGrade` và đã có phiếu; disable kèm tooltip `readonlyReason` khi `!canGrade && sheetStatus === 'NOT_STARTED'`. Cột tiến độ hiển thị `gradedCount / totalCriteria`, cột điểm hiển thị `advisorScore ?? '—'`.
+- Mỗi dòng có thể hiện "Sửa được đến {lockAt}" (bỏ qua khi `lockAt = null`). **Không còn** dải "Hạn chấm" ở đầu màn vì C1 đã bỏ `deadline`.
+- Popup phiếu:
+  - `canEdit = false`: disable mọi ô, ẩn các nút, hiện banner theo `readonlyReason`.
+  - `canEdit = true` và `status = DRAFT`: nút **Lưu nháp** + **Nộp phiếu**.
+  - `canEdit = true` và `status = SUBMITTED`: ẩn **Lưu nháp** (BE chặn 3118), chỉ có nút **Nộp lại**; hiện `advisorScore`, `submittedAt` và "Sửa được đến {deadline.endDate}" nếu có.
+- Nút **"Nộp phiếu" / "Nộp lại"**: kiểm tra FE trước (đủ điểm mọi tiêu chí, có nhận xét), rồi mở dialog xác nhận, ghi rõ điểm còn sửa được đến `deadline.endDate` (không có mốc thì bỏ dòng này). Nộp xong cập nhật popup bằng `data` trả về, không cần gọi lại C3.
+- Khi C4/C5 trả **3117 / 3128**: đề tài đổi trạng thái hoặc đã khóa chấm trong lúc đang nhập → báo lỗi rồi gọi lại C3 + C1 để chuyển sang chế độ chỉ xem. Khi C4 trả **3118**: phiếu đã được nộp (vd ở tab khác) → gọi lại C3, dùng nút Nộp lại.
 - Sau C4 / C5 thành công: invalidate query C1 để cập nhật tab và số liệu.
 - Cảnh báo khi đóng popup có thay đổi chưa lưu (BE không tự lưu).
 
@@ -520,5 +533,5 @@ function toSheetBody(sheet: EvaluationSheet, scores: Record<string, number | nul
 
 ## 14. Ghi chú
 
-- Tài liệu viết theo code BE hiện tại (nhánh `Inter_1`), đã có unit test cho service. **Chưa test end-to-end với FE**; nếu gặp field / lỗi khác tài liệu thì báo lại BE.
+- Tài liệu viết theo code BE hiện tại (nhánh `Score_Config_Feature`, cập nhật quy tắc khóa chấm theo mốc Tổ chức hội đồng bảo vệ ngày 19/11/2026), đã có unit test cho service. **Chưa test end-to-end với FE**; nếu gặp field / lỗi khác tài liệu thì báo lại BE.
 - Ngày giờ trong các API này là ISO (`2026-11-17T10:00:00`), parse bằng `dayjs(value)` / `new Date(value)` trực tiếp, **không** dùng hàm parse `dd-MM-yyyy HH:mm:ss` của các màn khác.

@@ -23,7 +23,8 @@ export const API_ENDPOINTS = {
     outline: '/api/student/outline',
     reports: '/api/student/reports',
     schedule: '/api/student/schedule',
-    results: '/api/student/results',
+    // Điểm đồ án của sinh viên đang đăng nhập (HD / PB / HĐ + trọng số + tổng kết)
+    myScore: '/thesis-score/my-score',
     // Tài liệu / biểu mẫu sinh viên được xem và tải (chỉ 3 loại: Đề cương, Báo cáo toàn văn, Slide bảo vệ)
     templates: '/template/shared',
   },

@@ -9,10 +9,11 @@ import {
   canOpenAdvisorGradeSheet,
   computeAdvisorGradePreview,
   getAdvisorGradeActionLabel,
-  getAdvisorGradeDeadlineState,
   getAdvisorGradeReadonlyMessage,
   getInitialScoreInputs,
+  getSheetLockAt,
   getSubmitBlockers,
+  isAdvisorGradeAlreadySubmittedError,
   isAdvisorGradeLockingError,
   parseScoreInput,
   toAdvisorGradeSheetBody,
@@ -55,6 +56,7 @@ const topic = (over: Partial<AdvisorGradeTopic> = {}): AdvisorGradeTopic => ({
   gradedCount: 0,
   totalCriteria: 4,
   advisorScore: null,
+  lockAt: null,
   canGrade: true,
   readonlyReason: null,
   ...over,
@@ -167,50 +169,58 @@ describe('getInitialScoreInputs', () => {
 describe('điều kiện trên bảng', () => {
   it('không mở phiếu khi chưa có phiếu và không chấm được', () => {
     expect(canOpenAdvisorGradeSheet(topic())).toBe(true)
-    expect(canOpenAdvisorGradeSheet(topic({ canGrade: false, readonlyReason: 'DEADLINE_EXPIRED' }))).toBe(false)
+    expect(canOpenAdvisorGradeSheet(topic({ canGrade: false, readonlyReason: 'GRADING_LOCKED' }))).toBe(false)
     // Đã có phiếu thì vẫn mở để xem dù không sửa được
     expect(
       canOpenAdvisorGradeSheet(topic({ sheetStatus: 'SUBMITTED', sheetPublicId: 's1', canGrade: false })),
     ).toBe(true)
   })
 
-  it('nhãn nút Chấm / Xem', () => {
+  it('nhãn nút Chấm / Sửa điểm / Xem', () => {
     expect(getAdvisorGradeActionLabel(topic())).toBe('Chấm')
     expect(getAdvisorGradeActionLabel(topic({ sheetStatus: 'DRAFT' }))).toBe('Chấm')
+    // Đã nộp nhưng chưa khóa chấm → nộp lại được
+    expect(getAdvisorGradeActionLabel(topic({ sheetStatus: 'SUBMITTED' }))).toBe('Sửa điểm')
     expect(getAdvisorGradeActionLabel(topic({ sheetStatus: 'SUBMITTED', canGrade: false }))).toBe('Xem')
     expect(getAdvisorGradeActionLabel(topic({ sheetStatus: 'DRAFT', canGrade: false }))).toBe('Xem')
   })
 })
 
-describe('hạn chấm và lý do chỉ xem', () => {
-  const deadline = { startDate: '2026-11-10T00:00:00', endDate: '2026-11-30T23:59:59', open: false }
-
-  it('trạng thái hạn chấm', () => {
-    expect(getAdvisorGradeDeadlineState(null)).toBe('NOT_CONFIGURED')
-    expect(getAdvisorGradeDeadlineState({ ...deadline, open: true })).toBe('OPEN')
-    expect(getAdvisorGradeDeadlineState(deadline, new Date(2026, 10, 1))).toBe('NOT_OPEN')
-    expect(getAdvisorGradeDeadlineState(deadline, new Date(2026, 11, 5))).toBe('EXPIRED')
+describe('thời điểm khóa chấm và lý do chỉ xem', () => {
+  it('lockAt của phiếu = endDate mốc hội đồng, null khi chưa có mốc', () => {
+    expect(getSheetLockAt({ startDate: null, endDate: '2026-11-30T23:59:59', locked: false })).toBe(
+      '2026-11-30T23:59:59',
+    )
+    expect(getSheetLockAt(null)).toBeNull()
+    expect(getSheetLockAt(undefined)).toBeNull()
   })
 
-  it('lý do kèm mốc thời gian', () => {
-    expect(getAdvisorGradeReadonlyMessage(null, deadline)).toBeNull()
-    expect(getAdvisorGradeReadonlyMessage('SUBMITTED', deadline)).toBe('Phiếu đã nộp, chỉ xem.')
-    expect(getAdvisorGradeReadonlyMessage('DEADLINE_EXPIRED', deadline)).toMatch(
-      /^Đã hết hạn chấm \(hạn cuối .*30\/11\/2026.*\)\.$/,
+  it('lý do kèm thời điểm khóa khi GRADING_LOCKED', () => {
+    expect(getAdvisorGradeReadonlyMessage(null, '2026-11-30T23:59:59')).toBeNull()
+    expect(getAdvisorGradeReadonlyMessage('GRADING_LOCKED', '2026-11-30T23:59:59')).toMatch(
+      /^Đã qua thời gian tổ chức hội đồng bảo vệ, không thể chấm hoặc sửa điểm \(khóa lúc .*30\/11\/2026.*\)\.$/,
     )
-    expect(getAdvisorGradeReadonlyMessage('DEADLINE_NOT_OPEN', deadline)).toMatch(/mở lúc .*10\/11\/2026/)
-    expect(getAdvisorGradeReadonlyMessage('DEADLINE_EXPIRED', null)).toBe('Đã hết hạn chấm.')
+    expect(getAdvisorGradeReadonlyMessage('GRADING_LOCKED', null)).toBe(
+      'Đã qua thời gian tổ chức hội đồng bảo vệ, không thể chấm hoặc sửa điểm.',
+    )
+    expect(getAdvisorGradeReadonlyMessage('TOPIC_CANCELLED', '2026-11-30T23:59:59')).toBe('Đề tài đã hủy.')
   })
 })
 
-describe('isAdvisorGradeLockingError', () => {
-  it('chỉ nhận các mã làm phiếu bị khóa giữa chừng', () => {
-    for (const code of [3117, 3118, 3064, 3065, 3066]) {
+describe('phân loại lỗi', () => {
+  it('isAdvisorGradeLockingError chỉ nhận 3117 / 3128', () => {
+    for (const code of [3117, 3128]) {
       expect(isAdvisorGradeLockingError(new ApiError('x', code)), String(code)).toBe(true)
     }
-    for (const code of [3119, 3120, 4000, 2001]) {
+    for (const code of [3118, 3119, 3120, 4000, 2001]) {
       expect(isAdvisorGradeLockingError(new ApiError('x', code)), String(code)).toBe(false)
     }
     expect(isAdvisorGradeLockingError(new Error('x'))).toBe(false)
+  })
+
+  it('isAdvisorGradeAlreadySubmittedError chỉ nhận 3118', () => {
+    expect(isAdvisorGradeAlreadySubmittedError(new ApiError('x', 3118))).toBe(true)
+    expect(isAdvisorGradeAlreadySubmittedError(new ApiError('x', 3128))).toBe(false)
+    expect(isAdvisorGradeAlreadySubmittedError(new Error('x'))).toBe(false)
   })
 })

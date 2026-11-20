@@ -30,13 +30,10 @@ export const ADVISOR_GRADE_STATUS_META: Record<
 }
 
 export const ADVISOR_GRADE_READONLY_LABELS: Record<AdvisorGradeReadonlyReason, string> = {
-  SUBMITTED: 'Phiếu đã nộp, chỉ xem.',
   TOPIC_DISQUALIFIED: 'Đề tài bị đình chỉ.',
   TOPIC_CANCELLED: 'Đề tài đã hủy.',
-  TOPIC_NOT_READY: 'Đề tài chưa được duyệt báo cáo hoặc đã qua giai đoạn chấm hướng dẫn.',
-  DEADLINE_NOT_CONFIGURED: 'Chưa thiết lập hạn chấm.',
-  DEADLINE_NOT_OPEN: 'Chưa đến thời gian chấm.',
-  DEADLINE_EXPIRED: 'Đã hết hạn chấm.',
+  TOPIC_NOT_READY: 'Đề tài chưa được duyệt báo cáo hoặc đã bảo vệ xong.',
+  GRADING_LOCKED: 'Đã qua thời gian tổ chức hội đồng bảo vệ, không thể chấm hoặc sửa điểm.',
   TEMPLATE_NOT_ASSIGNED: 'Học kỳ chưa có rubric chấm hướng dẫn.',
 }
 
@@ -45,33 +42,25 @@ export function formatAdvisorGradeDateTime(value: string | null | undefined): st
   return value ? formatDate(value, 'full') : ''
 }
 
-/** Lý do chỉ xem, kèm mốc thời gian khi chưa mở / đã hết hạn */
+/**
+ * Lý do chỉ xem. Khi đã khóa chấm thì kèm thời điểm khóa
+ * (`lockAt` ở C1 hoặc `deadline.endDate` ở phiếu).
+ */
 export function getAdvisorGradeReadonlyMessage(
   reason: AdvisorGradeReadonlyReason | null,
-  deadline: AdvisorGradeDeadline | null,
+  lockAt: string | null | undefined,
 ): string | null {
   if (!reason) return null
   const base = ADVISOR_GRADE_READONLY_LABELS[reason] ?? 'Không thể chấm phiếu này.'
-  if (reason === 'DEADLINE_NOT_OPEN' && deadline?.startDate) {
-    return `${base.slice(0, -1)} (mở lúc ${formatAdvisorGradeDateTime(deadline.startDate)}).`
-  }
-  if (reason === 'DEADLINE_EXPIRED' && deadline?.endDate) {
-    return `${base.slice(0, -1)} (hạn cuối ${formatAdvisorGradeDateTime(deadline.endDate)}).`
+  if (reason === 'GRADING_LOCKED' && lockAt) {
+    return `${base.slice(0, -1)} (khóa lúc ${formatAdvisorGradeDateTime(lockAt)}).`
   }
   return base
 }
 
-export type AdvisorGradeDeadlineState = 'NOT_CONFIGURED' | 'OPEN' | 'NOT_OPEN' | 'EXPIRED'
-
-/** Trạng thái hạn chấm cho badge đầu màn. `open` do BE tính; FE chỉ so ngày để biết chưa mở hay đã hết */
-export function getAdvisorGradeDeadlineState(
-  deadline: AdvisorGradeDeadline | null,
-  now: Date = new Date(),
-): AdvisorGradeDeadlineState {
-  if (!deadline) return 'NOT_CONFIGURED'
-  if (deadline.open) return 'OPEN'
-  const start = new Date(deadline.startDate)
-  return !Number.isNaN(start.getTime()) && now < start ? 'NOT_OPEN' : 'EXPIRED'
+/** Thời điểm khóa chấm của phiếu; `null` = chưa có mốc (chưa khóa) */
+export function getSheetLockAt(deadline: AdvisorGradeDeadline | null | undefined): string | null {
+  return deadline?.endDate ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -83,9 +72,15 @@ export function canOpenAdvisorGradeSheet(topic: AdvisorGradeTopic): boolean {
   return !(topic.sheetStatus === 'NOT_STARTED' && !topic.canGrade)
 }
 
-/** Nhãn nút trên dòng: "Chấm" khi còn sửa được, "Xem" khi đã nộp hoặc chỉ xem */
-export function getAdvisorGradeActionLabel(topic: AdvisorGradeTopic): 'Chấm' | 'Xem' {
-  return topic.canGrade && topic.sheetStatus !== 'SUBMITTED' ? 'Chấm' : 'Xem'
+export type AdvisorGradeAction = 'Chấm' | 'Sửa điểm' | 'Xem'
+
+/**
+ * Nút trên dòng: "Chấm" khi chưa nộp và còn chấm được; "Sửa điểm" khi đã nộp nhưng chưa khóa
+ * (nộp lại được); "Xem" khi không chấm được nữa.
+ */
+export function getAdvisorGradeActionLabel(topic: AdvisorGradeTopic): AdvisorGradeAction {
+  if (!topic.canGrade) return 'Xem'
+  return topic.sheetStatus === 'SUBMITTED' ? 'Sửa điểm' : 'Chấm'
 }
 
 // ---------------------------------------------------------------------------
@@ -241,16 +236,21 @@ export function getSubmitBlockers(
 
 const LOCKING_ERROR_CODES: ReadonlySet<number> = new Set([
   ADVISOR_GRADE_ERROR_CODES.GRADING_TOPIC_NOT_ELIGIBLE,
-  ADVISOR_GRADE_ERROR_CODES.EVALUATION_SHEET_ALREADY_SUBMITTED,
-  ADVISOR_GRADE_ERROR_CODES.DEADLINE_NOT_CONFIGURED,
-  ADVISOR_GRADE_ERROR_CODES.DEADLINE_NOT_OPEN,
-  ADVISOR_GRADE_ERROR_CODES.DEADLINE_EXPIRED,
+  ADVISOR_GRADE_ERROR_CODES.ADVISOR_GRADING_LOCKED,
 ])
 
 /**
- * Phiếu bị khóa / hết hạn trong lúc đang nhập (3117, 3118, 3064–3066)
- * → màn hình cần tải lại phiếu (C3) và danh sách (C1) để chuyển sang chế độ chỉ xem.
+ * Đề tài đổi trạng thái hoặc đã khóa chấm trong lúc đang nhập (3117, 3128)
+ * → tải lại phiếu (C3) và danh sách (C1) để popup chuyển sang chế độ chỉ xem.
  */
 export function isAdvisorGradeLockingError(error: unknown): boolean {
   return isApiError(error) && LOCKING_ERROR_CODES.has(error.code)
+}
+
+/**
+ * C4 trả 3118: phiếu đã được nộp ở nơi khác (vd tab khác) → tải lại phiếu (C3),
+ * popup vẫn sửa được nhưng dùng nút "Nộp lại" thay cho "Lưu nháp".
+ */
+export function isAdvisorGradeAlreadySubmittedError(error: unknown): boolean {
+  return isApiError(error) && error.code === ADVISOR_GRADE_ERROR_CODES.EVALUATION_SHEET_ALREADY_SUBMITTED
 }
