@@ -1,91 +1,234 @@
 import { useMemo, useState } from 'react'
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import {
+  apiClient,
+  API_ENDPOINTS,
+  referenceDataQueryOptions,
+} from '@/shared/api'
 import { toast } from '@/shared/components/feedback/toast.store'
-import { advisorEvaluationService } from '../services/advisorEvaluation.service'
-import type { AdvisorEvaluation, AdvisorEvaluationFilter, AdvisorEvaluationRequest } from '../types'
+import { semesterService } from '@/shared/services/semester.service'
+import type { ApiResponse } from '@/shared/types'
+import type { SemesterResponse } from '@/shared/types/semester.types'
+import { formatDate } from '@/shared/utils'
+import {
+  downloadProgressFile,
+  formatProgressDeadlineForSupervisor,
+  guidingEvaluationService,
+  mapFinalReportToGuidingItem,
+} from '../services/guidingEvaluation.service'
+import { useGuidingEvaluationStore } from '../store/guidingEvaluation.store'
+import type {
+  GuidingEvaluationItem,
+  ProgressDeadlineSnapshot,
+  SubmitProgressReportPayload,
+} from '../types/guidingEvaluation.types'
+import { isEvaluationCompleted } from '../utils/guidingEvaluation.utils'
 
-export const advisorEvaluationKeys = {
-  all: ['lecturer', 'advisor-evaluation'] as const,
-  my: () => [...advisorEvaluationKeys.all, 'my'] as const,
-  detail: (topicPublicId: string) => [...advisorEvaluationKeys.all, 'detail', topicPublicId] as const,
+export const guidingEvaluationKeys = {
+  all: ['lecturer', 'guiding-evaluation'] as const,
+  semesters: ['lecturer', 'guiding-evaluation', 'semesters'] as const,
+  currentSemester: ['lecturer', 'guiding-evaluation', 'current-semester'] as const,
+  lists: () => [...guidingEvaluationKeys.all, 'list'] as const,
+  list: (semesterId: string | undefined) =>
+    [...guidingEvaluationKeys.lists(), semesterId] as const,
+  details: () => [...guidingEvaluationKeys.all, 'detail'] as const,
+  detail: (publicId: string | undefined) =>
+    [...guidingEvaluationKeys.details(), publicId] as const,
+  deadlines: () => [...guidingEvaluationKeys.all, 'deadline'] as const,
+  deadline: (semesterId: string | undefined) =>
+    [...guidingEvaluationKeys.deadlines(), semesterId] as const,
 }
 
-// Hoàn tất = đã nộp phiếu theo dõi tiến độ và đã gửi chính thức phiếu chấm hướng dẫn
-export function isAdvisorEvaluationCompleted(item: AdvisorEvaluation): boolean {
-  return Boolean(item.progressFileUrl) && item.sheetStatus === 'SUBMITTED'
-}
-
-export function getAdvisorMissingText(item: AdvisorEvaluation): string {
-  const missingFile = !item.progressFileUrl
-  const missingScore = item.sheetStatus !== 'SUBMITTED'
-  if (missingFile && missingScore) return 'Chưa nộp phiếu & chưa chấm'
-  if (missingFile) return 'Chưa nộp phiếu tiến độ'
-  if (item.sheetStatus === 'DRAFT') return 'Điểm đang lưu nháp'
-  return missingScore ? 'Chưa chấm điểm' : 'Đã hoàn tất'
-}
-
-export function useAdvisorEvaluationDetail(topicPublicId?: string) {
+/** Danh sách học kỳ cho dropdown chọn năm học / học kỳ */
+export function useGuidingEvaluationSemesters() {
   return useQuery({
-    queryKey: advisorEvaluationKeys.detail(topicPublicId ?? ''),
-    queryFn: topicPublicId ? () => advisorEvaluationService.getEvaluation(topicPublicId) : skipToken,
+    queryKey: guidingEvaluationKeys.semesters,
+    queryFn: () => semesterService.getAllSemesters(),
+    ...referenceDataQueryOptions,
   })
 }
 
-export function useSaveAdvisorEvaluation(topicPublicId: string) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (data: AdvisorEvaluationRequest) => advisorEvaluationService.saveEvaluation(topicPublicId, data),
-    onSuccess: (_, data) => {
-      toast.success(data.submit ? 'Đã lưu bảng điểm hướng dẫn chính thức' : 'Đã lưu nháp bảng điểm hướng dẫn')
-      void queryClient.invalidateQueries({ queryKey: advisorEvaluationKeys.all })
+/** Học kỳ hiện tại (tắt toast lỗi tự động vì có fallback sang học kỳ đầu danh sách) */
+export function useGuidingEvaluationCurrentSemester() {
+  return useQuery({
+    queryKey: guidingEvaluationKeys.currentSemester,
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<SemesterResponse>>(
+        API_ENDPOINTS.semester.current,
+        { skipErrorToast: true },
+      )
+      return response.data.data
     },
+    ...referenceDataQueryOptions,
+    retry: false,
   })
 }
 
+/** Danh sách sinh viên hướng dẫn theo học kỳ */
+export function useSupervisorProgressReports(
+  semesterId: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: guidingEvaluationKeys.list(semesterId),
+    queryFn: () =>
+      guidingEvaluationService.getSupervisorProgressReports({ semesterId }),
+    placeholderData: keepPreviousData,
+    enabled: enabled && Boolean(semesterId),
+  })
+}
+
+/** Fallback lấy mốc hạn nộp GĐ 4 từ /api/v1/deadlines khi supervisor-list trả rỗng [] */
+export function useFallbackProgressDeadline(
+  semesterId: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: guidingEvaluationKeys.deadline(semesterId),
+    queryFn:
+      semesterId && enabled
+        ? () => guidingEvaluationService.getFallbackProgressDeadline(semesterId)
+        : skipToken,
+    retry: false,
+  })
+}
+
+/** Chi tiết Báo cáo Final (kèm histories & progressReport) */
+export function useSupervisorReportDetail(publicId: string | null | undefined) {
+  return useQuery({
+    queryKey: guidingEvaluationKeys.detail(publicId ?? undefined),
+    queryFn: publicId
+      ? () => guidingEvaluationService.getReportDetailForSupervisor(publicId)
+      : skipToken,
+  })
+}
+
+export interface SubmitProgressMutationVariables {
+  payload: SubmitProgressReportPayload
+  studentName: string
+  isUpdate: boolean
+}
+
+/** GVHD chính nộp hoặc cập nhật Phiếu theo dõi tiến độ */
 export function useSubmitProgressReport() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ topicPublicId, file, note }: { topicPublicId: string; file: File; note?: string }) =>
-      advisorEvaluationService.submitProgressReport(topicPublicId, file, note),
-    onSuccess: () => {
-      toast.success('Đã nộp phiếu theo dõi tiến độ thành công')
-      void queryClient.invalidateQueries({ queryKey: advisorEvaluationKeys.all })
+    mutationFn: ({ payload }: SubmitProgressMutationVariables) =>
+      guidingEvaluationService.submitProgressReport(payload),
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables.isUpdate
+          ? `Đã cập nhật phiếu theo dõi tiến độ cho sinh viên ${variables.studentName}`
+          : `Đã nộp phiếu theo dõi tiến độ cho sinh viên ${variables.studentName}`,
+      )
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: guidingEvaluationKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['lecturer', 'report-check'] }),
+      ])
     },
   })
 }
 
-/** Trạng thái màn "Đánh giá hướng dẫn": danh sách SV mình hướng dẫn chính, lọc, tìm kiếm, phân trang, modal */
-export function useGuidingEvaluation() {
-  const listQuery = useQuery({
-    queryKey: advisorEvaluationKeys.my(),
-    queryFn: () => advisorEvaluationService.getMyEvaluations(),
-  })
-  const items = useMemo(() => listQuery.data ?? [], [listQuery.data])
+export function useGuidingEvaluation(semesterId?: string, enabled = true) {
+  const {
+    filterStatus,
+    searchQuery,
+    pageSize,
+    currentPage,
+    setFilterStatus,
+    setSearchQuery,
+    setPageSize,
+    setCurrentPage,
+  } =useGuidingEvaluationStore()
 
-  const [filterStatus, setFilterStatus] = useState<AdvisorEvaluationFilter>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [pageSize, setPageSize] = useState<number>(15)
-  const [currentPage, setCurrentPage] = useState<number>(1)
+  const reportsQuery = useSupervisorProgressReports(semesterId, enabled)
+  const rawReports = useMemo(
+    () => reportsQuery.data ?? [],
+    [reportsQuery.data],
+  )
 
-  const [uploadTarget, setUploadTarget] = useState<AdvisorEvaluation | null>(null)
-  const [rubricTarget, setRubricTarget] = useState<AdvisorEvaluation | null>(null)
-  const [previewTarget, setPreviewTarget] = useState<AdvisorEvaluation | null>(null)
+  const shouldFetchFallbackDeadline =
+    Boolean(semesterId) &&
+    reportsQuery.isSuccess &&
+    !reportsQuery.isPlaceholderData &&
+    rawReports.length === 0
 
-  const counts = useMemo(() => {
-    const completed = items.filter(isAdvisorEvaluationCompleted).length
-    return { all: items.length, completed, incomplete: items.length - completed }
-  }, [items])
+  const fallbackDeadlineQuery = useFallbackProgressDeadline(
+    semesterId,
+    shouldFetchFallbackDeadline,
+  )
+
+  const items = useMemo(
+    () => rawReports.map(mapFinalReportToGuidingItem),
+    [rawReports],
+  )
+
+  const deadlineSnapshot: ProgressDeadlineSnapshot | null = useMemo(() => {
+    if (rawReports.length > 0) {
+      const first = rawReports[0]
+      return {
+        deadlineName: first.deadlineName,
+        deadlineStartDate: first.deadlineStartDate,
+        deadlineEndDate: first.deadlineEndDate,
+        deadlineActive: first.deadlineActive,
+        deadlineStatus: first.deadlineStatus ?? 'NOT_CONFIGURED',
+      }
+    }
+    if (fallbackDeadlineQuery.data) {
+      return fallbackDeadlineQuery.data
+    }
+    return null
+  }, [rawReports, fallbackDeadlineQuery.data])
+
+  const deadlineInfo = useMemo(
+    () =>
+      formatProgressDeadlineForSupervisor(
+        deadlineSnapshot?.deadlineEndDate,
+        deadlineSnapshot?.deadlineStatus,
+        (iso) => formatDate(iso, 'full'),
+        deadlineSnapshot?.deadlineStartDate,
+      ),
+    [deadlineSnapshot],
+  )
+
+  const submitMutation = useSubmitProgressReport()
+
+  const [uploadTarget, setUploadTarget] = useState<GuidingEvaluationItem | null>(
+    null,
+  )
+  const [previewTarget, setPreviewTarget] =
+    useState<GuidingEvaluationItem | null>(null)
+  const [detailTarget, setDetailTarget] = useState<GuidingEvaluationItem | null>(
+    null,
+  )
+
+  const counts = useMemo(
+    () => guidingEvaluationService.getCounts(items),
+    [items],
+  )
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return items.filter((item) => {
-      const completed = isAdvisorEvaluationCompleted(item)
+      const completed = isEvaluationCompleted(item)
       if (filterStatus === 'incomplete' && completed) return false
       if (filterStatus === 'completed' && !completed) return false
-      if (!q) return true
-      return [item.studentName, item.studentCode, item.topicName, item.className].some((v) =>
-        (v ?? '').toLowerCase().includes(q),
-      )
+
+      if (q) {
+        return (
+          item.name.toLowerCase().includes(q) ||
+          item.mssv.toLowerCase().includes(q) ||
+          item.topic.toLowerCase().includes(q) ||
+          item.fileName.toLowerCase().includes(q)
+        )
+      }
+      return true
     })
   }, [items, filterStatus, searchQuery])
 
@@ -94,19 +237,59 @@ export function useGuidingEvaluation() {
   const safePage = Math.min(Math.max(1, currentPage), totalPages)
   const startIdx = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1
   const endIdx = Math.min(safePage * pageSize, totalItems)
-  const pagedItems = useMemo(
-    () => filteredItems.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filteredItems, safePage, pageSize],
-  )
 
-  // Hạn hoàn thành = cuối mốc NOP_BAO_CAO_VA_PHIEU_THEO_DOI (chung cho cả học kỳ)
-  const gradingEndAt = items.find((i) => i.gradingEndAt)?.gradingEndAt ?? null
+  const pagedItems = useMemo(() => {
+    const from = (safePage - 1) * pageSize
+    return filteredItems.slice(from, from + pageSize)
+  }, [filteredItems, safePage, pageSize])
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+    }
+  }
+
+  const handleConfirmUpload = async (
+    item: GuidingEvaluationItem,
+    payload: SubmitProgressReportPayload,
+  ) => {
+    await submitMutation.mutateAsync({
+      payload,
+      studentName: item.name,
+      isUpdate: Boolean(item.progressReport),
+    })
+    setUploadTarget(null)
+  }
+
+  const handleDownloadTrackingFile = (item: GuidingEvaluationItem) => {
+    if (!item.progressFileUrl) return
+    void downloadProgressFile(
+      item.progressFileUrl,
+      item.fileName || `phieu-tien-do-${item.mssv}.pdf`,
+    )
+  }
+
+  const handleDownloadFinalReportFile = (item: GuidingEvaluationItem) => {
+    if (!item.finalReportFile) return
+    void downloadProgressFile(
+      item.finalReportFile,
+      item.finalReportFileName || `bao-cao-final-${item.mssv}.pdf`,
+    )
+  }
 
   return {
-    isPending: listQuery.isPending,
-    isError: listQuery.isError,
-    gradingEndAt,
+    items,
     counts,
+    isLoading: reportsQuery.isPending,
+    isFetching: reportsQuery.isFetching,
+    isError: reportsQuery.isError,
+    refetch: reportsQuery.refetch,
+    deadlineSnapshot,
+    deadlineInfo,
+    isDeadlineLoading:
+      reportsQuery.isPending ||
+      (shouldFetchFallbackDeadline && fallbackDeadlineQuery.isPending),
+
     filterStatus,
     searchQuery,
     pageSize,
@@ -116,26 +299,21 @@ export function useGuidingEvaluation() {
     endIdx,
     totalItems,
     pagedItems,
+
     uploadTarget,
     setUploadTarget,
-    rubricTarget,
-    setRubricTarget,
     previewTarget,
     setPreviewTarget,
-    handleTabChange: (status: AdvisorEvaluationFilter) => {
-      setFilterStatus(status)
-      setCurrentPage(1)
-    },
-    handleSearchChange: (value: string) => {
-      setSearchQuery(value)
-      setCurrentPage(1)
-    },
-    handlePageSizeChange: (size: number) => {
-      setPageSize(size)
-      setCurrentPage(1)
-    },
-    handlePageChange: (page: number) => {
-      if (page >= 1 && page <= totalPages) setCurrentPage(page)
-    },
+    detailTarget,
+    setDetailTarget,
+
+    isSubmittingProgress: submitMutation.isPending,
+    handleTabChange: setFilterStatus,
+    handleSearchChange: setSearchQuery,
+    handlePageSizeChange: setPageSize,
+    handlePageChange,
+    handleConfirmUpload,
+    handleDownloadTrackingFile,
+    handleDownloadFinalReportFile,
   }
 }

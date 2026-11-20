@@ -20,8 +20,8 @@ Tài liệu hướng dẫn kết nối Frontend (`Frontend/Student`) với Backe
                                              │
                   ┌──────────────────────────┴──────────────────────────┐
                   ▼                                                     ▼
-      Trong hạn nộp (Deadline mở)                             Quá hạn nộp Deadline
-  Sinh viên gọi: POST /topic/confirm-title                    Hệ thống tự động quét:
+      Trong hạn nộp (CHOT_TEN_DE_TAI = OPEN)                  Quá hạn nộp / EXTENDED / COMPLETED
+  Sinh viên gọi: POST /topic/confirm-title                    Hệ thống Job tự động quét (5 phút/lần):
                   │                                            - Có tên dự kiến: Lấy làm tên chính thức -> STAGE_2
                   ▼                                            - Không có tên: Đình chỉ đồ án (DISQUALIFIED)
   Tạo bản ghi TopicTitleHistory: PENDING
@@ -30,28 +30,29 @@ Tài liệu hướng dẫn kết nối Frontend (`Frontend/Student`) với Backe
         ┌─────────┴─────────┐
         ▼                   ▼
     [APPROVED]          [REJECTED]
-Tên đề tài cập nhật     - Còn hạn nộp: Giữ nguyên ở STAGE_1 để SV gửi lại tên khác
-Chuyển sang:
+Tên đề tài cập nhật     - Còn hạn nộp (OPEN): Giữ ở STAGE_1 để SV gửi lại tên khác
+Chuyển sang:            - Trong EXTENDED: SV không được gửi lại -> Job quét kế tiếp tự xử lý
 STAGE_2_TOPIC_CONFIRMED
         │
         ▼
    Sinh viên thực hiện đồ án
         │
-   (Nếu cần đổi tên đề tài khi deadlineStatus === "OPEN")
+   (Nếu cần đổi tên đề tài khi mốc SV_CHINH_SUA_NOP_LAI_DE_CUONG === "OPEN")
         │
         ▼
   Sinh viên gọi: POST /topic/change-title
-  (Áp dụng chung hạn nộp đề cương SV_CHINH_SUA_NOP_LAI_DE_CUONG, tên mới khác tên cũ & không có yêu cầu PENDING)
+  (Áp dụng mốc SV_CHINH_SUA_NOP_LAI_DE_CUONG, tên mới khác tên cũ & không có yêu cầu PENDING)
         │
         ▼
   Tạo bản ghi TopicTitleHistory: PENDING -> GVHD chính duyệt / từ chối (OPEN hoặc EXTENDED)
 ```
 
-### Lưu ý về Mốc thời hạn (Deadline) dùng chung
-- Cả 3 nghiệp vụ **Chốt tên đề tài chính thức lần đầu** (`POST /topic/confirm-title`), **Xin đổi/cập nhật tên đề tài** (`POST /topic/change-title`), và **Nộp đề cương** (`POST /outline/submit`) đều sử dụng chung một mốc thời hạn duy nhất: **`SV_CHINH_SUA_NOP_LAI_DE_CUONG`** (*"Hạn sinh viên chỉnh sửa & nộp lại đề cương"*) do Trưởng bộ môn cấu hình cho học kỳ.
-- Chỉ khi `deadlineStatus === "OPEN"` (tức `startDate <= now <= endDate` và trạng thái mốc khác `EXTENDED` / `COMPLETED`), sinh viên mới được phép chốt tên lần đầu hoặc gửi yêu cầu đổi tên đề tài.
+### Lưu ý về 2 Mốc thời hạn (Deadline) áp dụng
+- **Chốt tên đề tài chính thức lần đầu (`POST /topic/confirm-title`)**: Sử dụng mốc riêng **`CHOT_TEN_DE_TAI`** (*"Hạn chốt tên đề tài"*).
+- **Xin đổi/cập nhật tên đề tài (`POST /topic/change-title`, khi đề tài đã `>= STAGE_2_TOPIC_CONFIRMED`)**: Sử dụng chung mốc nộp đề cương **`SV_CHINH_SUA_NOP_LAI_DE_CUONG`** (*"Hạn sinh viên chỉnh sửa & nộp lại đề cương"*). Khi mốc đề cương đã đóng (kể cả khi đề tài sang GĐ 4) thì không đổi tên được nữa.
+- Chỉ khi `deadlineStatus === "OPEN"` (tức `startDate <= now <= endDate` và trạng thái mốc khác `EXTENDED` / `COMPLETED`), sinh viên mới được phép gửi yêu cầu chốt tên hoặc đổi tên.
 - Khi mốc ở trạng thái **`EXTENDED`** (gia hạn chấm cho giảng viên): **khóa toàn bộ thao tác nộp/đổi tên của sinh viên**, nhưng GVHD chính vẫn tiếp tục được duyệt (`APPROVED`) hoặc từ chối (`REJECTED`) các yêu cầu `PENDING` đã gửi trước đó.
-- Thông tin thời hạn này được Backend trả kèm **trực tiếp trong `StudentTopicOverviewResponse`** (`GET /topic/my-title-history`) gồm: `deadlineName`, `deadlineStartDate`, `deadlineEndDate`, `deadlineActive`, `deadlineStatus` — thống nhất định dạng với `RegistrationOverviewResponse` ở Giai đoạn 1.
+- Thông tin thời hạn này được Backend trả kèm **trực tiếp trong `StudentTopicOverviewResponse`** (`GET /topic/my-title-history`) gồm: `deadlineName`, `deadlineStartDate`, `deadlineEndDate`, `deadlineActive`, `deadlineStatus` — **tự động chọn mốc theo giai đoạn đề tài** (`CHOT_TEN_DE_TAI` khi chưa có tên chính thức / chưa có đề tài; `SV_CHINH_SUA_NOP_LAI_DE_CUONG` khi đã có tên chính thức).
 
 ---
 
@@ -77,7 +78,10 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 - **Query Params**:
   - `semesterId` (`UUID`, *không bắt buộc*): `publicId` của học kỳ cần tra cứu. Nếu bỏ trống, Backend tự động lấy học kỳ hiện tại (`ONGOING`).
 - **Đặc điểm phản hồi**:
-  - **Luôn trả kèm thông tin Deadline** (`deadlineName`, `deadlineStartDate`, `deadlineEndDate`, `deadlineActive`, `deadlineStatus`), **ngay cả khi sinh viên chưa có đề tài trong học kỳ** (khi đó `topicPublicId: null`, các trường đề tài là `null`, `histories: []`).
+  - **Luôn trả kèm thông tin Deadline** (`deadlineName`, `deadlineStartDate`, `deadlineEndDate`, `deadlineActive`, `deadlineStatus`) tương ứng với giai đoạn hiện tại của đề tài:
+    - Nếu sinh viên **chưa có đề tài** hoặc đề tài **chưa có tên chính thức** (`currentStage < STAGE_2_TOPIC_CONFIRMED` hoặc `officialName == null`): trả về thông tin mốc **`CHOT_TEN_DE_TAI`** (*"Hạn chốt tên đề tài"*).
+    - Nếu đề tài **đã có tên chính thức** (`currentStage >= STAGE_2_TOPIC_CONFIRMED` và `officialName != null`): trả về thông tin mốc **`SV_CHINH_SUA_NOP_LAI_DE_CUONG`** (*"Hạn sinh viên chỉnh sửa & nộp lại đề cương"*).
+  - Nếu sinh viên chưa có đề tài trong học kỳ, `topicPublicId` là `null`, các trường đề tài là `null`, `histories: []`, nhưng vẫn có đầy đủ 5 trường deadline.
 - **Response Success (HTTP 200)**:
 
 ```json
@@ -96,7 +100,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
     "lecturerName": "Trần Văn Bình",
     "coLecturerPublicId": "018db26a-932f-789a-bc01-bbbbbbbbbbbb",
     "coLecturerName": "Lê Văn Cường",
-    "deadlineName": "Hạn sinh viên chỉnh sửa & nộp lại đề cương",
+    "deadlineName": "Hạn chốt tên đề tài",
     "deadlineStartDate": "2026-11-01T00:00:00",
     "deadlineEndDate": "2026-11-20T23:59:59",
     "deadlineActive": true,
@@ -127,11 +131,11 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 
 | Giá trị `deadlineStatus` | `deadlineActive` | Ý nghĩa |
 |---|:---:|---|
-| `NOT_CONFIGURED` | `null` | Học kỳ chưa cấu hình mốc `SV_CHINH_SUA_NOP_LAI_DE_CUONG` hoặc cả `startDate`/`endDate` đều `null`. |
+| `NOT_CONFIGURED` | `null` | Học kỳ chưa cấu hình mốc tương ứng (`CHOT_TEN_DE_TAI` hoặc `SV_CHINH_SUA_NOP_LAI_DE_CUONG`), hoặc cả `startDate`/`endDate` đều `null`. |
 | `INACTIVE` | `false` | Mới cấu hình 1 trong 2 mốc `startDate` / `endDate`. |
 | `NOT_STARTED` | `true` | Chưa đến thời điểm bắt đầu mở (`now < deadlineStartDate`). |
-| `OPEN` | `true` | Đang mở cho phép sinh viên chốt tên lần đầu, xin đổi tên đề tài và nộp đề cương (`deadlineStartDate <= now <= deadlineEndDate` và trạng thái không phải `EXTENDED`/`COMPLETED`). |
-| `EXTENDED` | `true` | TBM đang gia hạn thời gian chấm cho giảng viên (`status == EXTENDED` trong khoảng `startDate..endDate`). Ở trạng thái này **khóa mọi thao tác nộp mới của sinh viên** (chốt tên, đổi tên và nộp đề cương); giảng viên tiếp tục thẩm định/duyệt các yêu cầu `PENDING` đã gửi trước đó. |
+| `OPEN` | `true` | Đang mở cho phép sinh viên chốt tên lần đầu (`CHOT_TEN_DE_TAI`) hoặc xin đổi tên đề tài (`SV_CHINH_SUA_NOP_LAI_DE_CUONG`) (`deadlineStartDate <= now <= deadlineEndDate` và trạng thái không phải `EXTENDED`/`COMPLETED`). |
+| `EXTENDED` | `true` | TBM đang gia hạn thời gian chấm cho giảng viên (`status == EXTENDED` trong khoảng `startDate..endDate`). Ở trạng thái này **khóa mọi thao tác nộp mới của sinh viên** (chốt tên, đổi tên và nộp đề cương); giảng viên tiếp tục duyệt/thẩm định các yêu cầu `PENDING` đã gửi trước đó. |
 | `CLOSED` | `true` | Đã quá hạn kết thúc (`now > deadlineEndDate`) hoặc mốc đã đóng (`COMPLETED`). |
 
 ---
@@ -142,7 +146,7 @@ Tất cả API trả về cấu trúc wrapper chuẩn `APIResponse<T>` (`{ code:
 - **Điều kiện gọi thành công**:
   1. Đề tài của sinh viên đang ở trạng thái `IN_PROGRESS`.
   2. Giai đoạn hiện tại là `STAGE_1_ADVISOR_ASSIGNED` và đề tài chưa có tên (`officialName == null`).
-  3. Thời hạn (`SV_CHINH_SUA_NOP_LAI_DE_CUONG`) đã cấu hình và **đang mở cho sinh viên** (`deadlineStatus === "OPEN"`, không bị khóa bởi `EXTENDED` hay `COMPLETED`).
+  3. Thời hạn chốt tên đề tài (**`CHOT_TEN_DE_TAI`**) đã cấu hình và **đang mở cho sinh viên** (`deadlineStatus === "OPEN"`, không bị khóa bởi `EXTENDED` hay `COMPLETED`).
   4. Đề tài **chưa có yêu cầu nào đang ở trạng thái `PENDING`**.
 - **Request Body**:
 ```json
@@ -209,8 +213,8 @@ Khi API trả về lỗi (HTTP 4xx / 5xx), response body có dạng:
 | **409** | `3051` | `TOPIC_TITLE_PENDING_EXISTS` | Đang có một yêu cầu chờ GVHD duyệt. Cần ẩn/khóa form nộp để tránh gửi trùng lặp. |
 | **409** | `3056` | `TOPIC_STAGE_INVALID_FOR_TITLE` | Sai mốc giai đoạn (ví dụ: đã chốt tên rồi nhưng gọi `/confirm-title`, hoặc chưa chốt tên lần đầu mà gọi `/change-title`). |
 | **409** | `3057` | `TOPIC_NOT_IN_PROGRESS` | Đề tài không ở trạng thái đang thực hiện (đã bị đình chỉ `DISQUALIFIED` hoặc bị hủy `CANCELLED`). |
-| **403** | `3054` | `TOPIC_CONFIRMATION_DEADLINE_CLOSED` | Thời hạn nộp đề cương / cập nhật tên đề tài chưa mở, đang gia hạn chấm (`EXTENDED`) hoặc đã kết thúc. Hiển thị thông báo liên hệ GVHD / Trưởng bộ môn. |
-| **404** | `3053` | `TOPIC_CONFIRMATION_DEADLINE_NOT_FOUND` | Chưa cấu hình thời hạn nộp đề cương / cập nhật tên đề tài cho học kỳ này. |
+| **403** | `3054` | `TOPIC_CONFIRMATION_DEADLINE_CLOSED` | Thời hạn chưa mở, đang gia hạn chấm (`EXTENDED`) hoặc đã kết thúc.<br>• Chốt tên lần đầu (`CHOT_TEN_DE_TAI`): *"Thời hạn chốt tên đề tài chưa mở hoặc đã kết thúc"*<br>• Đổi tên (`SV_CHINH_SUA_NOP_LAI_DE_CUONG`): *"Thời hạn nộp đề cương (áp dụng cho đổi tên đề tài) chưa mở hoặc đã kết thúc"* |
+| **404** | `3053` | `TOPIC_CONFIRMATION_DEADLINE_NOT_FOUND` | Học kỳ chưa cấu hình thời hạn tương ứng.<br>• Chốt tên lần đầu: *"Chưa cấu hình thời hạn chốt tên đề tài cho học kỳ này"*<br>• Đổi tên: *"Chưa cấu hình thời hạn nộp đề cương (áp dụng cho đổi tên đề tài) cho học kỳ này"* |
 | **403** | `2001` | `FORBIDDEN` | Sinh viên không có tên trong danh sách làm đồ án kỳ này, hoặc tài khoản bị khóa. |
 | **401** | `2000` | `UNAUTHORIZED` | Phiên đăng nhập hết hạn. Điều hướng về màn hình đăng nhập. |
 
@@ -386,12 +390,15 @@ export const useRequestChangeTitle = () => {
 Dựa vào dữ liệu trả về từ `GET /topic/my-title-history`:
 
 ### 1. Hiển thị Thời hạn nộp thực tế (bỏ toàn bộ dữ liệu hardcode):
-- Thay thế hoàn toàn dữ liệu giả `getTermInfo(term).outlineDeadline` / `'28/10/2026 23:59:55'` trong `StudentOutlinePage.tsx` và `"Từ 01/10/2026 đến 15/01/2027"` trong `StudentOutlinePreviewPage.tsx` bằng `topicOverview.deadlineStartDate`, `topicOverview.deadlineEndDate`, `topicOverview.deadlineStatus`:
-  - `NOT_CONFIGURED` / `INACTIVE`: Hiển thị `"Chưa cấu hình thời hạn nộp"` (màu xám).
-  - `NOT_STARTED`: Hiển thị `"Chưa mở (Mở từ {formatDateTime(deadlineStartDate)} - Đóng lúc {formatDateTime(deadlineEndDate)})"` (màu xanh/xám).
-  - `OPEN`: Hiển thị `"Từ {formatDateTime(deadlineStartDate)} đến {formatDateTime(deadlineEndDate)} (Đang mở)"` (màu xanh/hổ phách).
-  - `EXTENDED`: Hiển thị `"Đã hết hạn nộp — Đang trong thời gian gia hạn chấm của giảng viên (đến {formatDateTime(deadlineEndDate)})"` (màu cam).
-  - `CLOSED`: Hiển thị `"Đã hết hạn ({formatDateTime(deadlineEndDate)})"` (màu đỏ).
+- Thay thế hoàn toàn dữ liệu giả `getTermInfo(term).outlineDeadline` / `'28/10/2026 23:59:55'` trong `StudentOutlinePage.tsx` và `"Từ 01/10/2026 đến 15/01/2027"` trong `StudentOutlinePreviewPage.tsx`:
+  - **`GET /topic/my-title-history`** trả về `topicOverview.deadlineName`, `deadlineStartDate`, `deadlineEndDate`, `deadlineStatus` tương ứng với **mốc chốt tên (`CHOT_TEN_DE_TAI`)** khi chưa chốt tên, và tự động chuyển sang **mốc đề cương (`SV_CHINH_SUA_NOP_LAI_DE_CUONG`)** sau khi đề tài đã chốt tên chính thức.
+  - Nếu cần hiển thị riêng **hạn nộp file đề cương** trên `StudentOutlinePage.tsx` ngay cả khi sinh viên vẫn đang ở `STAGE_1`, sử dụng `GET /outline/my-outline` (luôn trả về mốc `SV_CHINH_SUA_NOP_LAI_DE_CUONG`).
+  - Quy tắc hiển thị nhãn theo `deadlineStatus`:
+    - `NOT_CONFIGURED` / `INACTIVE`: Hiển thị `"Chưa cấu hình thời hạn nộp"` (màu xám).
+    - `NOT_STARTED`: Hiển thị `"Chưa mở (Mở từ {formatDateTime(deadlineStartDate)} - Đóng lúc {formatDateTime(deadlineEndDate)})"` (màu xanh/xám).
+    - `OPEN`: Hiển thị `"Từ {formatDateTime(deadlineStartDate)} đến {formatDateTime(deadlineEndDate)} (Đang mở)"` (màu xanh/hổ phách).
+    - `EXTENDED`: Hiển thị `"Đã hết hạn nộp — Đang trong thời gian gia hạn chấm của giảng viên (đến {formatDateTime(deadlineEndDate)})"` (màu cam).
+    - `CLOSED`: Hiển thị `"Đã hết hạn ({formatDateTime(deadlineEndDate)})"` (màu đỏ).
 
 ### 2. Trạng thái chưa có đề tài trong học kỳ (`!topicOverview?.topicPublicId`):
 - Hiển thị thông báo: *"Bạn chưa nằm trong danh sách sinh viên thực hiện đồ án của học kỳ này"* và khóa nút gửi/sửa tên, nhưng vẫn hiển thị `deadlineStatus` / thời hạn nếu đã cấu hình.
@@ -405,12 +412,12 @@ const hasPendingRequest = topicOverview?.histories?.some((h) => h.status === 'PE
   - **Khóa (Disable)** ô nhập và nút gửi tên mới để tránh gửi trùng (`3051 - TOPIC_TITLE_PENDING_EXISTS`).
 
 ### 4. Điều kiện mở Form Chốt tên lần đầu (`/topic/confirm-title`) & Form Đổi tên (`/topic/change-title`):
-- Cả hai thao tác **Chốt tên lần đầu** và **Đổi/Cập nhật tên đề tài** dùng chung điều kiện hạn mở nộp của mốc `SV_CHINH_SUA_NOP_LAI_DE_CUONG`:
+- Cả hai thao tác kiểm tra cùng điều kiện `deadlineStatus === 'OPEN'` trên `topicOverview` (Backend đã tự động chọn đúng mốc `CHOT_TEN_DE_TAI` cho chốt tên lần đầu và `SV_CHINH_SUA_NOP_LAI_DE_CUONG` cho đổi tên):
   ```typescript
   const isDeadlineOpenForStudent = topicOverview?.deadlineStatus === 'OPEN';
   ```
 - **Nếu `deadlineStatus !== 'OPEN'`** (bao gồm `NOT_CONFIGURED`, `INACTIVE`, `NOT_STARTED`, `EXTENDED`, `CLOSED`):
-  - **Khóa (Disable)** thao tác gửi của **cả hai form** (`confirm-title` và `change-title`), kèm thông báo thống nhất theo thời hạn nộp đề cương và cập nhật tên đề tài.
+  - **Khóa (Disable)** thao tác gửi của form tương ứng (`confirm-title` hoặc `change-title`), kèm thông báo rõ theo `topicOverview.deadlineName` (hoặc trạng thái gia hạn chấm `EXTENDED` / chưa mở / đã đóng).
 - **Form Chốt tên lần đầu (`/topic/confirm-title`)**:
   - Hiển thị khi `topicOverview?.currentStage === 'STAGE_1_ADVISOR_ASSIGNED' && !topicOverview?.officialName`.
   - Điền sẵn gợi ý `provisionalName` (nếu có).

@@ -471,7 +471,7 @@ export function normalizeDepartment(value: string): string {
     .trim()
     .replace(/^bo mon /, '')
     .replace(/^nganh /, '')
-    .replace(/^khoa /, '')
+    .replace(/^khoa (?!hoc\b)/, '')
   if (raw.includes('phan mem')) return 'ky thuat phan mem'
   return raw
 }

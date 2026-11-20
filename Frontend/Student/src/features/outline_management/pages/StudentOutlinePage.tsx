@@ -24,8 +24,10 @@ import {
 import { extractOutlineFileName, isSafeFileUrl } from '../services/outline.service'
 import type { OutlineStatus, SubmitOutlineRequest } from '../types/outline.types'
 import {
+  formatOutlineDeadlineName,
   getOutlineDeadlineDisplay,
   getOutlineSubmitState,
+  hasDistinctTopicDeadline,
 } from '../utils/outlineDeadline'
 
 const OUTLINE_STATUS_STYLE: Record<
@@ -99,9 +101,12 @@ export default function StudentOutlinePage() {
     toast[type](message)
   }
 
-  // 4. Các điều kiện nghiệp vụ dựa theo API response (GET /topic/my-title-history)
+  // 4. Các điều kiện nghiệp vụ dựa theo API response (GET /topic/my-title-history & GET /outline/my-outline)
   const hasTopic = Boolean(topicOverview?.topicPublicId)
-  const isDisqualified = topicOverview?.status === 'DISQUALIFIED'
+  const isDisqualified =
+    topicOverview?.status === 'DISQUALIFIED' || outlineData?.topicStatus === 'DISQUALIFIED'
+  const disqualificationReason =
+    outlineData?.disqualificationReason || topicOverview?.disqualificationReason
   const isTopicLockedStatus =
     Boolean(topicOverview?.status) && topicOverview?.status !== 'IN_PROGRESS'
   const isInitial =
@@ -111,8 +116,16 @@ export default function StudentOutlinePage() {
     !topicOverview?.officialName
   const isChange = hasTopic && topicOverview?.officialName != null && !hasPendingRequest
 
-  const deadlineDisplay = getOutlineDeadlineDisplay(topicOverview)
-  // Cả chốt tên lần đầu lẫn đổi/cập nhật tên đều dùng chung mốc hạn nộp đề cương (chỉ mở khi deadlineStatus === 'OPEN')
+  // Chốt tên lần đầu dùng mốc CHOT_TEN_DE_TAI; đổi tên dùng mốc SV_CHINH_SUA_NOP_LAI_DE_CUONG
+  const topicDeadlineLabel =
+    topicOverview?.deadlineName ||
+    (isChange
+      ? 'Thời hạn nộp đề cương (áp dụng cho đổi tên đề tài)'
+      : 'Thời hạn chốt tên đề tài')
+  const deadlineDisplay = getOutlineDeadlineDisplay(topicOverview, {
+    fallbackName: topicDeadlineLabel,
+  })
+  // Chỉ mở thao tác chốt tên / đổi tên khi deadlineStatus === 'OPEN'
   const isBlockedByDeadline = !deadlineDisplay.isOpenForStudent
   const canEditTopic =
     !isTopicLoading &&
@@ -183,7 +196,15 @@ export default function StudentOutlinePage() {
   const outlineSubmitState = getOutlineSubmitState(outlineData)
   const outlineDeadlineDisplay = outlineData
     ? outlineSubmitState.deadlineDisplay
-    : getOutlineDeadlineDisplay(deadlineSource)
+    : getOutlineDeadlineDisplay(deadlineSource, {
+        fallbackName: 'Thời hạn nộp đề cương',
+      })
+  const showAdditionalTopicDeadline =
+    !isTopicLoading &&
+    !isTopicError &&
+    !isOutlineLoading &&
+    !isOutlineError &&
+    hasDistinctTopicDeadline(topicOverview, outlineData)
   const canSubmitOutline =
     !isOutlineLoading && !isOutlineError && outlineSubmitState.canSubmit
 
@@ -200,6 +221,7 @@ export default function StudentOutlinePage() {
       {
         file: payload.file,
         title: payload.title,
+        submissionNote: 'Soạn và nộp từ hệ thống trực tuyến',
       },
       {
         onSuccess: () => {
@@ -248,13 +270,24 @@ export default function StudentOutlinePage() {
   }
 
   const outlineHistories = outlineData?.histories ?? []
-  const hasExactOutlineFileMatch = Boolean(
-    outlineData?.outlineFile &&
-      outlineHistories.some((h) => h.outlineHistoryFile === outlineData.outlineFile),
-  )
 
   return (
     <div className="w-full max-w-full space-y-4">
+      {isDisqualified && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-3 shadow-xs"
+        >
+          <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-sm text-rose-900">Đề tài đã bị đình chỉ (DISQUALIFIED)</p>
+            <p className="text-rose-700">
+              Bạn đã bị dừng thực hiện đồ án trong học kỳ này.
+              {disqualificationReason ? ` Lý do: ${disqualificationReason}` : ''}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 1. Khối thông tin đề cương (Cùng 1 khối, thẳng hàng trên 1 line: Tên đề tài, Nội dung, Thời hạn nộp, Nút thao tác) */}
       <div className="rounded-xl border border-slate-200 bg-white px-4 sm:px-5 py-3.5 sm:py-4 shadow-xs">
@@ -269,7 +302,7 @@ export default function StudentOutlinePage() {
             }}
             className="lg:pr-4 xl:pr-5"
           >
-            <div className="min-h-[28px] flex items-center justify-between gap-2 mb-2">
+            <div className="min-h-[28px] flex items-center justify-between gap-2 mb-2 flex-wrap">
               <label
                 htmlFor="outlineTopicInput"
                 className="text-xs font-bold text-slate-700 flex items-center gap-1.5 flex-wrap"
@@ -288,20 +321,41 @@ export default function StudentOutlinePage() {
                   </span>
                 )}
               </label>
-              <button
-                type="submit"
-                disabled={isTopicSubmitDisabled}
-                className="h-7 px-2.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[11px] font-bold tracking-wide uppercase transition cursor-pointer shadow-2xs inline-flex items-center justify-center gap-1 shrink-0 whitespace-nowrap"
-              >
-                <Send size={12} className="shrink-0" />
-                <span>
-                  {isMutating
-                    ? 'Đang gửi...'
-                    : isInitial
-                      ? 'Chốt tên đề tài'
-                      : 'Gửi yêu cầu'}
-                </span>
-              </button>
+
+              <div className="flex items-center gap-2.5 ml-auto flex-wrap justify-end">
+                {showAdditionalTopicDeadline && (
+                  <span
+                    id="topicDeadlineText"
+                    className={cn(
+                      'inline-flex items-center gap-1 text-[11.5px] font-semibold whitespace-nowrap',
+                      deadlineDisplay.toneClassName,
+                    )}
+                  >
+                    <Clock size={12} className="shrink-0" />
+                    <span>
+                      {formatOutlineDeadlineName(
+                        topicOverview?.deadlineName,
+                        'Hạn chốt tên đề tài',
+                      )}
+                      : {deadlineDisplay.text}
+                    </span>
+                  </span>
+                )}
+                <button
+                  type="submit"
+                  disabled={isTopicSubmitDisabled}
+                  className="h-7 px-2.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[11px] font-bold tracking-wide uppercase transition cursor-pointer shadow-2xs inline-flex items-center justify-center gap-1 shrink-0 whitespace-nowrap"
+                >
+                  <Send size={12} className="shrink-0" />
+                  <span>
+                    {isMutating
+                      ? 'Đang gửi...'
+                      : isInitial
+                        ? 'Chốt tên đề tài'
+                        : 'Gửi yêu cầu'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {isTopicLoading ? (
@@ -321,7 +375,7 @@ export default function StudentOutlinePage() {
                 </p>
                 <p className="text-[11px] text-rose-700">
                   Bạn đã bị dừng thực hiện đồ án trong học kỳ này. Lý do:{' '}
-                  {topicOverview?.disqualificationReason || 'Không xác định'}
+                  {disqualificationReason || 'Không xác định'}
                 </p>
               </div>
             ) : !hasTopic ? (
@@ -340,7 +394,8 @@ export default function StudentOutlinePage() {
                     hasPendingRequest ||
                     isMutating ||
                     isTopicLockedStatus ||
-                    isBlockedByDeadline
+                    isBlockedByDeadline ||
+                    (!isInitial && !isChange)
                   }
                   onChange={(e) => {
                     setEditedTopic(e.target.value)
@@ -430,7 +485,7 @@ export default function StudentOutlinePage() {
             <div className="min-h-[28px] flex items-center mb-2">
               <h2 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Clock size={14} className="text-[#1565C0] shrink-0" />
-                <span>{deadlineSource?.deadlineName || 'Thời hạn nộp'}</span>
+                <span>{formatOutlineDeadlineName(deadlineSource?.deadlineName)}</span>
               </h2>
             </div>
 
@@ -483,7 +538,10 @@ export default function StudentOutlinePage() {
                 <strong className="text-slate-900 font-semibold">
                   {isOutlineLoading
                     ? 'Đang tải...'
-                    : outlineData?.reviewerName || 'Chưa phân công'}
+                    : outlineData?.reviewerName ||
+                      (outlineData?.publicId === null
+                        ? 'Hiển thị sau khi nộp lần đầu'
+                        : 'Chưa phân công')}
                 </strong>
               </div>
               {topicOverview?.currentStageDescription && (
@@ -617,23 +675,12 @@ export default function StudentOutlinePage() {
                   </td>
                 </tr>
               ) : (
-                outlineHistories.map((row, idx) => {
+                outlineHistories.map((row) => {
                   const canOpenFile = isSafeFileUrl(row.outlineHistoryFile)
                   const displayFileName = extractOutlineFileName(row.outlineHistoryFile)
-                  const isLatestRow = hasExactOutlineFileMatch
-                    ? row.outlineHistoryFile === outlineData?.outlineFile
-                    : idx === 0
-                  const rowAdvisorFeedback =
-                    isLatestRow && outlineData?.advisorFeedback
-                      ? outlineData.advisorFeedback
-                      : null
+                  const rowAdvisorFeedback = row.advisorFeedback?.trim() || null
 
-                  const isRejected =
-                    row.status === 'REJECTED' || row.status === 'REQUEST_CHANGES'
-                  const reviewerFeedbackText =
-                    isRejected && row.reviewFeedback?.trim()
-                      ? row.reviewFeedback.trim()
-                      : '-'
+                  const reviewerFeedbackText = row.reviewFeedback?.trim() || '—'
 
                   return (
                     <tr key={row.publicId} className="hover:bg-slate-50/60 transition-colors">
@@ -653,7 +700,7 @@ export default function StudentOutlinePage() {
                                 {displayFileName}
                               </a>
                               <a
-                                href={row.outlineHistoryFile}
+                                href={`/student/outline/preview?url=${encodeURIComponent(row.outlineHistoryFile)}&file=${encodeURIComponent(displayFileName)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1 rounded text-slate-400 hover:text-[#1565C0] hover:bg-blue-50 transition"
@@ -701,13 +748,6 @@ export default function StudentOutlinePage() {
       <SubmitOutlineFileModal
         open={fileModalOpen}
         isSubmitting={submitOutlineMutation.isPending}
-        defaultTitle={
-          outlineData?.title ||
-          outlineData?.topicName ||
-          topicOverview?.officialName ||
-          topicOverview?.provisionalName ||
-          ''
-        }
         onClose={() => setFileModalOpen(false)}
         onSubmitFile={handleFileSubmit}
       />

@@ -1,13 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { FileCheck2, FileUp, UploadCloud, X } from 'lucide-react'
+import { validateOutlineFile } from '../services/outline.service'
 import type { SubmitOutlineRequest } from '../types/outline.types'
-
-const MAX_OUTLINE_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 interface SubmitOutlineFileModalProps {
   open: boolean
   isSubmitting?: boolean
-  defaultTitle?: string
   onClose: () => void
   onSubmitFile: (payload: SubmitOutlineRequest) => void
 }
@@ -15,12 +13,10 @@ interface SubmitOutlineFileModalProps {
 export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
   open,
   isSubmitting = false,
-  defaultTitle,
   onClose,
   onSubmitFile,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [submissionNote, setSubmissionNote] = useState<string>('')
   const [fileError, setFileError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -29,7 +25,6 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
     setPrevOpen(open)
     if (open) {
       setSelectedFile(null)
-      setSubmissionNote('')
       setFileError(null)
     }
   }
@@ -40,16 +35,10 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
     const f = e.target.files?.[0] ?? null
     if (!f) return
 
-    if (!/\.(pdf|doc|docx)$/i.test(f.name)) {
+    const validationError = validateOutlineFile(f)
+    if (validationError) {
       setSelectedFile(null)
-      setFileError('Chỉ hỗ trợ tệp định dạng .pdf, .doc, .docx.')
-      e.target.value = ''
-      return
-    }
-
-    if (f.size > MAX_OUTLINE_FILE_SIZE_BYTES) {
-      setSelectedFile(null)
-      setFileError('Dung lượng tệp không được vượt quá 50MB.')
+      setFileError(validationError)
       e.target.value = ''
       return
     }
@@ -89,11 +78,12 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
               <strong className="font-bold text-slate-700">.pdf, .doc, .docx</strong>
             </p>
             <p>
-              • Dung lượng tối đa: <strong className="font-bold text-slate-700">50MB</strong>
+              • Dung lượng tối đa: <strong className="font-bold text-slate-700">nhỏ hơn 10 MB</strong>
             </p>
             <p>
               • Vui lòng đặt tên tệp theo cú pháp:{' '}
-              <em className="text-slate-600">De_cuong_MSSV_HoTen.pdf</em>
+              <em className="text-slate-700 font-medium">Tenlop_MaSV_HoVaTen.pdf</em>{' '}
+              <span className="text-[11px] text-slate-500">(VD: DHKTPM17A_22110001_NguyenVanAn.pdf)</span>
             </p>
           </div>
 
@@ -154,24 +144,6 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
             </p>
           </div>
 
-          <div>
-            <label
-              htmlFor="outlineSubmissionNoteInput"
-              className="block text-xs font-semibold text-slate-700 mb-1.5"
-            >
-              Ghi chú khi nộp <span className="text-slate-400 font-normal">(không bắt buộc)</span>
-            </label>
-            <textarea
-              id="outlineSubmissionNoteInput"
-              rows={2}
-              disabled={isSubmitting}
-              value={submissionNote}
-              onChange={(e) => setSubmissionNote(e.target.value)}
-              placeholder="Ví dụ: Em nộp bản đề cương lần 1 / Em đã chỉnh sửa theo góp ý..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#1565C0]/20 focus:border-[#1565C0] disabled:bg-slate-50 disabled:text-slate-400 resize-y"
-            />
-          </div>
-
           <div className="pt-2 flex items-center justify-end gap-2">
             <button
               type="button"
@@ -188,8 +160,6 @@ export const SubmitOutlineFileModal: React.FC<SubmitOutlineFileModalProps> = ({
                 if (selectedFile) {
                   onSubmitFile({
                     file: selectedFile,
-                    submissionNote: submissionNote.trim() || undefined,
-                    title: defaultTitle?.trim() || undefined,
                   })
                 }
               }}

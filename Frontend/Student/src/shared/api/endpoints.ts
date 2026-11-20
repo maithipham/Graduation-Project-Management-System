@@ -51,6 +51,11 @@ export const API_ENDPOINTS = {
     myOutline: '/outline/my-outline',
     submit: '/outline/submit',
   },
+  report: {
+    myReport: '/report/my-report',
+    submit: '/report/submit',
+    detail: (publicId: string) => `/report/${publicId}`,
+  },
   advisor: {
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
   },
