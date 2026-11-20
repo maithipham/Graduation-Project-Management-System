@@ -17,8 +17,10 @@
 
 **Sinh viên thấy gì:**
 - 3 điểm nhóm: **Hướng dẫn (HD)**, **Phản biện (PB)**, **Hội đồng (HĐ)**.
-- Trọng số (%) của từng nhóm.
 - **Điểm tổng kết**.
+
+> Hệ thống **không có trọng số** cho 3 điểm nhóm. Điểm tổng kết là trung bình cộng điểm của GVHD, 2 cán bộ phản biện
+> và các thành viên hội đồng bảo vệ (QĐ1305), BE tự tính.
 
 **Sinh viên KHÔNG thấy:** điểm từng tiêu chí, điểm từng phiếu chấm (ví dụ PB1 / PB2 riêng), nhận xét của giảng viên, tên người chấm.
 
@@ -27,7 +29,7 @@ Thêm vào `src/shared/api/endpoints.ts` (trong nhóm `student`):
 ```ts
 student: {
   // ...
-  // Điểm đồ án của sinh viên đang đăng nhập (HD / PB / HĐ + trọng số + tổng kết)
+  // Điểm đồ án của sinh viên đang đăng nhập (HD / PB / HĐ + tổng kết)
   myScore: '/thesis-score/my-score',
 },
 ```
@@ -76,14 +78,10 @@ Lưu ý: chọn học kỳ mà sinh viên **không có đề tài** → BE trả
     "topicPublicId": "0192f3b8-1d40-7e21-8c6a-5b9f4e2a1c03",
     "topicName": "Xây dựng hệ thống quản lý đồ án tốt nghiệp",
     "advisorScore": 8.5,
-    "advisorWeight": 30.00,
     "examinerScore": 8.3,
-    "examinerWeight": 20.00,
     "examinerPassed": true,
     "councilScore": 8.0,
-    "councilWeight": 50.00,
-    "finalScore": 8.2,
-    "weightConfigured": true
+    "finalScore": 8.2
   }
 }
 ```
@@ -99,19 +97,15 @@ Lưu ý: chọn học kỳ mà sinh viên **không có đề tài** → BE trả
     "topicPublicId": "0192f3b8-1d40-7e21-8c6a-5b9f4e2a1c03",
     "topicName": "Xây dựng hệ thống quản lý đồ án tốt nghiệp",
     "advisorScore": 8.5,
-    "advisorWeight": 30.00,
     "examinerScore": null,
-    "examinerWeight": 20.00,
     "examinerPassed": null,
     "councilScore": null,
-    "councilWeight": 50.00,
-    "finalScore": null,
-    "weightConfigured": true
+    "finalScore": null
   }
 }
 ```
 
-### 3.3. Chưa có điểm nào, kỳ chưa cấu hình trọng số
+### 3.3. Chưa có điểm nào
 
 ```json
 {
@@ -122,14 +116,10 @@ Lưu ý: chọn học kỳ mà sinh viên **không có đề tài** → BE trả
     "topicPublicId": "0192f3b8-1d40-7e21-8c6a-5b9f4e2a1c03",
     "topicName": "Xây dựng hệ thống quản lý đồ án tốt nghiệp",
     "advisorScore": null,
-    "advisorWeight": null,
     "examinerScore": null,
-    "examinerWeight": null,
     "examinerPassed": null,
     "councilScore": null,
-    "councilWeight": null,
-    "finalScore": null,
-    "weightConfigured": false
+    "finalScore": null
   }
 }
 ```
@@ -145,41 +135,35 @@ Lưu ý: chọn học kỳ mà sinh viên **không có đề tài** → BE trả
 | `topicPublicId` | string (UUID) | Dùng làm `key` |
 | `topicName` | string \| null | Tên đề tài; có thể `null` nếu sinh viên chưa chốt tên đề tài |
 | `advisorScore` | number \| null | Điểm Hướng dẫn, thang 10, **1 chữ số thập phân**. `null` = GVHD chưa nộp phiếu |
-| `advisorWeight` | number \| null | Trọng số % của điểm HD (tối đa 2 chữ số thập phân) |
 | `examinerScore` | number \| null | Điểm Phản biện = trung bình **2 phiếu** phản biện, 1 chữ số thập phân. `null` = chưa đủ 2 phiếu |
-| `examinerWeight` | number \| null | Trọng số % của điểm PB |
 | `examinerPassed` | boolean \| null | `true` khi điểm PB ≥ 5.0; `false` khi < 5.0; `null` khi chưa có điểm PB |
 | `councilScore` | number \| null | Điểm Hội đồng = trung bình **5 phiếu** hội đồng, 1 chữ số thập phân. `null` = chưa đủ 5 phiếu |
-| `councilWeight` | number \| null | Trọng số % của điểm HĐ |
-| `finalScore` | number \| null | Điểm tổng kết, 1 chữ số thập phân. `null` = chưa đủ 3 điểm **hoặc** kỳ chưa có cấu hình trọng số |
-| `weightConfigured` | boolean | `false` = Trưởng ngành **chưa cấu hình** trọng số cho kỳ → 3 trọng số và `finalScore` đều `null` |
+| `finalScore` | number \| null | Điểm tổng kết theo QĐ1305, 1 chữ số thập phân. `null` = chưa có kết quả bảo vệ (chưa đủ điểm) |
 
 **Cách BE tính (FE không cần tính lại, chỉ hiển thị):**
 
 ```
-finalScore = round1( (advisorScore × advisorWeight + examinerScore × examinerWeight + councilScore × councilWeight) / 100 )
+finalScore = round1( trung bình cộng điểm cá nhân của GVHD, 2 cán bộ phản biện và các thành viên hội đồng )
 ```
 
+- Theo QĐ1305 – Điều 9.1. **Không có trọng số**, BE (phần bảo vệ) tính và ghi khi đủ điểm.
 - Làm tròn 1 chữ số kiểu HALF_UP (8.25 → 8.3).
-- Tổng 3 trọng số luôn = 100.
 - Điểm chỉ được tính từ **phiếu đã nộp chính thức**. Phiếu giảng viên đang lưu nháp không ảnh hưởng điểm sinh viên thấy.
 
-> ⚠ **Không tự tính lại `finalScore` ở FE** (mock cũ đang `reduce` theo trọng số). Kết quả có thể lệch do làm tròn, và khi thiếu điểm FE sẽ ra số sai. Luôn hiển thị `finalScore` của BE.
-
-> Trọng số BE trả dạng số (vd `30.00`); `JSON.parse` ra `30`. Hiển thị bằng `${weight}%`, không cần format thêm. Trọng số có thể lẻ (vd `33.33`).
+> ⚠ **Không tự tính `finalScore` ở FE** (mock cũ đang `reduce` theo trọng số). `finalScore` là trung bình điểm **từng
+> giảng viên**, FE không có đủ dữ liệu để tính (chỉ có 3 điểm nhóm). Luôn hiển thị `finalScore` của BE.
 
 ## 4. Cách hiển thị đề xuất
 
 ### 4.1. Bảng 3 dòng
 
-| Loại điểm | Trọng số | Điểm | Ghi chú |
-|---|---|---|---|
-| Hướng dẫn | `advisorWeight` | `advisorScore` | — |
-| Phản biện | `examinerWeight` | `examinerScore` | Kèm nhãn từ `examinerPassed` |
-| Hội đồng | `councilWeight` | `councilScore` | — |
+| Loại điểm | Điểm | Ghi chú |
+|---|---|---|
+| Hướng dẫn | `advisorScore` | — |
+| Phản biện | `examinerScore` | Kèm nhãn từ `examinerPassed` |
+| Hội đồng | `councilScore` | — |
 
 - Điểm `null` → hiện **"Chưa có điểm"** (chữ xám, nghiêng), **không** hiện `0`.
-- Trọng số `null` → hiện **"—"**.
 - `examinerPassed`: `true` → nhãn xanh "PB ≥ 5.0"; `false` → nhãn đỏ "PB < 5.0"; `null` → không hiện nhãn.
 
 ### 4.2. Điểm tổng kết
@@ -187,8 +171,7 @@ finalScore = round1( (advisorScore × advisorWeight + examinerScore × examinerW
 | Trường hợp | Hiển thị |
 |---|---|
 | `finalScore !== null` | Số to, `finalScore.toFixed(1)` |
-| `finalScore === null` và `weightConfigured === false` | "Chưa có điểm tổng kết" + dòng phụ: *Trưởng ngành chưa cấu hình trọng số điểm cho học kỳ này.* |
-| `finalScore === null` và `weightConfigured === true` | "Chưa có điểm tổng kết" + dòng phụ: *Chờ đủ điểm Hướng dẫn, Phản biện và Hội đồng.* |
+| `finalScore === null` | "Chưa có điểm tổng kết" + dòng phụ: *Chờ đủ điểm Hướng dẫn, Phản biện và Hội đồng.* |
 
 > BE **không trả** cờ "Đạt / Chưa đạt" cho điểm tổng kết. Nhãn "Đạt / Chưa đạt" (≥ 5.0) trong mock cũ là FE tự đặt; nếu muốn giữ, cần xác nhận lại quy định với nhóm nghiệp vụ. Tài liệu này đề xuất **bỏ** nhãn đó cho tới khi BE có cờ chính thức.
 
@@ -201,7 +184,8 @@ finalScore = round1( (advisorScore × advisorWeight + examinerScore × examinerW
 | `className` | **BE không trả** → bỏ dòng "Lớp", thay bằng "Đề tài: `topicName`" |
 | `rows[]` (4 dòng, PB1 / PB2 tách riêng) | 3 dòng HD / PB / HĐ, PB là điểm trung bình |
 | `row.comment` (nhận xét) | **BE không trả** → bỏ cột "Nhận xét" |
-| `totalScore` (FE tự tính) | `finalScore` |
+| `totalScore` (FE tự tính theo trọng số) | `finalScore` (BE tính, không trọng số) |
+| Cột "Trọng số" | **Bỏ** (hệ thống không có trọng số 3 điểm nhóm) |
 | Mảng nhiều kỳ | Mỗi lần gọi 1 kỳ |
 
 ## 5. Mapping code
@@ -216,21 +200,16 @@ export interface StudentScoreResponse {
   topicPublicId: string
   topicName: string | null
   advisorScore: number | null
-  advisorWeight: number | null
   examinerScore: number | null
-  examinerWeight: number | null
   examinerPassed: boolean | null
   councilScore: number | null
-  councilWeight: number | null
   finalScore: number | null
-  weightConfigured: boolean
 }
 
 // Một dòng của bảng điểm (dùng cho UI)
 export interface StudentScoreRow {
   key: 'advisor' | 'examiner' | 'council'
   label: string // 'Hướng dẫn' | 'Phản biện' | 'Hội đồng'
-  weight: number | null
   score: number | null
   passed?: boolean | null // chỉ dòng Phản biện
 }
@@ -245,15 +224,14 @@ import type { StudentScoreResponse, StudentScoreRow } from '../types/score.types
 
 // Chuyển response thành 3 dòng của bảng điểm
 export const toScoreRows = (s: StudentScoreResponse): StudentScoreRow[] => [
-  { key: 'advisor', label: 'Hướng dẫn', weight: s.advisorWeight, score: s.advisorScore },
+  { key: 'advisor', label: 'Hướng dẫn', score: s.advisorScore },
   {
     key: 'examiner',
     label: 'Phản biện',
-    weight: s.examinerWeight,
     score: s.examinerScore,
     passed: s.examinerPassed,
   },
-  { key: 'council', label: 'Hội đồng', weight: s.councilWeight, score: s.councilScore },
+  { key: 'council', label: 'Hội đồng', score: s.councilScore },
 ]
 
 export const scoreService = {
@@ -333,12 +311,11 @@ Các điểm cần sửa:
 - Bỏ `reduce` tính `totalScore`; hiển thị `item.finalScore` theo mục 4.2.
 - Bỏ dòng "Lớp", thay bằng "Đề tài: `item.topicName ?? 'Chưa có tên đề tài'`".
 - Badge kỳ: `item.semesterName`.
-- Bảng: dùng `toScoreRows(item)`, 3 cột **Loại điểm / Trọng số / Điểm**; bỏ cột "Điểm thành phần" và "Nhận xét", bỏ logic `rowSpan` (mỗi loại chỉ 1 dòng).
+- Bảng: dùng `toScoreRows(item)`, 2 cột **Loại điểm / Điểm**; bỏ cột "Điểm thành phần" và "Nhận xét", bỏ logic `rowSpan` (mỗi loại chỉ 1 dòng).
 - Hàm hiển thị gợi ý:
 
 ```ts
 const formatScore = (score: number | null) => (score === null ? null : score.toFixed(1))
-const formatWeight = (weight: number | null) => (weight === null ? '—' : `${weight}%`)
 ```
 
 ```tsx
@@ -374,8 +351,7 @@ Vì request có `skipErrorToast: true`, interceptor **không** tự hiện toast
   - `advisorScore`: ngay khi GVHD **nộp** phiếu chấm hướng dẫn.
   - `examinerScore`: khi đủ **2 phiếu** phản biện đã nộp.
   - `councilScore`: khi đủ **5 phiếu** hội đồng đã nộp.
-  - `finalScore`: khi đủ cả 3 điểm **và** kỳ đã có cấu hình trọng số.
-- Điểm có thể **thay đổi** sau khi đã hiển thị: Trưởng ngành sửa trọng số / đổi khoảng kỳ áp dụng thì BE tính lại `finalScore`. Không cache lâu ở FE (mặc định React Query là đủ; có thể `refetchOnWindowFocus`).
-- Trọng số: nếu đã có điểm thì BE trả **trọng số đã dùng để tính** điểm; nếu chưa có điểm nào thì trả trọng số đang áp dụng cho kỳ (để sinh viên biết trước tỉ lệ).
+  - `finalScore`: khi phần bảo vệ đã có kết quả (đủ phiếu theo QĐ1305).
+- Điểm có thể **thay đổi** sau khi đã hiển thị: GVHD được nộp lại phiếu hướng dẫn tới hết mốc Tổ chức hội đồng bảo vệ, khi đó BE cập nhật `advisorScore` và tính lại `finalScore`. Không cache lâu ở FE (mặc định React Query là đủ; có thể `refetchOnWindowFocus`).
 - API chỉ **đọc**, sinh viên không có API sửa / khiếu nại điểm.
 - Chưa test end-to-end với FE.

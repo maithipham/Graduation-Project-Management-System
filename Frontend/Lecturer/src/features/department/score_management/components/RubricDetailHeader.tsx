@@ -1,7 +1,7 @@
 import { Calculator, Calendar, UserRound } from 'lucide-react'
 import { cn } from '@/shared/utils/cn'
-import type { RubricDetail, RubricStatus } from '../types'
-import { RUBRIC_DETAIL_STATUS_LABEL, formatSemesterRange } from '../utils/rubricHelpers'
+import type { RubricDetail } from '../types'
+import { RUBRIC_STATUS_META, formatSemesterRange } from '../utils/rubricHelpers'
 
 interface RubricDetailHeaderProps {
   detail: RubricDetail
@@ -9,13 +9,6 @@ interface RubricDetailHeaderProps {
   name: string
   readOnly: boolean
   onNameChange: (name: string) => void
-}
-
-const STATUS_PILL_CLASS: Record<RubricStatus, string> = {
-  draft: 'bg-amber-50 text-amber-700 border-amber-200',
-  upcoming: 'bg-sky-50 text-sky-700 border-sky-200',
-  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  archived: 'bg-slate-100 text-slate-600 border-slate-200',
 }
 
 /** Header popup chi tiết: tên (sửa được khi canEdit), trạng thái, khoảng kỳ áp dụng, người tạo / sửa */
@@ -47,10 +40,10 @@ export function RubricDetailHeader({ detail, name, readOnly, onNameChange }: Rub
           <span
             className={cn(
               'whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-bold',
-              STATUS_PILL_CLASS[detail.status],
+              RUBRIC_STATUS_META[detail.status].className,
             )}
           >
-            {detail.statusLabel || RUBRIC_DETAIL_STATUS_LABEL[detail.status]}
+            {detail.statusLabel || RUBRIC_STATUS_META[detail.status].label}
           </span>
 
           <span className="flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1 text-[12px] text-slate-600">

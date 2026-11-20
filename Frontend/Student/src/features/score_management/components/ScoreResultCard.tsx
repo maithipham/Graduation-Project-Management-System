@@ -7,7 +7,6 @@ interface ScoreResultCardProps {
 }
 
 const formatScore = (score: number | null) => (score === null ? null : score.toFixed(1))
-const formatWeight = (weight: number | null) => (weight === null ? '—' : `${weight}%`)
 
 export function ScoreResultCard({ item }: ScoreResultCardProps) {
   const rows = toScoreRows(item)
@@ -41,7 +40,7 @@ export function ScoreResultCard({ item }: ScoreResultCardProps) {
           <div className="space-y-0.5">
             <div className="text-sm font-semibold text-slate-700">Chưa có điểm tổng kết</div>
             <div className="text-xs italic text-slate-500">
-              {/* Điểm tổng kết tính theo QĐ1305 khi có kết quả bảo vệ, không phụ thuộc cấu hình trọng số */}
+              {/* Điểm tổng kết tính theo QĐ1305 khi có kết quả bảo vệ (không có trọng số) */}
               Chờ đủ điểm Hướng dẫn, Phản biện và Hội đồng.
             </div>
           </div>
@@ -54,7 +53,6 @@ export function ScoreResultCard({ item }: ScoreResultCardProps) {
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-700 font-semibold">
             <tr>
               <th className="py-3 px-4">Loại điểm</th>
-              <th className="py-3 px-4 w-32">Trọng số</th>
               <th className="py-3 px-4 w-56">Điểm</th>
             </tr>
           </thead>
@@ -62,7 +60,6 @@ export function ScoreResultCard({ item }: ScoreResultCardProps) {
             {rows.map((row) => (
               <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
                 <td className="py-3.5 px-4 font-semibold text-slate-800">{row.label}</td>
-                <td className="py-3.5 px-4 font-medium">{formatWeight(row.weight)}</td>
                 <td className="py-3.5 px-4 font-bold text-slate-900">
                   <div className="flex items-center gap-2 flex-wrap">
                     {formatScore(row.score) ?? (

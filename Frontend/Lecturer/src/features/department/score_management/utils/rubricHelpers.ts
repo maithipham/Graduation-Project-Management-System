@@ -22,14 +22,6 @@ export const RUBRIC_STATUS_META: Record<RubricStatus, { label: string; className
   archived: { label: 'Hết áp dụng', className: 'bg-slate-100 text-slate-600 border-slate-200' },
 }
 
-/** Nhãn trạng thái ở header popup chi tiết (theo mockup khác chút với bảng) */
-export const RUBRIC_DETAIL_STATUS_LABEL: Record<RubricStatus, string> = {
-  draft: 'Bản nháp',
-  upcoming: 'Sắp áp dụng',
-  active: 'Đang sử dụng',
-  archived: 'Đã lưu trữ',
-}
-
 /**
  * Cột "Thời gian áp dụng" / header chi tiết: "HK1 2026-2027 → HK2 2027-2028".
  * Chưa có "Từ kỳ" = Nháp → "Chưa áp dụng"; chưa có "Đến kỳ" → "Chưa xác định" (đặc tả mục 5)
@@ -87,7 +79,3 @@ export function keepValidToSemester(
     : null
 }
 
-/** Thang 10 điểm: 100% ứng với 10 điểm */
-export function formatScore(weight: number): string {
-  return `${(weight / 10).toFixed(1)} điểm`
-}

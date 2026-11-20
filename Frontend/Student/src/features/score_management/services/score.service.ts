@@ -4,15 +4,14 @@ import type { StudentScoreResponse, StudentScoreRow } from '../types/score.types
 
 // Chuyển response thành 3 dòng của bảng điểm
 export const toScoreRows = (s: StudentScoreResponse): StudentScoreRow[] => [
-  { key: 'advisor', label: 'Hướng dẫn', weight: s.advisorWeight, score: s.advisorScore },
+  { key: 'advisor', label: 'Hướng dẫn', score: s.advisorScore },
   {
     key: 'examiner',
     label: 'Phản biện',
-    weight: s.examinerWeight,
     score: s.examinerScore,
     passed: s.examinerPassed,
   },
-  { key: 'council', label: 'Hội đồng', weight: s.councilWeight, score: s.councilScore },
+  { key: 'council', label: 'Hội đồng', score: s.councilScore },
 ]
 
 export const scoreService = {

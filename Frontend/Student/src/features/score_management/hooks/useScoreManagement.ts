@@ -11,7 +11,7 @@ export function useMyScore(semesterId?: string) {
   return useQuery({
     queryKey: studentScoreKeys.myScore(semesterId),
     queryFn: () => scoreService.getMyScore(semesterId),
-    // Điểm có thể được tính lại khi Trưởng ngành đổi trọng số → tải lại khi quay lại tab
+    // Điểm có thể được tính lại khi GVHD nộp lại phiếu → tải lại khi quay lại tab
     refetchOnWindowFocus: true,
   })
 }

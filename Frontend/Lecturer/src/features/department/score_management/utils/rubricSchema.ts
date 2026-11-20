@@ -4,17 +4,12 @@ import { roundWeight } from './rubricMapper'
 // Schema zod giống Bean Validation (@NotBlank, @Size, @DecimalMin) bên DTO Spring:
 // FE chặn sớm cho người dùng thấy lỗi ngay dưới ô, BE vẫn kiểm tra lại (đặc tả mục 3 và 5.5).
 
-const rubricNameSchema = z
+/** Tên rubric: dùng cho A3 (dòng nhập tên inline, loại phiếu lấy theo tab đang mở) và A5 */
+export const rubricNameSchema = z
   .string()
   .trim()
   .min(1, 'Tên rubric không được để trống')
   .max(255, 'Tên rubric tối đa 255 ký tự')
-
-/** A3 – tạo rubric Nháp (dòng nhập tên inline). Loại phiếu lấy theo tab đang mở */
-export const createRubricSchema = z.object({
-  type: z.enum(['ADVISOR', 'EXAMINER', 'COUNCIL']),
-  name: rubricNameSchema,
-})
 
 /** true nếu số có tối đa 2 chữ số thập phân (chịu được sai số dấu phẩy động, VD 15.55) */
 function hasAtMostTwoDecimals(value: number): boolean {
@@ -53,7 +48,6 @@ export const saveRubricSchema = z.object({
   groups: z.array(groupSchema),
 })
 
-export type CreateRubricInput = z.infer<typeof createRubricSchema>
 export type SaveRubricInput = z.infer<typeof saveRubricSchema>
 
 /** Tổng trọng số cả rubric, làm tròn 2 chữ số (chỉ để cảnh báo sớm, BE là nguồn chuẩn) */

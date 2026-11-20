@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { FolderSearch, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/shared/utils/cn'
 import type { RubricTreeCriterion, RubricTreeGroup } from '../types'
@@ -24,6 +24,41 @@ interface RubricCriteriaTableProps {
 function toWeight(raw: string): number {
   const value = Number(raw)
   return Number.isFinite(value) ? value : 0
+}
+
+interface WeightInputProps {
+  value: number
+  label: string
+  onChange: (weight: number) => void
+}
+
+/**
+ * Ô nhập trọng số giữ nguyên chuỗi đang gõ: xóa trắng ô thì vẫn trống (trọng số tính là 0, schema báo lỗi khi lưu),
+ * không hiện lại "0" khiến số gõ tiếp bị dính thành "025". Giá trị đổi từ ngoài (tải lại, hoàn tác) thì cập nhật theo.
+ */
+function WeightInput({ value, label, onChange }: WeightInputProps) {
+  const [text, setText] = useState(String(value))
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== prevValue) {
+    setPrevValue(value)
+    if (toWeight(text) !== value) setText(String(value))
+  }
+
+  return (
+    <input
+      type="number"
+      min={0}
+      max={100}
+      step={0.01}
+      value={text}
+      aria-label={label}
+      onChange={(event) => {
+        setText(event.target.value)
+        onChange(toWeight(event.target.value))
+      }}
+      className={WEIGHT_INPUT_CLASS}
+    />
+  )
 }
 
 /** Thang 10 điểm: 100% = 10 điểm. Tiêu chí đã lưu dùng maxScore BE trả, tiêu chí mới tự tính */
@@ -155,17 +190,10 @@ export function RubricCriteriaTable({
                       <span className="font-semibold text-slate-700">{criterion.weight}%</span>
                     ) : (
                       <span className="inline-flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.01}
+                        <WeightInput
                           value={criterion.weight}
-                          aria-label={`Trọng số tiêu chí ${criterion.code}`}
-                          onChange={(event) =>
-                            onCriterionChange(group.key, criterion.key, { weight: toWeight(event.target.value) })
-                          }
-                          className={WEIGHT_INPUT_CLASS}
+                          label={`Trọng số tiêu chí ${criterion.code}`}
+                          onChange={(weight) => onCriterionChange(group.key, criterion.key, { weight })}
                         />
                         <span className="font-semibold text-slate-500">%</span>
                       </span>

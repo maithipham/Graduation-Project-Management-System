@@ -34,13 +34,11 @@ export const rubricKeys = {
 // ---------------------------------------------------------------------------
 
 /** A1 – kho rubric của tab đang mở. Đổi tab = đổi `role`, tab khác vẫn giữ cache */
-export function useRubricList(role: RubricRole, enabled = true) {
+export function useRubricList(role: RubricRole) {
   const type = toEvaluationType(role)
   return useQuery({
     queryKey: rubricKeys.list(type),
     queryFn: async () => (await rubricService.getList(type)).map(toRubricListItem),
-    // false khi đang ở mục "Trọng số" → không gọi A1 thừa
-    enabled,
   })
 }
 

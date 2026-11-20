@@ -343,7 +343,9 @@ function RubricDetailBody({ detail, childOpenRef, onReload, onClose }: RubricDet
         title="Hủy áp dụng rubric"
         description={getCancelApplyDescription(detail, cancelPreviewQuery)}
         confirmLabel="Hủy áp dụng"
-        isPending={cancelApplyMutation.isPending || cancelPreviewQuery.isFetching}
+        isPending={cancelApplyMutation.isPending}
+        // Chưa xem trước được các học kỳ bị ảnh hưởng (A7b đang tải / lỗi) → chưa cho xác nhận
+        confirmDisabled={cancelPreviewQuery.isFetching || cancelPreviewQuery.isError}
         onConfirm={cancelApply}
         onCancel={() => setConfirmCancelApply(false)}
       />

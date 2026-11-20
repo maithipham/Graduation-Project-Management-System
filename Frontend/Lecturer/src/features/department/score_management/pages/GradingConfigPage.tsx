@@ -7,22 +7,19 @@ import { RubricDetailDialog } from '../components/RubricDetailDialog'
 import { RubricPendingRow } from '../components/RubricPendingRow'
 import { GradingConfigTabs } from '../components/GradingConfigTabs'
 import { RubricVersionTable } from '../components/RubricVersionTable'
-import { ScoreWeightPanel } from '../components/ScoreWeightPanel'
 import { useCloneRubric, useCreateRubric, useDeleteRubric, useRubricList } from '../hooks/useRubrics'
-import type { GradingConfigTab, RubricListItem, RubricRole } from '../types'
+import type { RubricListItem, RubricRole } from '../types'
 import { getRubricErrorMessage } from '../utils/rubricErrors'
 import { DEFAULT_RUBRIC_PAGE_SIZE, getRoleLabel } from '../utils/rubricHelpers'
-import { createRubricSchema } from '../utils/rubricSchema'
+import { rubricNameSchema } from '../utils/rubricSchema'
 
 interface PendingRow {
   name: string
   error: string | null
 }
 
-/** Trang "Cấu hình điểm" (Trưởng bộ môn): kho rubric theo 3 loại phiếu chấm + tab trọng số tổng kết */
+/** Trang "Cấu hình điểm" (Trưởng bộ môn): kho rubric theo 3 loại phiếu chấm */
 export default function GradingConfigPage() {
-  const [tab, setTab] = useState<GradingConfigTab>('supervisor')
-  /** Loại rubric gần nhất: giữ nguyên khi sang tab trọng số để các hook rubric luôn có role hợp lệ */
   const [role, setRole] = useState<RubricRole>('supervisor')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_RUBRIC_PAGE_SIZE)
@@ -32,7 +29,7 @@ export default function GradingConfigPage() {
   const [deleteTarget, setDeleteTarget] = useState<RubricListItem | null>(null)
 
   const roleLabel = getRoleLabel(role)
-  const listQuery = useRubricList(role, tab !== 'weight')
+  const listQuery = useRubricList(role)
   const createMutation = useCreateRubric()
   const cloneMutation = useCloneRubric()
   const deleteMutation = useDeleteRubric()
@@ -53,9 +50,7 @@ export default function GradingConfigPage() {
     )
   }, [listQuery.data, pageIndex, pageSize])
 
-  function changeTab(next: GradingConfigTab) {
-    setTab(next)
-    if (next === 'weight') return
+  function changeTab(next: RubricRole) {
     setRole(next)
     setPageIndex(0)
     setPendingRow(null)
@@ -68,7 +63,7 @@ export default function GradingConfigPage() {
 
   function savePending() {
     if (!pendingRow) return
-    const parsed = createRubricSchema.shape.name.safeParse(pendingRow.name)
+    const parsed = rubricNameSchema.safeParse(pendingRow.name)
     if (!parsed.success) {
       setPendingRow({ ...pendingRow, error: parsed.error.issues[0]?.message ?? 'Tên rubric không hợp lệ' })
       return
@@ -102,14 +97,10 @@ export default function GradingConfigPage() {
     )
   }
 
-  if (tab === 'weight') {
-    return <ScoreWeightPanel tabs={<GradingConfigTabs value={tab} onChange={changeTab} />} />
-  }
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
-        <GradingConfigTabs value={tab} onChange={changeTab} />
+        <GradingConfigTabs value={role} onChange={changeTab} />
         <button
           type="button"
           onClick={startCreate}
