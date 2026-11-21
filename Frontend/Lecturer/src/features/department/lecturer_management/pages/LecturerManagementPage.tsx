@@ -175,14 +175,28 @@ export default function LecturerManagementPage() {
     }
   }, [pagedContent, currentPage, pageSize, totalElements, totalPages, filteredList.length])
 
-  const selectedTeachers = useMemo(() => {
-    if (!filteredList) return []
-    return filteredList.filter((t, idx) => {
-      const rawId = getTeacherId(t)
-      const id = typeof rawId === 'number' ? rawId : t.id ?? idx + 1
-      return selectedIds.has(id)
+  // Lưu thông tin mọi GV từng xuất hiện trong danh sách, theo id. GV đã tick có thể biến mất khỏi
+  // danh sách đang hiển thị (đổi bộ lọc, tìm kiếm, API tải lại) nhưng vẫn nằm trong selectedIds;
+  // nếu lấy GV từ filteredList thì popup bị thiếu người so với số (N) trên nút.
+  const [teacherCache, setTeacherCache] = useState<Map<number, TeacherListItem>>(new Map())
+  useEffect(() => {
+    if (!rawTeachers || rawTeachers.length === 0) return
+    setTeacherCache((prev) => {
+      const next = new Map(prev)
+      rawTeachers.forEach((t) => {
+        const rawId = getTeacherId(t)
+        const id = typeof rawId === 'number' ? rawId : t.id
+        if (typeof id === 'number') next.set(id, t)
+      })
+      return next
     })
-  }, [filteredList, selectedIds])
+  }, [rawTeachers])
+
+  const selectedTeachers = useMemo(() => {
+    return Array.from(selectedIds)
+      .map((id) => teacherCache.get(id))
+      .filter((t): t is TeacherListItem => Boolean(t))
+  }, [teacherCache, selectedIds])
 
   const filtered = useMemo(() => {
     const isKeyword = Boolean((filters.keyword ?? filters.name ?? '').trim())

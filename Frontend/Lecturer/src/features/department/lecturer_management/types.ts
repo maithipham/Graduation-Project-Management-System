@@ -90,6 +90,8 @@ export interface SemesterAdvisorResponse {
   semesterId?: string
   maxStudents?: number
   currentStudents?: number
+  // Số đơn đăng ký PENDING đang chờ GV duyệt (còn > 0 thì BE không cho loại bỏ GV khỏi kỳ)
+  pendingRegistrations?: number
   assignedStudents?: number
   teacherId?: number
   teacherPublicId?: string
@@ -240,6 +242,8 @@ export interface SupervisorLecturer {
   department: string
   quota: number
   assigned: number
+  // Số đơn đăng ký PENDING đang chờ GV duyệt
+  pendingRegistrations?: number
   year: string
   semester: string
   status: 'active' | 'busy'

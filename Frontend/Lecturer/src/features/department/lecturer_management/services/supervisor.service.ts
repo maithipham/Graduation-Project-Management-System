@@ -250,6 +250,8 @@ export function toSupervisorLecturerFromAdvisor(
     department,
     quota,
     assigned,
+    pendingRegistrations:
+      typeof item.pendingRegistrations === 'number' ? item.pendingRegistrations : 0,
     year,
     semester: semesterName,
     status: (item.status ?? teacher?.status ?? true) ? 'active' : 'busy',

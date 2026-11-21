@@ -1,12 +1,10 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
-  Download,
   Lock,
   Save,
   Send,
-  Upload,
   XCircle,
 } from 'lucide-react'
 import { isApiError } from '@/shared/types'
@@ -25,7 +23,6 @@ import { useMyInfo } from '@/features/auth'
 import {
   useExaminerEvaluation,
   useSaveExaminerEvaluation,
-  useUploadReviewFile,
 } from '../hooks/useExaminerReview'
 import { MeetingLocation } from './MeetingLocation'
 import type {
@@ -48,9 +45,6 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
   lecturerName,
 }) => {
   const saveMutation = useSaveExaminerEvaluation(
-    evaluation.examinerAssignmentPublicId,
-  )
-  const uploadMutation = useUploadReviewFile(
     evaluation.examinerAssignmentPublicId,
   )
 
@@ -86,9 +80,6 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
   )
   const [serverError, setServerError] = useState<string | null>(null)
 
-  // File upload
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [fileError, setFileError] = useState<string | null>(null)
 
   // Confirm dialog
   const [confirmDraftOpen, setConfirmDraftOpen] = useState(false)
@@ -161,6 +152,19 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
       return
     }
 
+    // Nộp phiếu (không áp dụng cho lưu nháp và sửa điểm trong buổi bảo vệ): bắt buộc nhận xét + 2 câu hỏi
+    if (submit && !defenseOnly) {
+      const missing = [
+        !generalComment.trim() && 'Nhận xét',
+        !question1.trim() && 'Câu hỏi 1',
+        !question2.trim() && 'Câu hỏi 2',
+      ].filter(Boolean)
+      if (missing.length > 0) {
+        setServerError(`Vui lòng nhập ${missing.join(', ')} trước khi nộp phiếu.`)
+        return
+      }
+    }
+
     const payload: ExaminerEvaluationRequest = {
       criteriaScores: Object.entries(criteriaScores).map(([id, val]) => ({
         criteriaPublicId: id,
@@ -192,29 +196,6 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
     } else {
       doSubmit(false)
     }
-  }
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setFileError(null)
-    const allowed = ['.pdf', '.doc', '.docx']
-    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
-    if (!allowed.includes(ext)) {
-      setFileError('File nhận xét phải có định dạng .pdf, .doc hoặc .docx')
-      return
-    }
-
-    uploadMutation.mutate(file, {
-      onError: (err) => {
-        if (isApiError(err)) {
-          setFileError(err.message || 'Không thể tải lên file nhận xét')
-        } else {
-          setFileError('Lỗi tải file, vui lòng thử lại')
-        }
-      },
-    })
   }
 
   const coExaminerName = assignment.coExaminer
@@ -254,26 +235,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
           </div>
         </div>
 
-        {evaluation.reviewFileUrl ? (
-          <a
-            href={evaluation.reviewFileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-[#1565C0] border border-blue-200 hover:bg-blue-100/70 transition shrink-0 cursor-pointer shadow-2xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Báo cáo sinh viên</span>
-          </a>
-        ) : defenseOnly ? null : (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition shrink-0 cursor-pointer shadow-2xs"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Tải file nhận xét</span>
-          </button>
-        )}
+        {/* Không còn bước tải file nhận xét: phiếu chấm sau khi bấm Nộp chính là bản nhận xét phản biện */}
       </div>
 
       {/* Lock Banner if locked */}
@@ -404,7 +366,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-xs font-bold text-slate-900">
-            Câu hỏi 1
+            Câu hỏi 1 <span className="text-rose-500">*</span>
           </label>
           <textarea
             rows={2}
@@ -418,7 +380,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
 
         <div className="space-y-1">
           <label className="text-xs font-bold text-slate-900">
-            Câu hỏi 2
+            Câu hỏi 2 <span className="text-rose-500">*</span>
           </label>
           <textarea
             rows={2}
@@ -442,14 +404,16 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
           </span>
         </div>
 
-        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+        {/* Panel chấm điểm hẹp (nằm cạnh danh sách SV): cột tiêu chí tự xuống dòng, cột điểm luôn hiện;
+            màn quá hẹp thì cuộn ngang thay vì cắt mất ô nhập điểm */}
+        <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
-                <th className="py-2.5 px-3.5 min-w-[280px]">Tiêu chí đánh giá</th>
-                <th className="py-2.5 px-3 w-24 text-center">Trọng số</th>
-                <th className="py-2.5 px-3 w-24 text-center">Quy đổi</th>
-                <th className="py-2.5 px-3 w-32 text-center">Điểm (0–10)</th>
+                <th className="py-2.5 px-3.5 min-w-[140px]">Tiêu chí đánh giá</th>
+                <th className="py-2.5 px-2 w-16 text-center whitespace-nowrap">Trọng số</th>
+                <th className="py-2.5 px-2 w-16 text-center whitespace-nowrap">Quy đổi</th>
+                <th className="py-2.5 px-2 w-28 text-center whitespace-nowrap">Điểm (0–10)</th>
               </tr>
             </thead>
             <tbody>
@@ -481,7 +445,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
                         <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-600">
                           {converted}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
                           <div className="inline-flex items-center gap-1">
                             <input
                               type="text"
@@ -515,7 +479,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
                 <td className="py-3 px-3 text-center font-mono text-[#1565C0]">
                   {calculatedTotal.toFixed(1)}
                 </td>
-                <td className="py-3 px-3 text-center text-sm font-bold text-[#1565C0]">
+                <td className="py-3 px-2 text-center text-sm font-bold text-[#1565C0] whitespace-nowrap">
                   {calculatedTotal.toFixed(1)} / 10
                 </td>
               </tr>
@@ -566,17 +530,6 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
         </div>
       </div>
 
-      {/* Upload File Nhận xét input */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept=".pdf,.doc,.docx"
-        className="hidden"
-      />
-      {fileError && (
-        <p className="text-xs font-semibold text-[#DC2626]">{fileError}</p>
-      )}
 
       {/* Server Error Alert */}
       {serverError && (

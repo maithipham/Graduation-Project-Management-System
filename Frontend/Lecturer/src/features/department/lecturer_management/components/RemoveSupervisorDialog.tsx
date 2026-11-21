@@ -59,7 +59,7 @@ export function RemoveSupervisorDialog({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                {lecturer.title && (
+                {lecturer.title && !lecturer.name.startsWith(lecturer.title) && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold text-slate-700 bg-white border border-slate-200">
                     {lecturer.title}
                   </span>
@@ -87,7 +87,9 @@ export function RemoveSupervisorDialog({
             <div className="text-[12.5px] text-rose-900 leading-relaxed">
               Bạn có chắc chắn muốn loại bỏ giảng viên{' '}
               <strong className="text-rose-950 font-bold">
-                {lecturer.title ? `${lecturer.title} ` : ''}{lecturer.name}
+                {lecturer.title && !lecturer.name.startsWith(lecturer.title)
+                  ? `${lecturer.title} ${lecturer.name}`
+                  : lecturer.name}
               </strong>{' '}
               khỏi danh sách giáo viên hướng dẫn trong{' '}
               <span className="font-semibold text-rose-950">

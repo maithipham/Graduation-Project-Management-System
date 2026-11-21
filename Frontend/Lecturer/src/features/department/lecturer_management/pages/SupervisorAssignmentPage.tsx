@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback'
+import { ApiError } from '@/shared/types'
 import { cn } from '@/shared/utils/cn'
 import { useMajors } from '@/features/department/student_management'
 import {
@@ -309,10 +310,14 @@ export default function SupervisorAssignmentPage() {
       queryClient.invalidateQueries({ queryKey: ['supervisors'] })
       queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không thể loại bỏ giảng viên hướng dẫn. Vui lòng kiểm tra lại sinh viên hướng dẫn của giảng viên.'
-      toast.error(msg)
+      // Interceptor đã đổi lỗi HTTP thành ApiError và tự toast đúng message của BE
+      // (vd. "đang nhận hướng dẫn N sinh viên", "danh sách đã bị khóa") → không toast lại
+      // thông báo chung chung đè lên lý do thật.
+      if (!(err instanceof ApiError)) {
+        toast.error(
+          'Không thể loại bỏ giảng viên hướng dẫn. Vui lòng kiểm tra lại sinh viên hướng dẫn của giảng viên.',
+        )
+      }
       throw err
     }
   }
@@ -490,6 +495,9 @@ export default function SupervisorAssignmentPage() {
           academicYears={academicYears}
           termsOfYear={termsOfYear}
           isLoading={semestersLoading || lecturersLoading}
+          isLocked={isLocked}
+          lockedAt={lockedAt}
+          lockedByName={lockedByName}
           onYearChange={onYearChange}
           onSemesterChange={onSemesterChange}
           onUpdateQuota={handleUpdateQuota}

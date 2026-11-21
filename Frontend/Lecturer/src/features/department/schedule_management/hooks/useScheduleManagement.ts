@@ -38,7 +38,7 @@ export function getTodayDateString(): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-export const useScheduleManagement = (selectedSemesterId: string, selectedMajorId?: string | null) => {
+export const useScheduleManagement = (selectedSemesterId: string) => {
   // Hoàn toàn không dùng data mẫu, khởi tạo mảng rỗng và lấy 100% từ Database
   const [events, setEvents] = useState<ScheduleEventItem[]>([]);
   const [currentPhase, setCurrentPhase] = useState<SchedulePhase>('assignment');
@@ -64,7 +64,7 @@ export const useScheduleManagement = (selectedSemesterId: string, selectedMajorI
     if (!selectedSemesterId) return;
     setLoading(true);
     try {
-      const data = await scheduleService.getSchedule(selectedSemesterId, selectedMajorId);
+      const data = await scheduleService.getSchedule(selectedSemesterId);
       
       const rawList: any[] = [];
       if (data) {
@@ -87,11 +87,8 @@ export const useScheduleManagement = (selectedSemesterId: string, selectedMajorI
             code: item.code,
             phase,
             stage: item.stage,
-            scope: item.scope,
             orderIndex: item.orderIndex || 0,
             description: item.description,
-            majorId: item.majorId,
-            majorName: item.majorName,
             start: formatDisplayDate(item.startDate),
             end: formatDisplayDate(item.endDate),
             rawStart: item.startDate || '',
@@ -113,7 +110,7 @@ export const useScheduleManagement = (selectedSemesterId: string, selectedMajorI
     } finally {
       setLoading(false);
     }
-  }, [selectedSemesterId, selectedMajorId]);
+  }, [selectedSemesterId]);
 
   useEffect(() => {
     fetchSchedule();
@@ -243,7 +240,6 @@ export const useScheduleManagement = (selectedSemesterId: string, selectedMajorI
           {
             deadlineId: pendingConfirm.item.deadlineId,
             templateId: pendingConfirm.item.templateId,
-            majorId: pendingConfirm.item.majorId || selectedMajorId || undefined,
             startDate: formatPayloadDate(pendingConfirm.rawStart),
             endDate: formatPayloadDate(pendingConfirm.rawEnd),
           },

@@ -1,16 +1,14 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowLeft,
   Award,
   CheckCircle2,
-  Download,
   FileText,
   Lock,
   Save,
   Send,
-  Upload,
   XCircle,
 } from 'lucide-react'
 import { isApiError } from '@/shared/types'
@@ -28,7 +26,6 @@ import { formatDate } from '@/shared/utils'
 import {
   useExaminerEvaluation,
   useSaveExaminerEvaluation,
-  useUploadReviewFile,
 } from '../hooks/useExaminerReview'
 import type { ExaminerEvaluation, ExaminerEvaluationRequest } from '../types'
 
@@ -44,9 +41,6 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
   isLocked,
 }) => {
   const saveMutation = useSaveExaminerEvaluation(
-    evaluation.examinerAssignmentPublicId,
-  )
-  const uploadMutation = useUploadReviewFile(
     evaluation.examinerAssignmentPublicId,
   )
 
@@ -78,9 +72,6 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
   )
   const [serverError, setServerError] = useState<string | null>(null)
 
-  // File upload
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [fileError, setFileError] = useState<string | null>(null)
 
   // Confirm dialog for reverting SUBMITTED to DRAFT
   const [confirmDraftOpen, setConfirmDraftOpen] = useState(false)
@@ -155,6 +146,19 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
       return
     }
 
+    // Nộp phiếu (không áp dụng cho lưu nháp): bắt buộc nhận xét + 2 câu hỏi phản biện
+    if (submit && !evaluation.defenseEditing) {
+      const missing = [
+        !generalComment.trim() && 'Nhận xét',
+        !question1.trim() && 'Câu hỏi 1',
+        !question2.trim() && 'Câu hỏi 2',
+      ].filter(Boolean)
+      if (missing.length > 0) {
+        setServerError(`Vui lòng nhập ${missing.join(', ')} trước khi nộp phiếu.`)
+        return
+      }
+    }
+
     const payload: ExaminerEvaluationRequest = {
       criteriaScores: Object.entries(criteriaScores).map(([id, val]) => ({
         criteriaPublicId: id,
@@ -186,29 +190,6 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
     } else {
       doSubmit(false)
     }
-  }
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setFileError(null)
-    const allowedExtensions = ['.pdf', '.doc', '.docx']
-    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
-    if (!allowedExtensions.includes(ext)) {
-      setFileError('File nhận xét phải có định dạng .pdf, .doc hoặc .docx')
-      return
-    }
-
-    uploadMutation.mutate(file, {
-      onError: (err) => {
-        if (isApiError(err)) {
-          setFileError(err.message || 'Không thể tải lên file nhận xét')
-        } else {
-          setFileError('Lỗi tải file, vui lòng thử lại')
-        }
-      },
-    })
   }
 
   return (
@@ -340,7 +321,7 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Câu hỏi phản biện 1
+                Câu hỏi phản biện 1 <span className="text-rose-500">*</span>
               </label>
               <textarea
                 rows={2}
@@ -354,7 +335,7 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Câu hỏi phản biện 2
+                Câu hỏi phản biện 2 <span className="text-rose-500">*</span>
               </label>
               <textarea
                 rows={2}
@@ -369,7 +350,7 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
         </div>
       </div>
 
-      {/* 3. Decision & File Upload */}
+      {/* 3. Decision */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
         <div>
           <h2 className="text-sm font-bold text-slate-900 mb-2">
@@ -428,57 +409,7 @@ const ExaminerGradingForm: React.FC<ExaminerGradingFormProps> = ({
           </div>
         </div>
 
-        {/* Upload File Nhận Xét */}
-        <div className="pt-4 border-t border-slate-100">
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
-            File nhận xét phản biện (tùy chọn)
-          </label>
-          <p className="text-[11px] text-slate-500 mb-3">
-            Tải lên bản nhận xét chi tiết định dạng PDF hoặc DOC/DOCX.
-          </p>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept=".pdf,.doc,.docx"
-            className="hidden"
-          />
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isLocked || uploadMutation.isPending}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="w-3.5 h-3.5 mr-1.5" />
-              {uploadMutation.isPending ? 'Đang tải lên...' : 'Tải file nhận xét'}
-            </Button>
-
-            {evaluation.reviewFileName && evaluation.reviewFileUrl ? (
-              <a
-                href={evaluation.reviewFileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1565C0] hover:underline bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{evaluation.reviewFileName}</span>
-              </a>
-            ) : (
-              <span className="text-xs text-slate-400 italic">
-                Chưa có file nhận xét
-              </span>
-            )}
-          </div>
-
-          {fileError && (
-            <p className="text-xs font-semibold text-[#DC2626] mt-2">
-              {fileError}
-            </p>
-          )}
-        </div>
+        {/* Không còn bước tải file nhận xét: phiếu chấm sau khi bấm Nộp chính là bản nhận xét phản biện */}
       </div>
 
       {/* Server Error Alert */}

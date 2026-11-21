@@ -5,7 +5,6 @@
 export type SchedulePhase = 'assignment' | 'execution' | 'evaluation';
 
 export type DeadlineStage = 'GIAO_NHAN' | 'THUC_HIEN' | 'DANH_GIA';
-export type DeadlineScope = 'GLOBAL' | 'MAJOR_SPECIFIC';
 export type DeadlineStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'EXTENDED';
 
 export interface ScheduleEventItem {
@@ -16,11 +15,8 @@ export interface ScheduleEventItem {
   code?: string;
   phase: SchedulePhase;    // assignment, execution, evaluation
   stage: DeadlineStage;    // GIAO_NHAN, THUC_HIEN, DANH_GIA
-  scope: DeadlineScope;    // GLOBAL, MAJOR_SPECIFIC
   orderIndex: number;
   description?: string;
-  majorId: string | null;
-  majorName: string | null;
   start: string;           // Chuỗi hiển thị (VD: "02h35 07/11/2026")
   end: string;             // Chuỗi hiển thị (VD: "23h59 09/12/2026")
   rawStart: string;        // ISO string (VD: "2026-11-07T02:35:00")
@@ -37,7 +33,6 @@ export interface ScheduleGroupedData {
 export interface DeadlineItemUpdatePayload {
   deadlineId?: string;
   templateId?: string;
-  majorId?: string | null;
   startDate: string;
   endDate: string;
   status?: DeadlineStatus;

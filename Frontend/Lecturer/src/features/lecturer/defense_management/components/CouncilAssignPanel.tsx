@@ -180,6 +180,8 @@ export const CouncilAssignPanel: React.FC<CouncilAssignPanelProps> = ({
     })
 
     board.students.forEach((sv) => {
+      // SV đã qua phản biện / đã xếp lịch / đã bảo vệ → BE không cho phân lại, bỏ qua
+      if (!sv.canAssignExaminers) return
       // Find members who are not supervisors/co-supervisors
       const ineligible = sv.ineligibleMemberPublicIds || []
       const valid = board.members.filter(
@@ -213,12 +215,15 @@ export const CouncilAssignPanel: React.FC<CouncilAssignPanelProps> = ({
     })
 
     setAssignments(newMap)
-    toast.success('Đã tự động phân bổ cân bằng 2 GVPB cho tất cả sinh viên!')
+    // Chỉ điền vào bảng, chưa gọi API: người dùng xem lại rồi bấm "Xác nhận & Gửi" mới lưu
+    toast.info('Đã gợi ý 2 GVPB cho các sinh viên còn được phân công. Kiểm tra lại rồi bấm "Xác nhận & Gửi" để lưu.')
   }
 
   // Check if anything changed compared to server
   const changedStudents = useMemo(() => {
     return board.students.filter((s) => {
+      // Chỉ gửi SV còn được phân GVPB (đang "Đã gán vào hội đồng"); SV khác BE trả lỗi 3122 và làm dừng cả lượt lưu
+      if (!s.canAssignExaminers) return false
       const current = assignments[s.defenseAssignmentPublicId]
       if (!current || !current.gvpb1Id || !current.gvpb2Id) return false
       const origSlot1 = s.examiners.find((e) => e.examinerOrder === 1)

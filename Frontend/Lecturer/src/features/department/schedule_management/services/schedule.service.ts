@@ -4,14 +4,10 @@ import type { DeadlineBatchUpdatePayload } from '../types';
 
 export const scheduleService = {
   /**
-   * Lấy toàn bộ mốc thời hạn đồ án theo học kỳ và chuyên ngành
+   * Lấy toàn bộ mốc thời hạn đồ án theo học kỳ (mọi mốc áp dụng chung cả khoa)
    */
-  getSchedule: async (semesterId: string, majorId?: string | null) => {
-    const params: Record<string, string> = { semesterId };
-    if (majorId) {
-      params.majorId = majorId;
-    }
-    const response = await apiClient.get<ApiResponse<any>>('/api/v1/deadlines', { params });
+  getSchedule: async (semesterId: string) => {
+    const response = await apiClient.get<ApiResponse<any>>('/api/v1/deadlines', { params: { semesterId } });
     return response.data.data;
   },
 

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Download,
+  Lock,
   Search,
   SlidersHorizontal,
   Trash2,
@@ -32,6 +33,10 @@ interface SupervisorOverviewViewProps {
   academicYears: string[]
   termsOfYear: SemesterOption[]
   isLoading?: boolean
+  // Kỳ đã chốt danh sách phân công GVHD → BE chặn loại bỏ GVHD (ASSIGNMENT_ALREADY_LOCKED)
+  isLocked?: boolean
+  lockedAt?: string | null
+  lockedByName?: string | null
   onYearChange: (year: string) => void
   onSemesterChange: (semesterId: string) => void
   onUpdateQuota: (id: string, quota: number) => void
@@ -50,6 +55,9 @@ export function SupervisorOverviewView({
   academicYears,
   termsOfYear,
   isLoading,
+  isLocked = false,
+  lockedAt,
+  lockedByName,
   onYearChange,
   onSemesterChange,
   onUpdateQuota,
@@ -133,8 +141,18 @@ export function SupervisorOverviewView({
 
   const handleRemove = (e: React.MouseEvent, l: SupervisorLecturer) => {
     e.stopPropagation()
+    if (isLocked) {
+      toast.warning('Danh sách phân công GVHD của kỳ đã được chốt, không thể loại bỏ giảng viên!')
+      return
+    }
     if (l.assigned > 0) {
       toast.warning('Không thể loại bỏ giảng viên đang có sinh viên hướng dẫn!')
+      return
+    }
+    if ((l.pendingRegistrations ?? 0) > 0) {
+      toast.warning(
+        `Không thể loại bỏ giảng viên còn ${l.pendingRegistrations} đơn đăng ký đang chờ duyệt!`,
+      )
       return
     }
     setRemoveLecturerTarget(l)
@@ -174,8 +192,46 @@ export function SupervisorOverviewView({
     }
   }
 
+  // Thời điểm khóa từ BE (LocalDateTime ISO) → "HH:mm dd/MM/yyyy"
+  const lockedAtText = useMemo(() => {
+    if (!lockedAt) return null
+    const d = new Date(lockedAt)
+    if (Number.isNaN(d.getTime())) return lockedAt
+    return d.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  }, [lockedAt])
+
   return (
     <div className="space-y-4">
+      {/* Thông báo kỳ đã chốt danh sách phân công GVHD: không thêm / loại bỏ GVHD được nữa */}
+      {isLocked && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <Lock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-[13px] leading-relaxed text-amber-800">
+            <div className="font-semibold">Danh sách phân công GVHD của học kỳ đã được chốt</div>
+            <div>
+              Không thể loại bỏ giảng viên khỏi danh sách GVHD của kỳ.
+              {(lockedByName || lockedAtText) && (
+                <>
+                  {' '}Khóa
+                  {lockedByName ? ` bởi ${lockedByName}` : ''}
+                  {lockedAtText ? ` lúc ${lockedAtText}` : ''}.
+                </>
+              )}{' '}
+              Muốn chỉnh sửa, mở khóa ở màn Phân công GVHD.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Thanh phía trên: Bộ lọc Năm học & Học kỳ (trái), Nút thao tác (phải) - Không có tiêu đề h1 */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <SemesterScopeFilter
@@ -446,7 +502,7 @@ export function SupervisorOverviewView({
                         className="py-3.5 px-3 text-center whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {assignedCount === 0 ? (
+                        {!isLocked && assignedCount === 0 && (l.pendingRegistrations ?? 0) === 0 ? (
                           <button
                             type="button"
                             onClick={(e) => handleRemove(e, l)}
@@ -459,7 +515,13 @@ export function SupervisorOverviewView({
                           <button
                             type="button"
                             disabled
-                            title="Không thể loại bỏ giảng viên đang có sinh viên hướng dẫn"
+                            title={
+                              isLocked
+                                ? 'Danh sách phân công GVHD đã được chốt, không thể loại bỏ giảng viên'
+                                : assignedCount > 0
+                                ? 'Không thể loại bỏ giảng viên đang có sinh viên hướng dẫn'
+                                : `Không thể loại bỏ: còn ${l.pendingRegistrations} đơn đăng ký đang chờ giảng viên duyệt`
+                            }
                             className="w-7 h-7 rounded-lg text-slate-300 cursor-not-allowed flex items-center justify-center mx-auto"
                           >
                             <Trash2 className="w-4 h-4" />

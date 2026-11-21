@@ -77,7 +77,6 @@ export const ScheduleManagementPage: React.FC = () => {
     () => managedMajor ?? majorList?.[0],
     [managedMajor, majorList]
   );
-  const selectedMajorId = activeMajor?.publicId || ((activeMajor as { id?: number | string })?.id ? String((activeMajor as { id?: number | string }).id) : '');
   const majorDisplayName = activeMajor
     ? `${activeMajor.name}${activeMajor.code ? ` (${activeMajor.code})` : ''}`
     : managedMajorLoading
@@ -99,10 +98,7 @@ export const ScheduleManagementPage: React.FC = () => {
     handleResetRow,
     handleOpenConfirm,
     handleExecuteSave,
-  } = useScheduleManagement(
-    selectedSemesterId,
-    selectedMajorId
-  );
+  } = useScheduleManagement(selectedSemesterId);
 
   return (
     <div className="space-y-3">
@@ -167,15 +163,10 @@ export const ScheduleManagementPage: React.FC = () => {
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ngành:</span>
             <div className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 text-[13px] font-semibold text-slate-700 flex items-center gap-2 shadow-2xs">
               <span className="text-slate-900 font-bold">{majorDisplayName}</span>
-              {currentPhase === 'evaluation' ? (
-                <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 border border-blue-200/80 px-2 py-0.5 rounded-full">
-                  Bộ môn phụ trách
-                </span>
-              ) : (
-                <span className="text-[11px] font-normal text-slate-400 italic">
-                  (Áp dụng toàn trường)
-                </span>
-              )}
+              {/* Mọi mốc deadline áp dụng chung cả khoa, kể cả giai đoạn Đánh giá */}
+              <span className="text-[11px] font-normal text-slate-400 italic">
+                (Áp dụng toàn khoa)
+              </span>
             </div>
           </div>
         </div>
