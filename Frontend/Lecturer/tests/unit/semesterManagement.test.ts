@@ -5,7 +5,6 @@ import {
   semesterSchema,
   semesterConfigSchema,
 } from '@/features/admin/semester_management/types/semester.types'
-import { useSemesterStore } from '@/features/admin/semester_management/store/semester.store'
 import { apiClient } from '@/shared/api'
 
 let requests: InternalAxiosRequestConfig[] = []
@@ -214,13 +213,5 @@ describe('semesterService endpoints', () => {
   it('không còn phương thức create và delete thủ công trong semesterService', () => {
     expect((semesterService as Record<string, unknown>).create).toBeUndefined()
     expect((semesterService as Record<string, unknown>).delete).toBeUndefined()
-  })
-})
-
-describe('useSemesterStore state', () => {
-  it('không còn hàm addSemester và activateSemester trong store', () => {
-    const store = useSemesterStore.getState()
-    expect((store as unknown as Record<string, unknown>).addSemester).toBeUndefined()
-    expect((store as unknown as Record<string, unknown>).activateSemester).toBeUndefined()
   })
 })

@@ -1,5 +1,6 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
+import { getFilenameFromDisposition, type DownloadedFile } from '@/shared/utils/download'
 import type {
   AssignExaminersRequest,
   CouncilExaminerBoard,
@@ -47,6 +48,20 @@ export const examinerReviewService = {
     return res.data.data
   },
 
+  // PUT /defense-council/{councilPublicId}/examiner – lưu phân công GVPB cho nhiều sinh viên 1 lần
+  // (tất cả hoặc không; lỗi trả message ghi rõ sinh viên). Trả về message của BE.
+  batchAssignExaminers: async (
+    councilPublicId: string,
+    items: Array<{ defenseAssignmentPublicId: string } & AssignExaminersRequest>,
+  ): Promise<string | undefined> => {
+    const res = await apiClient.put<ApiResponse<void>>(
+      API_ENDPOINTS.examinerReview.batchAssignExaminers(councilPublicId),
+      { items },
+      { skipErrorToast: true },
+    )
+    return res.data.message
+  },
+
   // 4. GET /examiner-assignment/my (?semesterId=)
   getMyAssignments: async (
     semesterId?: string,
@@ -83,6 +98,21 @@ export const examinerReviewService = {
       API_ENDPOINTS.examinerReview.evaluation(examinerAssignmentPublicId),
     )
     return res.data.data
+  },
+
+  // GET /examiner-assignment/{examinerAssignmentPublicId}/evaluation/export – file .docx, không bọc APIResponse
+  exportEvaluation: async (examinerAssignmentPublicId: string): Promise<DownloadedFile> => {
+    const res = await apiClient.get<Blob>(
+      API_ENDPOINTS.examinerReview.evaluationExport(examinerAssignmentPublicId),
+      { responseType: 'blob' },
+    )
+    return {
+      blob: res.data,
+      filename: getFilenameFromDisposition(
+        res.headers['content-disposition'] as string | undefined,
+        'Phieu_cham_Rubric_GVPB.docx',
+      ),
+    }
   },
 
   // 7. PUT /examiner-assignment/{examinerAssignmentPublicId}/evaluation

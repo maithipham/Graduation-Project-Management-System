@@ -40,6 +40,10 @@ export const API_ENDPOINTS = {
     base: '/semester',
     current: '/semester/current',
   },
+  deadline: {
+    // GET ?semesterId=... : các mốc thời hạn của học kỳ, gom theo 3 giai đoạn
+    base: '/api/v1/deadlines',
+  },
   major: {
     base: '/major',
   },

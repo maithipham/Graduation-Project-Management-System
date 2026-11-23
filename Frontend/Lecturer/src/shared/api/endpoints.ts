@@ -189,7 +189,11 @@ export const API_ENDPOINTS = {
     base: '/defense-council',
     // POST: tạo hàng loạt hội đồng bảo vệ
     batch: '/defense-council/batch',
-    // PATCH: cập nhật hội đồng (phòng, thời gian bảo vệ)
+    // PATCH: sửa ngày bảo vệ chung cho mọi hội đồng của ngành trong học kỳ
+    defenseDate: '/defense-council/defense-date',
+    // GET: danh sách mốc thời hạn (dùng đọc mốc THANH_LAP_HOI_DONG)
+    deadlines: '/api/v1/deadlines',
+    // PATCH / DELETE: cập nhật hoặc xóa hội đồng (phòng, thời gian bảo vệ)
     detail: (councilPublicId: string) => `/defense-council/${councilPublicId}`,
     // GET: danh sách giảng viên ứng viên (?semesterId=&majorId=&scope=&assignedOnly=&keyword=)
     teacher: '/defense-council/teacher',
@@ -208,9 +212,13 @@ export const API_ENDPOINTS = {
     myCouncils: '/defense-council/my',
     councilBoard: (councilPublicId: string) => `/defense-council/${councilPublicId}/examiner`,
     assignExaminers: (defenseAssignmentPublicId: string) => `/defense-assignment/${defenseAssignmentPublicId}/examiner`,
+    // PUT: lưu phân công GVPB cho nhiều sinh viên của Hội đồng trong 1 lần
+    batchAssignExaminers: (councilPublicId: string) => `/defense-council/${councilPublicId}/examiner`,
     myAssignments: '/examiner-assignment/my',
     schedule: (id: string) => `/examiner-assignment/${id}/schedule`,
     evaluation: (id: string) => `/examiner-assignment/${id}/evaluation`,
+    // GET: tải phiếu chấm tóm tắt Rubric (.docx) của GVPB
+    evaluationExport: (id: string) => `/examiner-assignment/${id}/evaluation/export`,
     decision: (id: string) => `/examiner-assignment/${id}/decision`,
     reviewFile: (id: string) => `/examiner-assignment/${id}/review-file`,
   },
@@ -222,6 +230,10 @@ export const API_ENDPOINTS = {
       `/defense-assignment/${defenseAssignmentPublicId}/defense-slot`,
     unscheduleSlot: (defenseAssignmentPublicId: string) =>
       `/defense-assignment/${defenseAssignmentPublicId}/defense-slot`,
+    // POST: tạo ca bảo vệ (tên tùy chỉnh) cho Hội đồng
+    createSession: (councilPublicId: string) => `/defense-council/${councilPublicId}/defense-session`,
+    // DELETE: xóa ca bảo vệ (sinh viên trong ca về Chưa xếp ca)
+    deleteSession: (sessionPublicId: string) => `/defense-session/${sessionPublicId}`,
   },
   // Bước 14: Chấm điểm Hội đồng, bảng điểm realtime, biên bản, hoàn tất bảo vệ, nộp lại báo cáo
   defenseEvaluation: {
@@ -229,6 +241,9 @@ export const API_ENDPOINTS = {
       `/defense-council/${councilPublicId}/council-evaluation`,
     councilEvaluation: (defenseAssignmentPublicId: string) =>
       `/defense-assignment/${defenseAssignmentPublicId}/council-evaluation`,
+    // GET: tải phiếu chấm tóm tắt Rubric (.docx) của thành viên Hội đồng
+    councilEvaluationExport: (defenseAssignmentPublicId: string) =>
+      `/defense-assignment/${defenseAssignmentPublicId}/council-evaluation/export`,
     scoreBoard: (defenseAssignmentPublicId: string) =>
       `/defense-score/${defenseAssignmentPublicId}`,
     trialScore: (defenseAssignmentPublicId: string) =>

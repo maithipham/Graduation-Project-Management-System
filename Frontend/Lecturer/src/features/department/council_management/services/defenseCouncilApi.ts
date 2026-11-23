@@ -7,6 +7,7 @@ import type {
   CouncilListResponse,
   CreateCouncilBatchRequest,
   UpdateCouncilLocationRequest,
+  UpdateCommonDefenseDateRequest,
   CandidateTeacher,
   CandidateTeacherParams,
   UpdateCouncilMembersRequest,
@@ -14,6 +15,18 @@ import type {
   EligibleStudentParams,
   AssignStudentsToCouncilRequest,
 } from '../types'
+
+/** Phần cần dùng của response GET /api/v1/deadlines (3 nhóm mốc) */
+interface RawDeadlineItem {
+  code: string
+  startDate?: string | null
+  endDate?: string | null
+}
+interface RawDeadlineGroups {
+  giaoNhanDeadlines?: RawDeadlineItem[]
+  thucHienDeadlines?: RawDeadlineItem[]
+  danhGiaDeadlines?: RawDeadlineItem[]
+}
 
 export const defenseCouncilApi = {
   /**
@@ -53,6 +66,48 @@ export const defenseCouncilApi = {
       data,
     )
     return res.data.data
+  },
+
+  /**
+   * 3b. PATCH /defense-council/defense-date — sửa ngày bảo vệ chung
+   */
+  async updateCommonDefenseDate(data: UpdateCommonDefenseDateRequest): Promise<DefenseCouncil[]> {
+    const res = await apiClient.patch<ApiResponse<DefenseCouncil[]>>(
+      DEFENSE_COUNCIL_ENDPOINTS.DEFENSE_DATE,
+      data,
+    )
+    return res.data.data
+  },
+
+  /**
+   * 3c. DELETE /defense-council/{councilPublicId}
+   */
+  async deleteCouncil(councilPublicId: string): Promise<void> {
+    const res = await apiClient.delete<ApiResponse<void>>(
+      DEFENSE_COUNCIL_ENDPOINTS.DETAIL(councilPublicId),
+    )
+    return res.data.data
+  },
+
+  /**
+   * 3d. GET /api/v1/deadlines — lấy mốc THANH_LAP_HOI_DONG để biết đang mở hay đóng
+   */
+  async getFormationMilestone(params: {
+    semesterId: number | string
+    majorId: number | string
+  }): Promise<{ startDate: string | null; endDate: string | null } | null> {
+    const res = await apiClient.get<ApiResponse<RawDeadlineGroups>>(
+      DEFENSE_COUNCIL_ENDPOINTS.DEADLINES,
+      { params },
+    )
+    const data = res.data.data
+    const all = [
+      ...(data?.giaoNhanDeadlines ?? []),
+      ...(data?.thucHienDeadlines ?? []),
+      ...(data?.danhGiaDeadlines ?? []),
+    ]
+    const item = all.find((d) => d.code === 'THANH_LAP_HOI_DONG')
+    return item ? { startDate: item.startDate ?? null, endDate: item.endDate ?? null } : null
   },
 
   /**

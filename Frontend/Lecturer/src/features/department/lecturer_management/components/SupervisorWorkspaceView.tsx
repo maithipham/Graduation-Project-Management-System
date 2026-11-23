@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/shared/components/feedback'
 import { cn } from '@/shared/utils/cn'
+import { ResizableSplit } from '@/shared/components/ui'
 import type { SemesterOption } from '@/features/department/student_management'
 import type { SupervisorLecturer, SupervisorStudent, RegistrationDeadlineInfo } from '../types'
 import { matchTeacher } from '../services/supervisor.service'
@@ -922,8 +923,18 @@ export function SupervisorWorkspaceView({
       )}
 
       {/* 2. KHU VỰC CHÍNH 2 CỘT: CẢ 2 CỘT CUỘN ĐỘC LẬP */}
-      <div className="flex-1 min-h-0 flex flex-row items-stretch gap-3.5 w-full">
-        {/* === CỘT TRÁI (SINH VIÊN): Ô tìm kiếm + 3 tabs + Bảng sinh viên cuộn riêng === */}
+      <ResizableSplit
+        className="flex-1 w-full items-stretch"
+        sizedPane="end"
+        defaultSize={410}
+        minSize={320}
+        maxSize={760}
+        minOtherSize={560}
+        storageKey="department.supervisor-workspace"
+        startClassName="flex"
+        endClassName="flex"
+        start={
+        /* === CỘT TRÁI (SINH VIÊN): Ô tìm kiếm + 3 tabs + Bảng sinh viên cuộn riêng === */
         <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Ô tìm kiếm sinh viên & Nút Phê duyệt / Từ chối */}
           <div className="flex items-center gap-2 mb-1">
@@ -1467,9 +1478,10 @@ export function SupervisorWorkspaceView({
               </table>
             </div>
         </div>
-
-        {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */}
-        <div className="w-[390px] xl:w-[430px] shrink-0 flex flex-col h-full">
+        }
+        end={
+        /* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */
+        <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Ô tìm kiếm giảng viên & Nút Gán */}
           <div className="shrink-0 flex items-center gap-2 mb-1.5">
             <div className="relative flex-1">
@@ -1721,7 +1733,8 @@ export function SupervisorWorkspaceView({
             </div>
           </div>
         </div>
-      </div>
+        }
+      />
 
       {/* ================================================================= */}
       {/* 4. MODAL XÁC NHẬN KHÓA DANH SÁCH                                  */}

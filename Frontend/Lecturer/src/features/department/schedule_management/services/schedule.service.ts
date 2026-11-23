@@ -15,7 +15,8 @@ export const scheduleService = {
    * Cập nhật thời gian mốc thời hạn
    */
   updateDeadlines: async (payload: DeadlineBatchUpdatePayload) => {
-    await apiClient.put<ApiResponse<void>>('/api/v1/deadlines/batch-update', payload);
+    // Hook tự hiện toast lỗi (đúng message BE), tắt toast của interceptor để không bị 2 thông báo
+    await apiClient.put<ApiResponse<void>>('/api/v1/deadlines/batch-update', payload, { skipErrorToast: true });
   },
 
   /**

@@ -2,6 +2,7 @@ import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
 import type {
   CouncilDefenseSchedule,
+  DefenseSessionRequest,
   ScheduleDefenseSlotRequest,
 } from '../types'
 
@@ -42,6 +43,28 @@ export const defenseScheduleService = {
       {
         skipErrorToast: options?.skipErrorToast,
       },
+    )
+    return res.data.data
+  },
+
+  // 4. POST /defense-council/{councilPublicId}/defense-session
+  createDefenseSession: async (
+    councilPublicId: string,
+    data: DefenseSessionRequest,
+  ): Promise<void> => {
+    const res = await apiClient.post<ApiResponse<void>>(
+      API_ENDPOINTS.defenseSchedule.createSession(councilPublicId),
+      data,
+      { skipErrorToast: true },
+    )
+    return res.data.data
+  },
+
+  // 5. DELETE /defense-session/{sessionPublicId}
+  deleteDefenseSession: async (sessionPublicId: string): Promise<void> => {
+    const res = await apiClient.delete<ApiResponse<void>>(
+      API_ENDPOINTS.defenseSchedule.deleteSession(sessionPublicId),
+      { skipErrorToast: true },
     )
     return res.data.data
   },

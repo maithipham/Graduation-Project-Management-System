@@ -7,8 +7,6 @@ export interface SystemOverviewStats {
   studentPct: number
   lecturerCount: number
   lecturerPct: number
-  adminCount: number
-  adminPct: number
   currentSemesterName: string
   currentSemesterPeriod: string
   totalFaculties: number

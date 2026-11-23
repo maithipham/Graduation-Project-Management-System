@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ChevronRight,
@@ -6,13 +6,9 @@ import {
   PanelLeftOpen,
   X,
 } from 'lucide-react'
-import {
-  computeLecturerBadges,
-  useLecturerPortalStore,
-} from '@/features/lecturer/lecturer_portal_storage'
+import { useLecturerNavBadges } from '../hooks/useLecturerNavBadges'
 import {
   lecturerNavItems,
-  type LecturerNavBadgeKey,
 } from './lecturerNav.config'
 
 interface LecturerSidebarProps {
@@ -50,43 +46,8 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
 }) => {
   const location = useLocation()
 
-  const supervisorRequests = useLecturerPortalStore((s) => s.supervisorRequests)
-  const topicProposals = useLecturerPortalStore((s) => s.topicProposals)
-  const outlines = useLecturerPortalStore((s) => s.outlines)
-  const reports = useLecturerPortalStore((s) => s.reports)
-
-  const badges = useMemo(
-    () =>
-      computeLecturerBadges({
-        supervisorRequests,
-        topicProposals,
-        outlines,
-        reports,
-      }),
-    [supervisorRequests, topicProposals, outlines, reports],
-  )
-
-  const getBadgeCount = (badgeKey?: LecturerNavBadgeKey): number => {
-    switch (badgeKey) {
-      case 'supervisorRequests':
-        return badges.supervisorRequests || 8
-      case 'topicProposals':
-        return badges.topicProposals || 6
-      case 'outlines':
-        return badges.outlines || 12
-      case 'reports':
-        return badges.reports || 2
-      case 'topicAssignmentGroup':
-        return (badges.supervisorRequests || 8) + (badges.topicProposals || 6)
-      case 'thesisExecutionGroup':
-        return badges.reports || 2
-      case 'defenseReviews':
-      case 'defenseGroup':
-        return 11
-      default:
-        return 0
-    }
-  }
+  // Số việc chờ xử lý lấy từ API thật (học kỳ hiện tại)
+  const getBadgeCount = useLecturerNavBadges()
 
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>(() =>
     getInitialOpenSubmenus(location.pathname),
