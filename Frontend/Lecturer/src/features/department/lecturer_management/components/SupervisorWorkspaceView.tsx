@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   ArrowLeft,
   ArrowUpDown,
@@ -181,13 +181,24 @@ export function SupervisorWorkspaceView({
   // Modals
   const [lockModalOpen, setLockModalOpen] = useState(false)
   const [unlockModalOpen, setUnlockModalOpen] = useState(false)
-  // Hộp xác nhận dùng chung (thay cho window.confirm của trình duyệt)
+  // Popup xác nhận nhỏ hiện ngay cạnh nút vừa bấm (thay cho window.confirm của trình duyệt)
   const [confirmState, setConfirmState] = useState<{
     title: string
     message: string
     confirmLabel: string
+    anchor: DOMRect
     onConfirm: () => void
   } | null>(null)
+
+  // Nhấn Esc để đóng popup xác nhận
+  useEffect(() => {
+    if (!confirmState) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmState(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [confirmState])
 
   // Đối tượng sinh viên đang được chọn để gán/đổi GVHD (chọn ở bảng phải rồi nhấn Gán, không dùng popup)
   const [editingTarget, setEditingTarget] = useState<{
@@ -647,7 +658,8 @@ export function SupervisorWorkspaceView({
   }
 
   // Hành động Từ chối (tab Đã nhận GV)
-  const handleRejectAction = async () => {
+  const handleRejectAction = (e: ReactMouseEvent<HTMLElement>) => {
+    const anchor = e.currentTarget.getBoundingClientRect()
     if (isDeadlineOpen) {
       toast.warning('Thao tác này chỉ khả dụng sau khi thời hạn đăng ký của sinh viên kết thúc.')
       return
@@ -660,9 +672,10 @@ export function SupervisorWorkspaceView({
 
     const selectedIdsArray = Array.from(selectedStudentIds)
     setConfirmState({
-      title: 'Từ chối đơn đăng ký',
-      message: `Bạn có chắc chắn muốn từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn? Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (TBM từ chối).`,
+      title: `Từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn?`,
+      message: 'Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (TBM từ chối).',
       confirmLabel: 'Từ chối',
+      anchor,
       onConfirm: () => void performReject(selectedIdsArray),
     })
   }
@@ -1381,9 +1394,10 @@ export function SupervisorWorkspaceView({
                                           e.stopPropagation()
                                           if (isLocked || isDeadlineOpen) return
                                           setConfirmState({
-                                            title: 'Gỡ bỏ GVHD 2',
-                                            message: `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
+                                            title: 'Gỡ bỏ GVHD 2?',
+                                            message: `Gỡ ${s.supervisor2Name} khỏi vai trò GVHD 2 của sinh viên ${s.name}.`,
                                             confirmLabel: 'Gỡ bỏ',
+                                            anchor: e.currentTarget.getBoundingClientRect(),
                                             onConfirm: () => {
                                             markRecentStudents([s.id])
                                             onChangeCoSupervisor(s.id, null)
@@ -1905,60 +1919,68 @@ export function SupervisorWorkspaceView({
       )}
 
       {/* ================================================================= */}
-      {/* 6. MODAL XÁC NHẬN DÙNG CHUNG (từ chối đơn, gỡ GVHD 2)              */}
+      {/* 6. POPUP XÁC NHẬN NHỎ NGAY CẠNH NÚT (từ chối đơn, gỡ GVHD 2)       */}
       {/* ================================================================= */}
-      {confirmState && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
-          onClick={() => setConfirmState(null)}
-        >
-          <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-[460px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 shadow-2xs">
-                  <AlertTriangle className="w-5 h-5" />
+      {confirmState &&
+        (() => {
+          const POPUP_WIDTH = 300
+          const POPUP_EST_HEIGHT = 130
+          const { anchor } = confirmState
+          // Canh mép phải popup theo mép phải nút, không cho tràn khỏi màn hình
+          const left = Math.min(
+            Math.max(anchor.right - POPUP_WIDTH, 8),
+            window.innerWidth - POPUP_WIDTH - 8,
+          )
+          // Mặc định hiện dưới nút; nếu sát đáy màn hình thì hiện phía trên
+          const showAbove = anchor.bottom + 8 + POPUP_EST_HEIGHT > window.innerHeight
+          const position = showAbove
+            ? { left, bottom: window.innerHeight - anchor.top + 8 }
+            : { left, top: anchor.bottom + 8 }
+
+          return (
+            <>
+              {/* Lớp trong suốt: bấm ra ngoài để đóng */}
+              <div className="fixed inset-0 z-50" onClick={() => setConfirmState(null)} />
+              <div
+                role="alertdialog"
+                aria-label={confirmState.title}
+                style={{ ...position, width: POPUP_WIDTH }}
+                className="fixed z-50 bg-white rounded-xl border border-slate-200 shadow-xl p-3.5 animate-in fade-in zoom-in-95 duration-100"
+              >
+                <div className="flex gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-900 leading-snug">
+                      {confirmState.title}
+                    </p>
+                    <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">{confirmState.message}</p>
+                  </div>
                 </div>
-                <h3 className="text-[16px] font-bold text-slate-900 leading-snug">{confirmState.title}</h3>
+                <div className="flex items-center justify-end gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmState(null)}
+                    className="h-7 px-3 rounded-lg bg-white border border-slate-300 text-slate-700 text-[12px] font-semibold hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={() => {
+                      const action = confirmState.onConfirm
+                      setConfirmState(null)
+                      action()
+                    }}
+                    className="h-7 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold transition cursor-pointer shadow-xs"
+                  >
+                    {confirmState.confirmLabel}
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setConfirmState(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer hover:bg-slate-200/50 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-5 text-[13px] text-slate-600 leading-relaxed">
-              <p>{confirmState.message}</p>
-            </div>
-
-            <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setConfirmState(null)}
-                className="h-9 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const action = confirmState.onConfirm
-                  setConfirmState(null)
-                  action()
-                }}
-                className="h-9 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition cursor-pointer shadow-xs"
-              >
-                {confirmState.confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </>
+          )
+        })()}
     </div>
   )
 }
