@@ -9,6 +9,7 @@ import { isApiError } from '@/shared/types'
 import { defenseScheduleService } from '../services/defenseSchedule.service'
 import {
   DEFENSE_SCHEDULE_ERROR_MAP,
+  type DefenseSessionRequest,
   type ScheduleDefenseSlotRequest,
 } from '../types'
 
@@ -125,6 +126,44 @@ export function useBatchScheduleDefenseSlots(councilPublicId: string) {
       void queryClient.invalidateQueries({
         queryKey: defenseScheduleKeys.council(councilPublicId),
       })
+    },
+  })
+}
+
+// 6. Hook tạo ca bảo vệ (tên tùy chỉnh)
+export function useCreateDefenseSession(councilPublicId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: DefenseSessionRequest) =>
+      defenseScheduleService.createDefenseSession(councilPublicId, data),
+    onSuccess: () => {
+      toast.success('Tạo ca bảo vệ thành công')
+      void queryClient.invalidateQueries({
+        queryKey: defenseScheduleKeys.council(councilPublicId),
+      })
+    },
+    onError: (error) => {
+      toast.error(getDefenseScheduleErrorMessage(error))
+    },
+  })
+}
+
+// 7. Hook xóa ca bảo vệ (sinh viên trong ca về Chưa xếp ca)
+export function useDeleteDefenseSession(councilPublicId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (sessionPublicId: string) =>
+      defenseScheduleService.deleteDefenseSession(sessionPublicId),
+    onSuccess: () => {
+      toast.success('Xóa ca bảo vệ thành công')
+      void queryClient.invalidateQueries({
+        queryKey: defenseScheduleKeys.council(councilPublicId),
+      })
+    },
+    onError: (error) => {
+      toast.error(getDefenseScheduleErrorMessage(error))
     },
   })
 }

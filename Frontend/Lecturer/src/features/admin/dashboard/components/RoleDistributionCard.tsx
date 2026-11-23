@@ -21,7 +21,7 @@ export const RoleDistributionCard: React.FC<RoleDistributionCardProps> = ({
           </CardTitle>
         </div>
         <Link
-          to="/admin/accounts"
+          to="/admin/accounts-lecturer"
           className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
         >
           <span>Quản lý</span>
@@ -66,26 +66,6 @@ export const RoleDistributionCard: React.FC<RoleDistributionCardProps> = ({
             <div
               className="h-full rounded-full bg-emerald-600 transition-all duration-500"
               style={{ width: `${stats.lecturerPct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Quản trị viên */}
-        <div>
-          <div className="flex items-center justify-between text-xs font-medium mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-purple-600" />
-              <span className="font-semibold text-slate-800">Quản trị viên</span>
-            </div>
-            <span className="text-slate-500">
-              <b className="text-slate-900">{stats.adminCount}</b> tài khoản (
-              {stats.adminPct}%)
-            </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-purple-600 transition-all duration-500"
-              style={{ width: `${stats.adminPct}%` }}
             />
           </div>
         </div>

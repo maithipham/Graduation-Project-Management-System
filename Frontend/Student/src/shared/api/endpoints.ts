@@ -42,6 +42,10 @@ export const API_ENDPOINTS = {
     base: '/semester',
     current: '/semester/current',
   },
+  deadline: {
+    // GET ?semesterId=... : các mốc thời hạn của học kỳ, gom theo 3 giai đoạn
+    base: '/api/v1/deadlines',
+  },
   major: {
     base: '/major',
   },
@@ -58,6 +62,13 @@ export const API_ENDPOINTS = {
     myReport: '/report/my-report',
     submit: '/report/submit',
     detail: (publicId: string) => `/report/${publicId}`,
+  },
+  // Nộp lại báo cáo cuối cùng sau bảo vệ (Thư ký đánh dấu trong biên bản, Thư ký / Chủ tịch duyệt)
+  defenseRevision: {
+    // GET ?semesterId=... : yêu cầu của sinh viên đang đăng nhập (data rỗng = không có yêu cầu)
+    my: '/defense-revision/my',
+    // POST multipart: revisedReportFile (bắt buộc), explanationFile, studentNote
+    submit: (revisionPublicId: string) => `/defense-revision/${revisionPublicId}/submission`,
   },
   advisor: {
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,

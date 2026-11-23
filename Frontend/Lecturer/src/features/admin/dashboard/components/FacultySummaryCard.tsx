@@ -10,10 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table'
-import type { Faculty } from '@/features/admin/faculty_management'
+import type { FacultyResponseBE } from '@/features/admin/faculty_management'
 
 interface FacultySummaryCardProps {
-  faculties: Faculty[]
+  faculties: FacultyResponseBE[]
 }
 
 export const FacultySummaryCard: React.FC<FacultySummaryCardProps> = ({
@@ -59,7 +59,7 @@ export const FacultySummaryCard: React.FC<FacultySummaryCardProps> = ({
           <TableBody>
             {faculties.slice(0, 5).map((faculty) => (
               <TableRow
-                key={faculty.id}
+                key={faculty.publicId ?? faculty.id}
                 className="hover:bg-slate-50/80 transition-colors"
               >
                 <TableCell>
@@ -79,12 +79,12 @@ export const FacultySummaryCard: React.FC<FacultySummaryCardProps> = ({
 
                 <TableCell>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                    {faculty.majors.length} ngành
+                    {faculty.totalMajors} ngành
                   </span>
                 </TableCell>
 
                 <TableCell>
-                  {faculty.status === 'active' ? (
+                  {faculty.statusCode === 'ACTIVE' ? (
                     <span className="text-xs font-semibold text-emerald-700">
                       Hoạt động
                     </span>

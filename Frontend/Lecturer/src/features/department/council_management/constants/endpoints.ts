@@ -9,7 +9,11 @@ export const DEFENSE_COUNCIL_ENDPOINTS = {
   OVERVIEW: API_ENDPOINTS.defenseCouncil.base,
   // POST /defense-council/batch
   BATCH_CREATE: API_ENDPOINTS.defenseCouncil.batch,
-  // PATCH /defense-council/{councilPublicId}
+  // PATCH /defense-council/defense-date
+  DEFENSE_DATE: API_ENDPOINTS.defenseCouncil.defenseDate,
+  // GET /api/v1/deadlines?semesterId=&majorId=
+  DEADLINES: API_ENDPOINTS.defenseCouncil.deadlines,
+  // PATCH / DELETE /defense-council/{councilPublicId}
   DETAIL: API_ENDPOINTS.defenseCouncil.detail,
   // GET /defense-council/teacher?semesterId=&majorId=&scope=&assignedOnly=&keyword=
   TEACHERS: API_ENDPOINTS.defenseCouncil.teacher,

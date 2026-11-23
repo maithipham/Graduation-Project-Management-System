@@ -1,5 +1,6 @@
 import { apiClient, API_ENDPOINTS } from '@/shared/api'
 import type { ApiResponse } from '@/shared/types'
+import { getFilenameFromDisposition, type DownloadedFile } from '@/shared/utils/download'
 import type {
   CouncilEvaluation,
   CouncilEvaluationRequest,
@@ -34,6 +35,20 @@ export const defenseEvaluationService = {
       EP.councilEvaluation(defenseAssignmentPublicId),
     )
     return res.data.data
+  },
+
+  // GET /defense-assignment/{id}/council-evaluation/export – file .docx, không bọc APIResponse
+  exportCouncilEvaluation: async (defenseAssignmentPublicId: string): Promise<DownloadedFile> => {
+    const res = await apiClient.get<Blob>(EP.councilEvaluationExport(defenseAssignmentPublicId), {
+      responseType: 'blob',
+    })
+    return {
+      blob: res.data,
+      filename: getFilenameFromDisposition(
+        res.headers['content-disposition'] as string | undefined,
+        'Phieu_cham_Rubric_TVHD.docx',
+      ),
+    }
   },
 
   // PUT /defense-assignment/{id}/council-evaluation

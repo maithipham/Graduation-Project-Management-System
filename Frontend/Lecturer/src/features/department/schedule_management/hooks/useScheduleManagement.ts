@@ -38,7 +38,17 @@ export function getTodayDateString(): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-export const useScheduleManagement = (selectedSemesterId: string) => {
+// "2026-08-15" / "2026-08-15T08:00" → "15/08/2026"
+const toDisplayDay = (val: string) => {
+  const m = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : val;
+};
+
+export const useScheduleManagement = (
+  selectedSemesterId: string,
+  // Khoảng ngày của học kỳ (yyyy-MM-dd): BE chặn mốc nằm ngoài khoảng này (lỗi 3183)
+  semesterRange?: { startDate: string | null; endDate: string | null },
+) => {
   // Hoàn toàn không dùng data mẫu, khởi tạo mảng rỗng và lấy 100% từ Database
   const [events, setEvents] = useState<ScheduleEventItem[]>([]);
   const [currentPhase, setCurrentPhase] = useState<SchedulePhase>('assignment');
@@ -176,6 +186,18 @@ export const useScheduleManagement = (selectedSemesterId: string) => {
       return;
     }
 
+    // 2b. Mốc phải nằm trong khoảng ngày của học kỳ (so theo ngày, giống BE)
+    const semStart = semesterRange?.startDate?.slice(0, 10);
+    const semEnd = semesterRange?.endDate?.slice(0, 10);
+    const startDay = rawStart.slice(0, 10);
+    const endDay = rawEnd.slice(0, 10);
+    if ((semStart && startDay < semStart) || (semEnd && endDay > semEnd)) {
+      toast.error(
+        `Thời gian của mốc phải nằm trong thời gian học kỳ (${semStart ? toDisplayDay(semStart) : '…'} – ${semEnd ? toDisplayDay(semEnd) : '…'})!`
+      );
+      return;
+    }
+
     // 3. RÀNG BUỘC TIẾN ĐỘ TUẦN TỰ (Sequential Constraints)
     const phaseEvents = events.filter((e) => e.phase === item.phase);
     const itemIndex = phaseEvents.findIndex((e) => e.id === item.id);
@@ -251,8 +273,9 @@ export const useScheduleManagement = (selectedSemesterId: string) => {
       handleResetRow(pendingConfirm.item.id);
       setPendingConfirm(null);
       await fetchSchedule();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Lỗi khi lưu mốc thời hạn');
+    } catch (err: unknown) {
+      // Interceptor trả ApiError (message = thông báo của BE); không ghi đè bằng câu chung chung
+      toast.error(err instanceof Error && err.message ? err.message : 'Lỗi khi lưu mốc thời hạn');
     } finally {
       setSaving(false);
     }

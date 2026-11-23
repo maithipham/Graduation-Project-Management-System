@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { defenseCouncilApi } from '../services/defenseCouncilApi'
+import { resolveMilestoneState } from '../utils/councilFormatters'
 import type {
+  FormationMilestone,
+  UpdateCommonDefenseDateRequest,
   CreateCouncilBatchRequest,
   UpdateCouncilLocationRequest,
   CandidateTeacherParams,
@@ -67,6 +70,58 @@ export function useUpdateCouncilLocation() {
       queryClient.invalidateQueries({
         queryKey: COUNCIL_QUERY_KEYS.all,
       })
+    },
+  })
+}
+
+/** Trạng thái mốc THANH_LAP_HOI_DONG của học kỳ (đang mở / chưa mở / đã đóng / chưa thiết lập) */
+export function useFormationMilestone(
+  semesterId: number | string | undefined,
+  majorId: number | string | undefined,
+): FormationMilestone {
+  const enabled = Boolean(semesterId && majorId && semesterId !== 'all')
+  const { data, isPending, isError } = useQuery({
+    queryKey: ['defense-council', 'milestone', semesterId ?? '', majorId ?? ''],
+    queryFn: () =>
+      defenseCouncilApi.getFormationMilestone({ semesterId: semesterId!, majorId: majorId! }),
+    enabled,
+  })
+
+  if (!enabled || (enabled && isPending)) {
+    return { state: 'LOADING', startDate: null, endDate: null }
+  }
+  // Không đọc được mốc: coi như chưa thiết lập để chặn thao tác (BE vẫn là nơi quyết định cuối)
+  if (isError || !data) {
+    return { state: 'NOT_CONFIGURED', startDate: null, endDate: null }
+  }
+  return {
+    state: resolveMilestoneState(data.startDate, data.endDate),
+    startDate: data.startDate,
+    endDate: data.endDate,
+  }
+}
+
+export function useUpdateCommonDefenseDate() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: UpdateCommonDefenseDateRequest) =>
+      defenseCouncilApi.updateCommonDefenseDate(data),
+    onSuccess: () => {
+      toast.success('Đã cập nhật ngày bảo vệ chung của các hội đồng!')
+      queryClient.invalidateQueries({ queryKey: COUNCIL_QUERY_KEYS.all })
+    },
+  })
+}
+
+export function useDeleteCouncil() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (councilPublicId: string) => defenseCouncilApi.deleteCouncil(councilPublicId),
+    onSuccess: () => {
+      toast.success('Đã xóa hội đồng bảo vệ!')
+      queryClient.invalidateQueries({ queryKey: COUNCIL_QUERY_KEYS.all })
     },
   })
 }

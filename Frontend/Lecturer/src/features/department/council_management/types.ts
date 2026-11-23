@@ -57,6 +57,36 @@ export interface CreateCouncilBatchRequest {
   defenseEndTime: string
 }
 
+/** Sửa ngày bảo vệ chung cho mọi hội đồng của ngành trong học kỳ */
+export interface UpdateCommonDefenseDateRequest {
+  semesterId: number | string
+  majorId: number | string
+  defenseStartTime: string
+  defenseEndTime: string
+}
+
+/** Trạng thái mốc THANH_LAP_HOI_DONG */
+export type FormationMilestoneState = 'LOADING' | 'NOT_CONFIGURED' | 'NOT_STARTED' | 'OPEN' | 'CLOSED'
+
+export interface FormationMilestone {
+  state: FormationMilestoneState
+  startDate: string | null
+  endDate: string | null
+}
+
+/** Form sửa ngày bảo vệ chung */
+export const editDefenseDateFormSchema = z
+  .object({
+    startDate: z.string().min(1, 'Vui lòng chọn ngày bắt đầu bảo vệ'),
+    endDate: z.string().min(1, 'Vui lòng chọn ngày kết thúc bảo vệ'),
+  })
+  .refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
+    message: 'Ngày kết thúc không được nhỏ hơn ngày bắt đầu',
+    path: ['endDate'],
+  })
+
+export type EditDefenseDateFormValues = z.infer<typeof editDefenseDateFormSchema>
+
 export interface UpdateCouncilLocationRequest {
   location: string
 }

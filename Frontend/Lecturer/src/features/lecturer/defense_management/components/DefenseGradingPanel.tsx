@@ -32,7 +32,8 @@ import type {
   CouncilMember,
   DefenseScoreBoard,
 } from '../types'
-import { DefenseScoreBoardCard } from './DefenseScoreBoardCard'
+import { defenseEvaluationService } from '../services/defenseEvaluation.service'
+import { RubricSheetExportActions } from './RubricSheetExportActions'
 import { StudentMinutesDialog } from './StudentMinutesDialog'
 
 interface DefenseGradingPanelProps {
@@ -490,9 +491,6 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ board, item, evaluation
             </table>
           </div>
         </div>
-
-        {/* Bảng điểm Hội đồng realtime */}
-        <DefenseScoreBoardCard board={scoreBoard} canTrial={Boolean(board?.canViewAllScores)} />
       </div>
 
       <div className="px-6 py-3.5 border-t border-slate-200 flex items-center justify-between gap-4 shrink-0">
@@ -508,6 +506,12 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ board, item, evaluation
                 : 'Đang lưu nháp'}
             </div>
           )}
+          <RubricSheetExportActions
+            className="mt-2"
+            download={() => defenseEvaluationService.exportCouncilEvaluation(evaluation.defenseAssignmentPublicId)}
+            savedFileUrl={evaluation.sheet.sheetFileUrl}
+            savedFileName={evaluation.sheet.sheetFileName}
+          />
         </div>
         {!locked && (
           <div className="flex items-center gap-2.5">

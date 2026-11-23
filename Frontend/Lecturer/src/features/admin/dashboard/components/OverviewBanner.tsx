@@ -1,16 +1,8 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { UserPlus, Building } from 'lucide-react'
-import { Button } from '@/shared/components/ui/button'
 
-interface OverviewBannerProps {
-  onQuickAddAccount: () => void
-  onQuickAddFaculty: () => void
-}
-
-export const OverviewBanner: React.FC<OverviewBannerProps> = ({
-  onQuickAddAccount,
-  onQuickAddFaculty,
-}) => {
+export const OverviewBanner: React.FC = () => {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-linear-to-r from-blue-700 via-blue-600 to-indigo-700 p-6 sm:p-8 text-white shadow-md">
       <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -27,26 +19,22 @@ export const OverviewBanner: React.FC<OverviewBannerProps> = ({
           </p>
         </div>
 
-        {/* Quick Action Buttons */}
+        {/* Lối tắt tới trang quản lý */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <Button
-            type="button"
-            onClick={onQuickAddAccount}
-            className="h-10 bg-white text-blue-700 hover:bg-blue-50 font-semibold text-xs gap-1.5 shadow-sm border border-transparent"
+          <Link
+            to="/admin/accounts-lecturer"
+            className="h-10 px-4 inline-flex items-center gap-1.5 rounded-lg bg-white text-blue-700 hover:bg-blue-50 font-semibold text-xs shadow-sm transition"
           >
             <UserPlus className="h-4 w-4 text-blue-700" />
-            <span>Thêm tài khoản</span>
-          </Button>
-
-          <Button
-            type="button"
-            onClick={onQuickAddFaculty}
-            variant="outline"
-            className="h-10 bg-white/10 hover:bg-white/20 text-white border-white/25 font-semibold text-xs gap-1.5 backdrop-blur-xs"
+            <span>Quản lý tài khoản</span>
+          </Link>
+          <Link
+            to="/admin/faculties"
+            className="h-10 px-4 inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/25 font-semibold text-xs backdrop-blur-xs transition"
           >
             <Building className="h-4 w-4" />
-            <span>Thêm khoa</span>
-          </Button>
+            <span>Quản lý khoa</span>
+          </Link>
         </div>
       </div>
 

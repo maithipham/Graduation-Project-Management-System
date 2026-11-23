@@ -2,23 +2,22 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, ArrowRight } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/components/ui/card'
-import { formatDate } from '@/shared/utils/formatDate'
-import type { Semester } from '@/features/admin/semester_management'
+import type { SemesterResponseBE } from '@/features/admin/semester_management'
 
 interface SemesterTimelineCardProps {
-  semesters: Semester[]
+  semesters: SemesterResponseBE[]
 }
 
 export const SemesterTimelineCard: React.FC<SemesterTimelineCardProps> = ({
   semesters,
 }) => {
-  const getStatusText = (status: Semester['status']) => {
-    switch (status) {
-      case 'active':
+  const getStatusText = (code: SemesterResponseBE['statusCode']) => {
+    switch (code) {
+      case 'ONGOING':
         return <span className="text-emerald-700 font-semibold">Đang diễn ra</span>
-      case 'upcoming':
+      case 'UPCOMING':
         return <span className="text-amber-700 font-semibold">Chưa bắt đầu</span>
-      case 'ended':
+      default:
         return <span className="text-slate-400 font-medium">Đã kết thúc</span>
     }
   }
@@ -42,8 +41,11 @@ export const SemesterTimelineCard: React.FC<SemesterTimelineCardProps> = ({
       </CardHeader>
 
       <CardContent className="pt-4 space-y-2.5">
+        {semesters.length === 0 && (
+          <div className="py-6 text-center text-xs text-slate-400">Chưa có học kỳ nào.</div>
+        )}
         {semesters.map((s) => {
-          const isCurrent = s.status === 'active'
+          const isCurrent = s.statusCode === 'ONGOING'
           return (
             <div
               key={s.id}
@@ -69,11 +71,11 @@ export const SemesterTimelineCard: React.FC<SemesterTimelineCardProps> = ({
                   )}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
-                  {formatDate(s.startDate)} — {formatDate(s.endDate)}
+                  {s.startDate} — {s.endDate}
                 </div>
               </div>
 
-              <div className="text-xs text-right">{getStatusText(s.status)}</div>
+              <div className="text-xs text-right">{getStatusText(s.statusCode)}</div>
             </div>
           )
         })}

@@ -27,6 +27,8 @@ import {
   useExaminerEvaluation,
   useSaveExaminerEvaluation,
 } from '../hooks/useExaminerReview'
+import { examinerReviewService } from '../services/examinerReview.service'
+import { RubricSheetExportActions } from '../components/RubricSheetExportActions'
 import type { ExaminerEvaluation, ExaminerEvaluationRequest } from '../types'
 
 const SCORE_REGEX = /^(10(\.0)?|[0-9](\.[0-9])?)$/
@@ -595,6 +597,12 @@ export const ExaminerGradingPage: React.FC = () => {
             <div className="text-xs text-slate-500 flex items-center gap-2 font-mono">
               <span>MSSV: {evaluation.studentCode}</span>
             </div>
+            <RubricSheetExportActions
+              className="pt-1"
+              download={() => examinerReviewService.exportEvaluation(evaluation.examinerAssignmentPublicId)}
+              savedFileUrl={evaluation.sheet.sheetFileUrl}
+              savedFileName={evaluation.sheet.sheetFileName}
+            />
           </div>
 
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs shrink-0 space-y-1">

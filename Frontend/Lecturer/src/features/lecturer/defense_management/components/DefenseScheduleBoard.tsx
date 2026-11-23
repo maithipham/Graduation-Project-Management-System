@@ -3,15 +3,12 @@ import {
   Calendar,
   CalendarDays,
   Clock,
-  CloudSun,
   Inbox,
   Lock,
   MapPin,
-  Moon,
   Pencil,
   PlusCircle,
   RotateCcw,
-  Sun,
   Trash2,
   UserPlus,
   X,
@@ -33,6 +30,8 @@ import {
   useBatchScheduleDefenseSlots,
   useUnscheduleDefenseSlot,
   useResetCouncilSchedule,
+  useCreateDefenseSession,
+  useDeleteDefenseSession,
 } from '../hooks/useDefenseSchedule'
 import type { DefenseSlot, ScheduleBlockedReason } from '../types'
 import {
@@ -55,15 +54,20 @@ const BLOCKED_REASON_MESSAGE: Record<ScheduleBlockedReason, string> = {
     'Ngành chưa thiết lập mốc "Thời gian tổ chức Hội đồng bảo vệ" cho học kỳ này, chưa thể xếp ca bảo vệ. Vui lòng liên hệ Trưởng ngành.',
 }
 
+// Ca bảo vệ hiển thị trên bảng: map từ DefenseSession của BE (id = sessionPublicId)
 export interface DefenseShift {
   id: string
   name: string
   date: string // YYYY-MM-DD
   startTime: string // HH:mm
   endTime: string // HH:mm
-  iconType: 'sun' | 'cloud-sun' | 'moon' | 'clock'
-  isCustom?: boolean
 }
+
+// Số sinh viên tích nhanh mỗi lượt bằng nút "Chọn 10 SV"
+const QUICK_SELECT_COUNT = 10
+
+// BE trả LocalTime dạng "HH:mm" hoặc "HH:mm:ss" -> cắt về "HH:mm"
+const toHHmm = (time: string): string => time.slice(0, 5)
 
 interface DefenseScheduleBoardProps {
   councilPublicId: string
@@ -82,6 +86,8 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
   const batchScheduleMutation = useBatchScheduleDefenseSlots(councilPublicId)
   const unscheduleMutation = useUnscheduleDefenseSlot(councilPublicId)
   const resetScheduleMutation = useResetCouncilSchedule(councilPublicId)
+  const createSessionMutation = useCreateDefenseSession(councilPublicId)
+  const deleteSessionMutation = useDeleteDefenseSession(councilPublicId)
 
   // State
   const [filterType, setFilterType] = useState<'all' | 'unassigned' | 'assigned'>('all')
@@ -115,142 +121,62 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
     return `${y}-${m}-${d}`
   }, [scheduleData])
 
-  // Danh sách các Ca bảo vệ mặc định (hoặc được tạo thêm)
-  const [shifts, setShifts] = useState<DefenseShift[]>([])
+  // Ca bảo vệ lưu ở BE (Chủ tịch / Thư ký tự tạo, tự đặt tên); không còn ca mặc định Sáng / Chiều / Tối
+  const shifts = useMemo<DefenseShift[]>(
+    () =>
+      (scheduleData?.sessions ?? []).map((s) => ({
+        id: s.sessionPublicId,
+        name: s.name,
+        date: s.sessionDate,
+        startTime: toHHmm(s.startTime),
+        endTime: toHHmm(s.endTime),
+      })),
+    [scheduleData?.sessions],
+  )
 
-  // Ngày đã dùng để tạo các ca mặc định lần trước
-  const lastDefaultDateRef = React.useRef<string | null>(null)
-
-  // Khởi tạo các Ca mặc định khi có ngày hội đồng.
-  // Ngày hội đồng đổi (đổi Hội đồng / dữ liệu tải lại) thì chuyển các ca đang ở ngày cũ sang ngày mới.
-  React.useEffect(() => {
-    if (!defaultCouncilDate) return
-    const oldDate = lastDefaultDateRef.current
-    lastDefaultDateRef.current = defaultCouncilDate
-
-    setShifts((prev) => {
-      if (prev.length > 0) {
-        if (oldDate && oldDate !== defaultCouncilDate) {
-          return prev.map((shift) =>
-            shift.date === oldDate ? { ...shift, date: defaultCouncilDate } : shift,
-          )
-        }
-        return prev
-      }
-      return [
-        {
-          id: 'shift_sang',
-          name: 'Ca Sáng',
-          date: defaultCouncilDate,
-          startTime: '08:00',
-          endTime: '11:20',
-          iconType: 'sun',
-        },
-        {
-          id: 'shift_chieu',
-          name: 'Ca Chiều',
-          date: defaultCouncilDate,
-          startTime: '13:30',
-          endTime: '17:00',
-          iconType: 'cloud-sun',
-        },
-        {
-          id: 'shift_toi',
-          name: 'Ca Tối',
-          date: defaultCouncilDate,
-          startTime: '18:00',
-          endTime: '21:00',
-          iconType: 'moon',
-        },
-      ]
-    })
-  }, [defaultCouncilDate])
-
-  // Phân loại sinh viên theo ca
-  // Hàm kiểm tra sinh viên có thuộc về ca nào
+  // Ca chứa sinh viên: theo sessionPublicId của BE;
+  // ca xếp trước khi có tính năng ca (chưa gắn ca) thì suy ra theo ngày + khung giờ
   const getStudentShiftId = (student: DefenseSlot): string | null => {
     if (!student.defenseStartTime) return null
+    if (student.sessionPublicId && shifts.some((s) => s.id === student.sessionPublicId)) {
+      return student.sessionPublicId
+    }
     const parts = parseIsoParts(student.defenseStartTime)
     if (!parts) return null
-
-    // 1. Tìm ca có cùng ngày và khoảng giờ bao gồm
-    for (const shift of shifts) {
-      if (shift.date === parts.date) {
-        if (parts.time >= shift.startTime && parts.time < shift.endTime) {
-          return shift.id
-        }
-      }
-    }
-
-    // 2. Phân loại theo buổi nếu cùng ngày
-    for (const shift of shifts) {
-      if (shift.date === parts.date) {
-        if (shift.iconType === 'sun' && parts.hours < 12) return shift.id
-        if (shift.iconType === 'cloud-sun' && parts.hours >= 12 && parts.hours < 18)
-          return shift.id
-        if (shift.iconType === 'moon' && parts.hours >= 18) return shift.id
-      }
-    }
-
-    return null
+    const matched = shifts.find(
+      (shift) =>
+        shift.date === parts.date && parts.time >= shift.startTime && parts.time < shift.endTime,
+    )
+    return matched?.id ?? null
   }
-
-  // Tự động bổ sung ca nếu có sinh viên xếp ở ngày khác chưa có ca
-  React.useEffect(() => {
-    if (!scheduleData?.students) return
-    const extraDates = new Set<string>()
-
-    scheduleData.students.forEach((s) => {
-      if (s.defenseStartTime) {
-        const parts = parseIsoParts(s.defenseStartTime)
-        if (parts && parts.date) {
-          extraDates.add(parts.date)
-        }
-      }
-    })
-
-    setShifts((currentShifts) => {
-      const existingDates = new Set(currentShifts.map((s) => s.date))
-      const toAdd: DefenseShift[] = []
-
-      extraDates.forEach((d) => {
-        if (!existingDates.has(d)) {
-          toAdd.push(
-            {
-              id: `shift_sang_${d}`,
-              name: `Ca Sáng (${formatDateSlash(d)})`,
-              date: d,
-              startTime: '08:00',
-              endTime: '11:20',
-              iconType: 'sun',
-            },
-            {
-              id: `shift_chieu_${d}`,
-              name: `Ca Chiều (${formatDateSlash(d)})`,
-              date: d,
-              startTime: '13:30',
-              endTime: '17:00',
-              iconType: 'cloud-sun',
-            },
-          )
-        }
-      })
-
-      return toAdd.length > 0 ? [...currentShifts, ...toAdd] : currentShifts
-    })
-  }, [scheduleData?.students])
 
   // Thống kê sinh viên
   const allStudents = scheduleData?.students ?? []
   const unassignedStudents = allStudents.filter((s) => !s.defenseStartTime)
   const assignedStudents = allStudents.filter((s) => Boolean(s.defenseStartTime))
 
-  // Danh sách sinh viên hiển thị theo bộ lọc
-  const filteredStudents = useMemo(() => {
+  // Danh sách sinh viên hiển thị theo bộ lọc; sinh viên đã xếp ca luôn nằm cuối danh sách
+  const filteredStudents = (() => {
     if (filterType === 'unassigned') return unassignedStudents
     if (filterType === 'assigned') return assignedStudents
-    return allStudents
-  }, [filterType, allStudents, unassignedStudents, assignedStudents])
+    return [...unassignedStudents, ...assignedStudents]
+  })()
+
+  // Sinh viên đã xếp ca nhưng không thuộc ca nào đang có (dữ liệu cũ / ca không khớp giờ)
+  const orphanStudents = assignedStudents.filter((s) => getStudentShiftId(s) === null)
+
+  // Tích nhanh 10 sinh viên chưa xếp ca (theo thứ tự danh sách), bỏ qua sinh viên đã tích
+  const handleQuickSelect = () => {
+    const candidates = unassignedStudents
+      .filter((s) => s.canSchedule && !selectedStudentIds.has(s.defenseAssignmentPublicId))
+      .slice(0, QUICK_SELECT_COUNT)
+    if (candidates.length === 0) return
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev)
+      candidates.forEach((s) => next.add(s.defenseAssignmentPublicId))
+      return next
+    })
+  }
 
   const isAllChecked =
     filteredStudents.length > 0 &&
@@ -288,9 +214,14 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
 
   // Thuật toán tính giờ nối tiếp & xếp ca tuần tự
   const handleAssignStudentsToShift = (
-    targetStudentIds: string[],
+    selectedIds: string[],
     shift: DefenseShift,
   ) => {
+    // Bỏ sinh viên đã nằm sẵn trong ca này (không xếp lại giờ của họ)
+    const targetStudentIds = selectedIds.filter((id) => {
+      const student = allStudents.find((s) => s.defenseAssignmentPublicId === id)
+      return student && student.canSchedule && getStudentShiftId(student) !== shift.id
+    })
     if (targetStudentIds.length === 0) return
 
     // 1. Lấy danh sách SV trong ca này hiện tại (đã sắp xếp theo defenseStartTime)
@@ -337,6 +268,7 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
         defenseStartTime: string
         defenseEndTime: string
         room?: string | null
+        sessionPublicId: string
       }
     }> = []
 
@@ -357,6 +289,7 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
           defenseStartTime: startIso,
           defenseEndTime: nextSlot.iso,
           room: scheduleData?.location || null,
+          sessionPublicId: shift.id,
         },
       })
 
@@ -371,7 +304,7 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
       onSuccess: () => {
         setSelectedStudentIds((prev) => {
           const next = new Set(prev)
-          targetStudentIds.forEach((id) => next.delete(id))
+          selectedIds.forEach((id) => next.delete(id))
           return next
         })
       },
@@ -450,55 +383,39 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
     }
   }
 
-  // Thêm ca bảo vệ mới
+  // Tạo ca bảo vệ mới (lưu BE)
   const handleConfirmCreateShift = () => {
     const name = newShiftName.trim()
-    if (!name) return
-
-    const newShift: DefenseShift = {
-      id: `shift_${Date.now()}`,
-      name,
-      date: newShiftDate.trim() || defaultCouncilDate,
-      startTime: newShiftStartTime.trim() || '08:00',
-      endTime: newShiftEndTime.trim() || '11:20',
-      iconType: name.toLowerCase().includes('tối')
-        ? 'moon'
-        : name.toLowerCase().includes('chiều')
-          ? 'cloud-sun'
-          : 'sun',
-      isCustom: true,
+    const date = newShiftDate.trim() || defaultCouncilDate
+    if (!name || !date || !newShiftStartTime || !newShiftEndTime) return
+    if (newShiftStartTime >= newShiftEndTime) {
+      alert('Giờ bắt đầu ca bảo vệ phải trước giờ kết thúc.')
+      return
     }
-
-    setShifts((prev) => [...prev, newShift])
-    setIsCreateShiftOpen(false)
-    setNewShiftName('')
+    createSessionMutation.mutate(
+      { name, sessionDate: date, startTime: newShiftStartTime, endTime: newShiftEndTime },
+      {
+        onSuccess: () => {
+          setIsCreateShiftOpen(false)
+          setNewShiftName('')
+        },
+      },
+    )
   }
 
-  // Xóa ca tự tạo
-  const handleDeleteShift = (shiftId: string) => {
-    const shift = shifts.find((s) => s.id === shiftId)
-    if (!shift) return
-
-    const studentsInThisShift = allStudents.filter(
-      (s) => getStudentShiftId(s) === shiftId,
-    )
-
-    if (studentsInThisShift.length > 0) {
-      if (
-        !confirm(
-          `Ca "${shift.name}" đang có ${studentsInThisShift.length} sinh viên đã xếp. Bạn có muốn gỡ tất cả sinh viên này về Chưa xếp ca và xóa ca không?`,
-        )
-      ) {
-        return
-      }
-      // Gỡ sinh viên trong ca
-      const idsToUnschedule = studentsInThisShift.map(
-        (s) => s.defenseAssignmentPublicId,
-      )
-      resetScheduleMutation.mutate(idsToUnschedule)
-    }
-
-    setShifts((prev) => prev.filter((s) => s.id !== shiftId))
+  // Xóa ca (BE gỡ sinh viên trong ca về Chưa xếp ca rồi xóa ca)
+  const handleDeleteShift = (shift: DefenseShift) => {
+    const studentCount = allStudents.filter((s) => getStudentShiftId(s) === shift.id).length
+    const message =
+      studentCount > 0
+        ? `Ca "${shift.name}" đang có ${studentCount} sinh viên. Xóa ca sẽ gỡ các sinh viên này về Chưa xếp ca. Tiếp tục?`
+        : `Xóa ca "${shift.name}"?`
+    if (!confirm(message)) return
+    deleteSessionMutation.mutate(shift.id, {
+      onSuccess: () => {
+        setSelectedStudentIds(new Set())
+      },
+    })
   }
 
   // Loading skeleton
@@ -531,7 +448,9 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
   const isOperating =
     batchScheduleMutation.isPending ||
     unscheduleMutation.isPending ||
-    resetScheduleMutation.isPending
+    resetScheduleMutation.isPending ||
+    createSessionMutation.isPending ||
+    deleteSessionMutation.isPending
 
   return (
     <div className="space-y-4">
@@ -604,6 +523,37 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
               </label>
             )}
           </div>
+
+          {/* Chọn nhanh 10 sinh viên chưa xếp ca + số đang chọn */}
+          {canEdit && (
+            <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleQuickSelect}
+                disabled={unassignedStudents.every(
+                  (s) => !s.canSchedule || selectedStudentIds.has(s.defenseAssignmentPublicId),
+                )}
+                className="h-7 px-2.5 rounded-lg border border-[#1565C0]/40 text-[#1565C0] hover:bg-blue-50 text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Chọn {QUICK_SELECT_COUNT} SV</span>
+              </button>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span>
+                  Đang chọn: <b className="text-slate-800">{selectedStudentIds.size}</b>
+                </span>
+                {selectedStudentIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentIds(new Set())}
+                    className="text-slate-400 hover:text-rose-600 font-semibold cursor-pointer"
+                  >
+                    Bỏ chọn
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Danh sách thẻ Sinh viên (Scrollable) */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2.5 divide-y-0 min-h-0 max-h-[720px] scrollbar-thin scrollbar-thumb-slate-200">
@@ -760,6 +710,45 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
 
           {/* Danh sách các Ca bảo vệ (Scrollable) */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0 max-h-[720px] scrollbar-thin scrollbar-thumb-slate-200">
+            {shifts.length === 0 && (
+              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+                <Clock className="w-5 h-5 text-slate-300" />
+                <span>
+                  Hội đồng chưa có ca bảo vệ nào.
+                  {canEdit && (
+                    <>
+                      {' '}Bấm <b>[Tạo ca bảo vệ]</b> để tạo ca và đặt tên tùy ý.
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+
+            {/* Sinh viên đã xếp giờ nhưng chưa thuộc ca nào (xếp trước khi có ca / ca đã đổi giờ) */}
+            {orphanStudents.length > 0 && (
+              <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 space-y-2">
+                <div className="text-xs font-bold text-amber-800">
+                  {orphanStudents.length} sinh viên đã xếp giờ nhưng chưa thuộc ca nào — kéo vào một ca để gom nhóm:
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {orphanStudents.map((sv) => {
+                    const startParts = parseIsoParts(sv.defenseStartTime)
+                    return (
+                      <span
+                        key={sv.defenseAssignmentPublicId}
+                        draggable={canEdit && sv.canSchedule}
+                        onDragStart={(e) => handleDragStart(e, sv.defenseAssignmentPublicId)}
+                        className="px-2 py-1 rounded-lg bg-white border border-amber-200 text-[11.5px] text-slate-700 cursor-grab"
+                      >
+                        <b>{sv.studentName}</b> ({sv.studentCode})
+                        {startParts && ` · ${formatDateSlash(startParts.date)} ${formatTimeSlot(startParts.time)}`}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {shifts.map((shift) => {
               const shiftStudents = allStudents
                 .filter((s) => getStudentShiftId(s) === shift.id)
@@ -770,26 +759,8 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
                 })
 
               const isOver = dragOverShiftId === shift.id
-
-              const iconEl =
-                shift.iconType === 'sun' ? (
-                  <Sun className="w-4.5 h-4.5 text-amber-600" />
-                ) : shift.iconType === 'cloud-sun' ? (
-                  <CloudSun className="w-4.5 h-4.5 text-[#1565C0]" />
-                ) : shift.iconType === 'moon' ? (
-                  <Moon className="w-4.5 h-4.5 text-purple-600" />
-                ) : (
-                  <Clock className="w-4.5 h-4.5 text-slate-600" />
-                )
-
-              const iconBgClass =
-                shift.iconType === 'sun'
-                  ? 'bg-amber-50 border-amber-200'
-                  : shift.iconType === 'cloud-sun'
-                    ? 'bg-sky-50 border-sky-200'
-                    : shift.iconType === 'moon'
-                      ? 'bg-purple-50 border-purple-200'
-                      : 'bg-slate-100 border-slate-200'
+              const iconEl = <Clock className="w-4.5 h-4.5 text-[#1565C0]" />
+              const iconBgClass = 'bg-sky-50 border-sky-200'
 
               return (
                 <div
@@ -855,16 +826,15 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
                           <UserPlus className="w-3.5 h-3.5" />
                           <span>Gán vào {shift.name}</span>
                         </button>
-                        {shift.isCustom && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteShift(shift.id)}
-                            className="w-8.5 h-8.5 rounded-xl border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center cursor-pointer transition"
-                            title="Xóa ca này"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteShift(shift)}
+                          disabled={isOperating}
+                          className="w-8.5 h-8.5 rounded-xl border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center cursor-pointer transition disabled:opacity-40"
+                          title="Xóa ca này"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1019,7 +989,7 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
                 type="text"
                 value={newShiftName}
                 onChange={(e) => setNewShiftName(e.target.value)}
-                placeholder="Ví dụ: Ca Tối, Ca Sáng ngày 2..."
+                placeholder="Ví dụ: Ca 1, Ca phòng 302, Ca ngày 25/06..."
                 className="w-full text-xs"
               />
             </FormField>
@@ -1065,7 +1035,7 @@ export const DefenseScheduleBoard: React.FC<DefenseScheduleBoardProps> = ({
             <Button
               type="button"
               onClick={handleConfirmCreateShift}
-              disabled={!newShiftName.trim()}
+              disabled={!newShiftName.trim() || createSessionMutation.isPending}
               className="text-xs bg-[#1565C0] hover:bg-[#0D47A1] text-white"
             >
               Tạo ca

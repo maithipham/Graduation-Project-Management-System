@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/shared/components/feedback'
 import { cn } from '@/shared/utils/cn'
+import { ResizableSplit } from '@/shared/components/ui'
 import type { SemesterOption } from '@/features/department/student_management'
 import type { SupervisorLecturer, SupervisorStudent, RegistrationDeadlineInfo } from '../types'
 import { matchTeacher } from '../services/supervisor.service'
@@ -180,6 +181,13 @@ export function SupervisorWorkspaceView({
   // Modals
   const [lockModalOpen, setLockModalOpen] = useState(false)
   const [unlockModalOpen, setUnlockModalOpen] = useState(false)
+  // Hộp xác nhận dùng chung (thay cho window.confirm của trình duyệt)
+  const [confirmState, setConfirmState] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   // Đối tượng sinh viên đang được chọn để gán/đổi GVHD (chọn ở bảng phải rồi nhấn Gán, không dùng popup)
   const [editingTarget, setEditingTarget] = useState<{
@@ -651,11 +659,16 @@ export function SupervisorWorkspaceView({
     if (selectedStudentIds.size === 0) return
 
     const selectedIdsArray = Array.from(selectedStudentIds)
-    const confirmReject = confirm(
-      `Bạn có chắc chắn muốn từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn? Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (TBM từ chối).`,
-    )
-    if (!confirmReject) return
+    setConfirmState({
+      title: 'Từ chối đơn đăng ký',
+      message: `Bạn có chắc chắn muốn từ chối ${selectedIdsArray.length} đơn đăng ký đã chọn? Sinh viên sẽ được chuyển về danh mục Chưa nhận GV (TBM từ chối).`,
+      confirmLabel: 'Từ chối',
+      onConfirm: () => void performReject(selectedIdsArray),
+    })
+  }
 
+  const performReject = async (selectedIdsArray: string[]) => {
+    const selectedSet = new Set(selectedIdsArray)
     const regIds: string[] = []
     selectedIdsArray.forEach((sId) => {
       const stu = localStudents.find((s) => s.id === sId)
@@ -675,7 +688,7 @@ export function SupervisorWorkspaceView({
     markRecentStudents(selectedIdsArray)
     setLocalStudents((prev) => {
       const updated = prev.map((s): SupervisorStudent => {
-        if (selectedStudentIds.has(s.id)) {
+        if (selectedSet.has(s.id)) {
           return {
             ...s,
             status: 'unassigned' as const,
@@ -688,8 +701,8 @@ export function SupervisorWorkspaceView({
         }
         return s
       })
-      const touched = updated.filter((s) => selectedStudentIds.has(s.id))
-      const others = updated.filter((s) => !selectedStudentIds.has(s.id))
+      const touched = updated.filter((s) => selectedSet.has(s.id))
+      const others = updated.filter((s) => !selectedSet.has(s.id))
       return [...touched, ...others]
     })
     setSelectedStudentIds(new Set())
@@ -922,8 +935,18 @@ export function SupervisorWorkspaceView({
       )}
 
       {/* 2. KHU VỰC CHÍNH 2 CỘT: CẢ 2 CỘT CUỘN ĐỘC LẬP */}
-      <div className="flex-1 min-h-0 flex flex-row items-stretch gap-3.5 w-full">
-        {/* === CỘT TRÁI (SINH VIÊN): Ô tìm kiếm + 3 tabs + Bảng sinh viên cuộn riêng === */}
+      <ResizableSplit
+        className="flex-1 w-full items-stretch"
+        sizedPane="end"
+        defaultSize={410}
+        minSize={320}
+        maxSize={760}
+        minOtherSize={560}
+        storageKey="department.supervisor-workspace"
+        startClassName="flex"
+        endClassName="flex"
+        start={
+        /* === CỘT TRÁI (SINH VIÊN): Ô tìm kiếm + 3 tabs + Bảng sinh viên cuộn riêng === */
         <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Ô tìm kiếm sinh viên & Nút Phê duyệt / Từ chối */}
           <div className="flex items-center gap-2 mb-1">
@@ -1357,11 +1380,11 @@ export function SupervisorWorkspaceView({
                                         onClick={(e) => {
                                           e.stopPropagation()
                                           if (isLocked || isDeadlineOpen) return
-                                          if (
-                                            confirm(
-                                              `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
-                                            )
-                                          ) {
+                                          setConfirmState({
+                                            title: 'Gỡ bỏ GVHD 2',
+                                            message: `Gỡ bỏ GVHD 2 (${s.supervisor2Name}) của sinh viên ${s.name}?`,
+                                            confirmLabel: 'Gỡ bỏ',
+                                            onConfirm: () => {
                                             markRecentStudents([s.id])
                                             onChangeCoSupervisor(s.id, null)
                                             setLocalStudents((prev) => {
@@ -1378,7 +1401,8 @@ export function SupervisorWorkspaceView({
                                               const others = updated.filter((item) => item.id !== s.id)
                                               return [...touched, ...others]
                                             })
-                                          }
+                                            },
+                                          })
                                         }}
                                         className={cn(
                                           'p-0.5 rounded transition',
@@ -1467,9 +1491,10 @@ export function SupervisorWorkspaceView({
               </table>
             </div>
         </div>
-
-        {/* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */}
-        <div className="w-[390px] xl:w-[430px] shrink-0 flex flex-col h-full">
+        }
+        end={
+        /* === CỘT PHẢI (GIẢNG VIÊN): Ô tìm kiếm + 4 tabs lọc + Danh sách GV cuộn riêng === */
+        <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Ô tìm kiếm giảng viên & Nút Gán */}
           <div className="shrink-0 flex items-center gap-2 mb-1.5">
             <div className="relative flex-1">
@@ -1721,7 +1746,8 @@ export function SupervisorWorkspaceView({
             </div>
           </div>
         </div>
-      </div>
+        }
+      />
 
       {/* ================================================================= */}
       {/* 4. MODAL XÁC NHẬN KHÓA DANH SÁCH                                  */}
@@ -1872,6 +1898,62 @@ export function SupervisorWorkspaceView({
               >
                 {isSubmittingUnlock && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{isSubmittingUnlock ? 'Đang mở khóa...' : 'Xác nhận'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 6. MODAL XÁC NHẬN DÙNG CHUNG (từ chối đơn, gỡ GVHD 2)              */}
+      {/* ================================================================= */}
+      {confirmState && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setConfirmState(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-[460px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <h3 className="text-[16px] font-bold text-slate-900 leading-snug">{confirmState.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmState(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer hover:bg-slate-200/50 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 text-[13px] text-slate-600 leading-relaxed">
+              <p>{confirmState.message}</p>
+            </div>
+
+            <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmState(null)}
+                className="h-9 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = confirmState.onConfirm
+                  setConfirmState(null)
+                  action()
+                }}
+                className="h-9 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition cursor-pointer shadow-xs"
+              >
+                {confirmState.confirmLabel}
               </button>
             </div>
           </div>

@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useFacultyStore } from '../store/faculty.store'
 import {
   useFaculties,
   useCreateFaculty,
@@ -36,14 +35,6 @@ export default function MajorManagementPage() {
     })
   }
 
-  const {
-    faculties: localFaculties,
-    addFaculty,
-    updateFaculty,
-    addMajor,
-    updateMajor,
-  } = useFacultyStore()
-
   // Query Backend
   const { data: apiFaculties } = useFaculties()
   const createFacultyMutation = useCreateFaculty()
@@ -51,7 +42,7 @@ export default function MajorManagementPage() {
   const addMajorMutation = useAddMajorToFaculty()
   const updateMajorMutation = useUpdateMajor()
 
-  // Đồng bộ hoặc fallback
+  // Danh sách khoa lấy hoàn toàn từ server
   const faculties: Faculty[] = useMemo(() => {
     if (apiFaculties && apiFaculties.content && apiFaculties.content.length > 0) {
       return apiFaculties.content.map((f, idx) => ({
@@ -65,8 +56,8 @@ export default function MajorManagementPage() {
         totalMajors: f.totalMajors,
       }))
     }
-    return localFaculties
-  }, [apiFaculties, localFaculties])
+    return []
+  }, [apiFaculties])
 
   // Dialog states
   const [isFacultyFormOpen, setIsFacultyFormOpen] = useState(false)
@@ -90,7 +81,6 @@ export default function MajorManagementPage() {
 
   const handleFacultyFormSubmit = async (values: FacultyFormValues, id?: number) => {
     if (id) {
-      updateFaculty(id, values)
       const target = editingFaculty?.backendId
         ? editingFaculty
         : faculties.find((f) => f.id === id)
@@ -107,7 +97,6 @@ export default function MajorManagementPage() {
         })
       }
     } else {
-      addFaculty(values)
       await createFacultyMutation.mutateAsync({
         code: values.code,
         name: values.name,
@@ -134,7 +123,6 @@ export default function MajorManagementPage() {
     const headTeacherIdNum = values.headTeacherId ? Number(values.headTeacherId) : null
 
     if (id) {
-      updateMajor(selectedFacultyId, id, values)
       const majorUuid = editingMajor?.backendId
       if (majorUuid) {
         await updateMajorMutation.mutateAsync({
@@ -149,7 +137,6 @@ export default function MajorManagementPage() {
         })
       }
     } else {
-      addMajor(selectedFacultyId, values)
       if (facultyUuid) {
         await addMajorMutation.mutateAsync({
           facultyId: facultyUuid,

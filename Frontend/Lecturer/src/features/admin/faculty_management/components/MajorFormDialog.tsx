@@ -17,7 +17,6 @@ import { Textarea } from '@/shared/components/ui/textarea'
 import { Button } from '@/shared/components/ui/button'
 import { toast } from '@/shared/components/feedback/toast.store'
 import { useHeadCandidates } from '../hooks/useFaculties'
-import { useAccountStore } from '@/features/admin/account_management'
 import { isApiError } from '@/shared/types'
 import {
   majorSchema,
@@ -54,7 +53,6 @@ export const MajorFormDialog: React.FC<MajorFormDialogProps> = ({
 }) => {
   const isEdit = Boolean(editingMajor)
   const { data: candidates } = useHeadCandidates()
-  const accounts = useAccountStore((s) => s.accounts)
 
   const candidateOptions = useMemo(() => {
     if (candidates && candidates.length > 0) {
@@ -64,16 +62,8 @@ export const MajorFormDialog: React.FC<MajorFormDialogProps> = ({
         description: c.email || c.majorName || undefined,
       }))
     }
-    const lecturers = accounts.filter((a) => a.role === 'Giảng viên')
-    if (lecturers.length > 0) {
-      return lecturers.map((lec) => ({
-        value: String(lec.id),
-        label: lec.name,
-        description: lec.email || lec.unit,
-      }))
-    }
     return []
-  }, [candidates, accounts])
+  }, [candidates])
 
   const {
     register,
