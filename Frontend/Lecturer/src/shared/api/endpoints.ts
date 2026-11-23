@@ -147,6 +147,8 @@ export const API_ENDPOINTS = {
     submit: (sheetPublicId: string) => `/advisor-grade/sheet/${sheetPublicId}/submit`,
   },
   lecturer: {
+    // GET: xem thông tin cá nhân · PUT: sửa Họ, Tên, Số điện thoại
+    myInfo: '/teacher/my-info',
     dashboard: '/lecturer/dashboard',
     topics: '/lecturer/topics',
     reviewOutline: '/lecturer/review-outline',

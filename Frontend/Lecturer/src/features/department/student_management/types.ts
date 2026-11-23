@@ -3,11 +3,13 @@ import type { SortValue } from '@/shared/types'
 import type { UseMutationResult } from '@tanstack/react-query'
 
 /**
- * Trạng thái đồ án của sinh viên trong học kì (cột Trạng thái, bộ lọc `status`).
- * Đề tài bị đình chỉ / hủy → DISQUALIFIED / CANCELLED, còn lại là giai đoạn đồ án
+ * Trạng thái hiển thị do BE tính (enum `StudentListStatus`), không còn là tên `ThesisStage` gốc.
+ * Cùng một giá trị dùng cho field `status` / `statusLabel` của từng dòng, tham số lọc `?status=`
+ * và cột Trạng thái trong file Excel export. DISQUALIFIED / CANCELLED ưu tiên cao nhất, bất kể giai đoạn.
  */
 export type StudentThesisStatus =
   | 'STAGE_1_REGISTERING_ADVISOR'
+  | 'STAGE_1_ADVISOR_REQUESTED'
   | 'STAGE_1_ADVISOR_ASSIGNED'
   | 'STAGE_2_TOPIC_CONFIRMED'
   | 'STAGE_3_OUTLINE_APPROVED'

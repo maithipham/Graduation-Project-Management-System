@@ -20,7 +20,8 @@ export const DEFAULT_STUDENT_FILTERS: StudentFilters = {
 
 // Thứ tự theo tiến độ đồ án. Nhãn khớp statusLabel BE trả về
 export const STUDENT_STATUS_OPTIONS: { value: StudentThesisStatus; label: string }[] = [
-  { value: 'STAGE_1_REGISTERING_ADVISOR', label: 'Đang đăng ký GVHD' },
+  { value: 'STAGE_1_REGISTERING_ADVISOR', label: 'Chưa đăng ký GVHD' },
+  { value: 'STAGE_1_ADVISOR_REQUESTED', label: 'Đã gửi đơn đăng ký GVHD' },
   { value: 'STAGE_1_ADVISOR_ASSIGNED', label: 'Đã phân công GVHD' },
   { value: 'STAGE_2_TOPIC_CONFIRMED', label: 'Đã chốt tên đề tài' },
   { value: 'STAGE_3_OUTLINE_APPROVED', label: 'Đã duyệt đề cương' },

@@ -28,6 +28,7 @@
 | 14  | Body `PUT /student/{publicId}` **bỏ `major`** (không đổi ngành, không còn lỗi `3018`), **thêm `accountStatus`** (khóa / mở khóa); lỗi mới `3031` | Đã làm: ô Bộ môn chỉ đọc, có ô bật/tắt tài khoản (Mục 6.4) |
 | 15  | Sửa / xóa SV ngành khác đổi từ `404 3008` "Sinh viên không tồn tại" sang **`403 3032`** "Bạn không có quyền thao tác với sinh viên không thuộc ngành phụ trách"; `3008` chỉ còn cho SV không có | FE chỉ hiện `message`; nếu có xử lý riêng theo HTTP 404 khi sửa / xóa thì xét thêm 403 (Mục 3, 6.4, 6.5) |
 | 16  | Body `PUT /student/{publicId}` **bỏ `accountStatus`** (thay đổi #14 đã hủy một phần): form Sửa không còn khóa / mở khóa tài khoản; **xóa mã lỗi `3031`** | ✅ Đã làm: bỏ ô bật/tắt "Được đăng nhập" khỏi form Sửa, bỏ `accountStatus` khỏi schema / payload, bỏ xử lý `3031` (Mục 6.4) |
+| 17  | `status` / `statusLabel` / `?status=` / cột Trạng thái Excel đổi sang **trạng thái hiển thị do BE tính** (enum `StudentListStatus`): thêm `STAGE_1_ADVISOR_REQUESTED` "Đã gửi đơn đăng ký GVHD"; đề tài Giai đoạn 2 chưa có tên → `STAGE_1_ADVISOR_ASSIGNED`; bộ lọc lọc đúng theo cột hiển thị; nhãn `STAGE_1_REGISTERING_ADVISOR` là "Chưa đăng ký GVHD" | ✅ Đã làm: thêm giá trị vào union, dropdown 10 option, badge cam, sửa nhãn (Mục 4.1.3, 6.5) |
 
 ---
 
@@ -173,6 +174,7 @@ Một phần tử trong `content`:
 ```ts
 export type StudentThesisStatus =
   | "STAGE_1_REGISTERING_ADVISOR"
+  | "STAGE_1_ADVISOR_REQUESTED"
   | "STAGE_1_ADVISOR_ASSIGNED"
   | "STAGE_2_TOPIC_CONFIRMED"
   | "STAGE_3_OUTLINE_APPROVED"
@@ -240,20 +242,25 @@ export interface StudentListParams {
 
 #### 4.1.3. Giá trị bộ lọc Trạng thái & màu badge
 
-Cột Trạng thái BE ghép từ 2 nguồn: đề tài bị **đình chỉ / hủy** → lấy trạng thái đề tài; còn lại → lấy **giai đoạn** đồ án.
-Lọc theo 1 giai đoạn chỉ trả các đề tài đang ở giai đoạn đó **và chưa** bị đình chỉ / hủy.
+BE tính **trạng thái hiển thị** (enum `StudentListStatus`). Cùng một giá trị dùng cho field `status` / `statusLabel`
+của từng dòng, tham số lọc `?status=` và cột Trạng thái trong file Excel export. Bộ lọc lọc **đúng theo cột đang hiển thị**
+(ví dụ `?status=STAGE_1_REGISTERING_ADVISOR` không trả SV đã gửi đơn; `?status=STAGE_2_TOPIC_CONFIRMED` không trả đề tài chưa có tên).
+Giá trị không thuộc bảng → `400`, code `3026`.
 
-| `status` (giá trị gửi lên / nhận về) | `statusLabel`                            | Badge gợi ý        |
-| :----------------------------------- | :--------------------------------------- | :----------------- |
-| `STAGE_1_REGISTERING_ADVISOR`        | Đang đăng ký GVHD                        | xám `slate`        |
-| `STAGE_1_ADVISOR_ASSIGNED`           | Đã phân công GVHD                        | xanh dương `blue`  |
-| `STAGE_2_TOPIC_CONFIRMED`            | Đã chốt tên đề tài                       | xanh dương `blue`  |
-| `STAGE_3_OUTLINE_APPROVED`           | Đã duyệt đề cương                        | chàm `indigo`      |
-| `STAGE_4_REPORT_APPROVED`            | Đã duyệt báo cáo                         | chàm `indigo`      |
-| `STAGE_5_REVIEW_PASSED`              | Đạt phản biện                            | tím `violet`       |
-| `STAGE_6_DEFENSE_COMPLETED`          | Đã bảo vệ hội đồng                       | xanh lá `green`    |
-| `DISQUALIFIED`                       | Bị đình chỉ / Không đủ điều kiện đi tiếp | đỏ `red`           |
-| `CANCELLED`                          | Đã hủy                                   | đỏ nhạt / xám gạch |
+| `status` (gửi lên / nhận về)   | `statusLabel`                            | Khi nào                                                                                       | Badge                 |
+| :----------------------------- | :--------------------------------------- | :-------------------------------------------------------------------------------------------- | :-------------------- |
+| `STAGE_1_REGISTERING_ADVISOR`  | Chưa đăng ký GVHD                        | Giai đoạn 1, chưa có GVHD, **chưa** có đơn đăng ký còn hiệu lực                              | vàng `amber`          |
+| `STAGE_1_ADVISOR_REQUESTED` 🆕 | Đã gửi đơn đăng ký GVHD                  | Giai đoạn 1, chưa có GVHD, đã có đơn `PENDING` / `TEACHER_APPROVED` / `HOD_APPROVED` trong kỳ | cam `orange`          |
+| `STAGE_1_ADVISOR_ASSIGNED`     | Đã phân công GVHD                        | Đã phân công GVHD **hoặc** Giai đoạn 2 nhưng chưa có tên đề tài                              | xanh trời `sky`       |
+| `STAGE_2_TOPIC_CONFIRMED`      | Đã chốt tên đề tài                       | Giai đoạn 2 và đã có tên đề tài                                                               | xanh dương `blue`     |
+| `STAGE_3_OUTLINE_APPROVED`     | Đã duyệt đề cương                        |                                                                                               | chàm `indigo`         |
+| `STAGE_4_REPORT_APPROVED`      | Đã duyệt báo cáo                         |                                                                                               | chàm `indigo`         |
+| `STAGE_5_REVIEW_PASSED`        | Đạt phản biện                            |                                                                                               | tím `violet`          |
+| `STAGE_6_DEFENSE_COMPLETED`    | Đã bảo vệ hội đồng                       |                                                                                               | xanh lá `green`       |
+| `DISQUALIFIED`                 | Bị đình chỉ / Không đủ điều kiện đi tiếp | Ưu tiên cao nhất (bất kể giai đoạn)                                                           | đỏ `red`              |
+| `CANCELLED`                    | Đã hủy                                   | Ưu tiên cao nhất (bất kể giai đoạn)                                                           | xám `slate`, gạch chữ |
+
+Đơn do TBM phân công thẳng (`ASSIGNED_BY_HOD`) không tính là "Đã gửi đơn".
 
 - Option đầu của dropdown: "Tất cả trạng thái" (không gửi `status`).
 - Danh sách option FE khai báo tĩnh (`STUDENT_STATUS_OPTIONS`) theo đúng bảng trên. Badge hiển thị **`statusLabel` của BE**
@@ -673,6 +680,7 @@ Thành công → `invalidateQueries(departmentStudentKeys.all)` + detail của S
   ("Xóa sinh viên thành công"); còn lịch sử ở kì khác → chỉ xóa khỏi kì ("Đã xóa sinh viên khỏi học kỳ"). FE hiện `message` của BE.
 - Chỉ xóa được khi SV **chưa đăng ký GVHD / chưa có đề tài**. FE chỉ hiện nút khi dòng có `status = STAGE_1_REGISTERING_ADVISOR`
   và không có `lecturerName` / `topicName`; BE vẫn kiểm tra lại (kể cả đơn đăng ký GVHD đã bị từ chối → `3028`).
+- SV **đã gửi đơn đăng ký GVHD** có `status = STAGE_1_ADVISOR_REQUESTED` → **không** hiện nút Xóa (BE chỉ cho xóa đề tài chưa có đơn đăng ký).
 - Hỏi xác nhận trước khi gọi: "Xóa sinh viên _Lê Trung Đức (2251172489)_ khỏi _Học kỳ 1 năm học 2026-2027_?"
 
 | Lỗi                               | HTTP | `code` | Message                                                             |

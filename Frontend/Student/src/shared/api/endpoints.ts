@@ -13,6 +13,8 @@ export const API_ENDPOINTS = {
   },
   student: {
     overview: '/student/overview',
+    // GET: thông tin cá nhân + đề tài kỳ hiện tại · PUT: sửa Họ, Tên, Số điện thoại
+    myInfo: '/student/my-info',
     // Đăng ký giảng viên hướng dẫn
     advisorRegistrations: '/api/student/advisor-registrations',
     // gvhd và đề tài chính thức các kỳ
@@ -60,6 +62,13 @@ export const API_ENDPOINTS = {
     myReport: '/report/my-report',
     submit: '/report/submit',
     detail: (publicId: string) => `/report/${publicId}`,
+  },
+  // Nộp lại báo cáo cuối cùng sau bảo vệ (Thư ký đánh dấu trong biên bản, Thư ký / Chủ tịch duyệt)
+  defenseRevision: {
+    // GET ?semesterId=... : yêu cầu của sinh viên đang đăng nhập (data rỗng = không có yêu cầu)
+    my: '/defense-revision/my',
+    // POST multipart: revisedReportFile (bắt buộc), explanationFile, studentNote
+    submit: (revisionPublicId: string) => `/defense-revision/${revisionPublicId}/submission`,
   },
   advisor: {
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,

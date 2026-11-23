@@ -1,3 +1,6 @@
 // Public API của sub-feature: profile_management
-// Không export pages: page được nạp bằng lazy() trong app/routes.
-export {}
+export * from './types/lecturerProfile.types'
+export * from './services/lecturerProfile.service'
+export * from './hooks/useLecturerMyInfo'
+export * from './components/LecturerProfileModal'
+export * from './components/LecturerProfileView'
