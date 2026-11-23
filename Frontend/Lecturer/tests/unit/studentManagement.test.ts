@@ -201,7 +201,7 @@ describe('canDeleteStudent', () => {
     className: '64KTPM1',
     batch: 'K64',
     status: 'STAGE_1_REGISTERING_ADVISOR',
-    statusLabel: 'Đang đăng ký GVHD',
+    statusLabel: 'Chưa đăng ký GVHD',
     accountStatus: true,
   }
 
@@ -210,5 +210,13 @@ describe('canDeleteStudent', () => {
     expect(canDeleteStudent({ ...base, lecturerName: 'ThS. A' })).toBe(false)
     expect(canDeleteStudent({ ...base, topicName: 'Đề tài' })).toBe(false)
     expect(canDeleteStudent({ ...base, status: 'STAGE_1_ADVISOR_ASSIGNED' })).toBe(false)
+    // Đã gửi đơn đăng ký GVHD → không xóa được
+    expect(
+      canDeleteStudent({
+        ...base,
+        status: 'STAGE_1_ADVISOR_REQUESTED',
+        statusLabel: 'Đã gửi đơn đăng ký GVHD',
+      }),
+    ).toBe(false)
   })
 })

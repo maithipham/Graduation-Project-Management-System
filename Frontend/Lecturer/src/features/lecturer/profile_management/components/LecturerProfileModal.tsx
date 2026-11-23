@@ -1,154 +1,179 @@
-import React, { useState, useEffect } from 'react'
-import { X, Mail, Phone, User } from 'lucide-react'
-import type { LecturerProfileContactPayload } from '../types/lecturerProfile.types'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { isApiError } from '@/shared/types'
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  FormField,
+  Input,
+} from '@/shared/components/ui'
+import { useUpdateLecturerMyInfo } from '../hooks/useLecturerMyInfo'
+import { PHONE_EXISTED, TEACHER_INFO_INVALID } from '../services/lecturerProfile.service'
+import type { TeacherMyInfoUpdatePayload } from '../types/lecturerProfile.types'
+
+// Chuẩn hóa giống BE: NFC, trim, gộp nhiều khoảng trắng thành 1
+const normalizeText = (value: string) => value.normalize('NFC').trim().replace(/\s+/g, ' ')
+
+// Quy tắc khớp BE (mục 2.4 tài liệu api_myInfo.md)
+const FIRST_NAME_REGEX = /^\p{Script=Latin}+( \p{Script=Latin}+)*$/u
+const LAST_NAME_REGEX = /^\p{Script=Latin}+$/u
+const PHONE_REGEX = /^0\d{9}$/
+
+const profileSchema = z.object({
+  firstName: z
+    .string()
+    .transform(normalizeText)
+    .pipe(
+      z
+        .string()
+        .min(1, 'Họ không được để trống')
+        .max(255, 'Họ tối đa 255 ký tự')
+        .regex(FIRST_NAME_REGEX, 'Họ không được chứa số và kí tự đặc biệt'),
+    ),
+  lastName: z
+    .string()
+    .transform(normalizeText)
+    .pipe(
+      z
+        .string()
+        .min(1, 'Tên không được để trống')
+        .max(255, 'Tên tối đa 255 ký tự')
+        .regex(LAST_NAME_REGEX, 'Tên chỉ gồm 1 từ và chỉ được chứa chữ cái'),
+    ),
+  phone: z
+    .string()
+    // Cho phép gõ "0912 345 678", bỏ dấu cách trước khi gửi (BE không tự bỏ)
+    .transform((value) => value.replace(/\s/g, ''))
+    .pipe(
+      z
+        .string()
+        .min(1, 'Số điện thoại không được để trống')
+        .regex(PHONE_REGEX, 'Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0'),
+    ),
+})
+
+type ProfileFormInput = z.input<typeof profileSchema>
+type ProfileFormValues = z.output<typeof profileSchema>
+
+// Lỗi 4000 sai 1 trường → BE trả message riêng của trường đó; sai ≥ 2 trường → message gộp
+function fieldOfValidationMessage(message: string): keyof ProfileFormInput | null {
+  if (message.includes('vui lòng kiểm tra lại')) return null
+  if (message.startsWith('Số điện thoại')) return 'phone'
+  if (message.startsWith('Tên')) return 'lastName'
+  if (message.startsWith('Họ')) return 'firstName'
+  return null
+}
 
 interface LecturerProfileModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (payload: LecturerProfileContactPayload) => void
-  initialValues: {
-    name: string
-    email: string
-    phone: string
-  }
+  /** Giá trị hiện tại (Họ/Tên tách từ `name` của GET /teacher/my-info) */
+  initialValues: TeacherMyInfoUpdatePayload
+  /** Chỉ hiển thị, không sửa và không gửi lên BE */
+  email: string
 }
 
-export const LecturerProfileModal: React.FC<LecturerProfileModalProps> = ({
-  isOpen,
-  onClose,
-  onSave,
-  initialValues,
-}) => {
-  const [name, setName] = useState(initialValues.name)
-  const [email, setEmail] = useState(initialValues.email)
-  const [phone, setPhone] = useState(initialValues.phone)
+export function LecturerProfileModal({ isOpen, onClose, initialValues, email }: LecturerProfileModalProps) {
+  const updateMutation = useUpdateLecturerMyInfo()
+  const isSaving = updateMutation.isPending
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<ProfileFormInput, unknown, ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { firstName: '', lastName: '', phone: '' },
+  })
+
+  // Mỗi lần mở popup: nạp lại giá trị hiện tại
+  const { firstName, lastName, phone } = initialValues
   useEffect(() => {
-    if (isOpen) {
-      setName(initialValues.name)
-      setEmail(initialValues.email)
-      setPhone(initialValues.phone)
-    }
-  }, [isOpen, initialValues])
+    if (isOpen) reset({ firstName, lastName, phone })
+  }, [isOpen, firstName, lastName, phone, reset])
 
-  if (!isOpen) return null
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave({
-      name: name.trim() || initialValues.name,
-      email: email.trim() || initialValues.email,
-      phone: phone.trim() || initialValues.phone,
+  const onSubmit = (values: ProfileFormValues) => {
+    updateMutation.mutate(values, {
+      // 1000 (đã lưu) hoặc 1104 (không đổi gì, toast vàng do interceptor hiện) → đóng popup
+      onSuccess: onClose,
+      // Lỗi → giữ popup mở để người dùng sửa
+      onError: (error) => {
+        if (!isApiError(error)) {
+          setError('root.server', { message: 'Cập nhật thất bại. Vui lòng thử lại.' })
+          return
+        }
+        if (error.code === PHONE_EXISTED) {
+          setError('phone', { message: error.message }, { shouldFocus: true })
+          return
+        }
+        if (error.code === TEACHER_INFO_INVALID) {
+          const field = fieldOfValidationMessage(error.message)
+          if (field) {
+            setError(field, { message: error.message }, { shouldFocus: true })
+            return
+          }
+        }
+        setError('root.server', { message: error.message })
+      },
     })
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
-      style={{
-        fontFamily:
-          '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Header Modal */}
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
-          <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-[#1565C0]" />
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              Cập nhật thông tin cá nhân
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
-            aria-label="Đóng"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSaving && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Cập nhật thông tin cá nhân</DialogTitle>
+          <DialogDescription>Bạn có thể sửa Họ, Tên và Số điện thoại.</DialogDescription>
+        </DialogHeader>
 
-        {/* Form Content: Chỉ cho sửa tên, email, sđt */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          {/* Họ và tên */}
-          <div>
-            <label htmlFor="editLecturerNameInput" className="block font-semibold text-slate-700 mb-1.5">
-              Họ và tên <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                id="editLecturerNameInput"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="VD: Trần Mai Anh"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#1565C0]/30 focus:border-[#1565C0] transition"
-              />
-            </div>
-          </div>
-
-          {/* Email liên hệ */}
-          <div>
-            <label htmlFor="editLecturerEmailInput" className="block font-semibold text-slate-700 mb-1.5">
-              Email liên hệ <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="email"
-                id="editLecturerEmailInput"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@tlu.edu.vn"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-[#1565C0]/30 focus:border-[#1565C0] transition"
-              />
-            </div>
-          </div>
-
-          {/* Số điện thoại */}
-          <div>
-            <label htmlFor="editLecturerPhoneInput" className="block font-semibold text-slate-700 mb-1.5">
-              Số điện thoại <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                id="editLecturerPhoneInput"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="0912 345 678"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-[#1565C0]/30 focus:border-[#1565C0] transition"
-              />
-            </div>
-          </div>
-
-          {/* Footer nút hành động */}
-          <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-9 px-4 rounded-lg bg-white border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition cursor-pointer text-xs"
+        <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <FormField
+              label="Họ và tên đệm"
+              required
+              error={errors.firstName?.message}
+              className="sm:col-span-2"
             >
+              <Input placeholder="VD: Nguyễn Văn" autoComplete="family-name" {...register('firstName')} />
+            </FormField>
+            <FormField label="Tên" required error={errors.lastName?.message}>
+              <Input placeholder="VD: An" autoComplete="given-name" {...register('lastName')} />
+            </FormField>
+          </div>
+
+          <FormField label="Số điện thoại" required error={errors.phone?.message}>
+            <Input type="tel" inputMode="numeric" placeholder="VD: 0912345678" {...register('phone')} />
+          </FormField>
+
+          <FormField label="Email" hint="Email không thể thay đổi.">
+            <Input value={email} readOnly disabled />
+          </FormField>
+
+          {errors.root?.server && (
+            <p role="alert" className="text-sm font-semibold text-[#DC2626]">
+              {errors.root.server.message}
+            </p>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
               Hủy
-            </button>
-            <button
-              type="submit"
-              className="h-9 px-5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white font-bold transition shadow-xs cursor-pointer text-xs active:scale-95"
-            >
-              Lưu thay đổi
-            </button>
-          </div>
+            </Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

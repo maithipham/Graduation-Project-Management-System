@@ -1,10 +1,11 @@
 import { cn } from '@/shared/utils/cn'
 import type { StudentThesisStatus } from '../types'
 
-// Màu theo tiến độ: vàng = chưa có GVHD, xanh dương = đang làm, tím = qua các mốc duyệt,
-// xanh lá = đã bảo vệ, đỏ = bị đình chỉ. Chữ hiển thị luôn là statusLabel của BE
+// Màu theo tiến độ: vàng = chưa đăng ký GVHD, cam = đã gửi đơn chờ duyệt, xanh = đã có GVHD / đang làm,
+// tím = qua các mốc duyệt, xanh lá = đã bảo vệ, đỏ = bị đình chỉ. Chữ hiển thị luôn là statusLabel của BE
 const STATUS_STYLES: Record<StudentThesisStatus, string> = {
   STAGE_1_REGISTERING_ADVISOR: 'border-amber-200 bg-amber-50 text-amber-700',
+  STAGE_1_ADVISOR_REQUESTED: 'border-orange-200 bg-orange-50 text-orange-700',
   STAGE_1_ADVISOR_ASSIGNED: 'border-sky-200 bg-sky-50 text-sky-700',
   STAGE_2_TOPIC_CONFIRMED: 'border-blue-200 bg-blue-50 text-blue-700',
   STAGE_3_OUTLINE_APPROVED: 'border-indigo-200 bg-indigo-50 text-indigo-700',

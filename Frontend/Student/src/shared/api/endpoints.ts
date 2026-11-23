@@ -13,6 +13,8 @@ export const API_ENDPOINTS = {
   },
   student: {
     overview: '/student/overview',
+    // GET: thông tin cá nhân + đề tài kỳ hiện tại · PUT: sửa Họ, Tên, Số điện thoại
+    myInfo: '/student/my-info',
     // Đăng ký giảng viên hướng dẫn
     advisorRegistrations: '/api/student/advisor-registrations',
     // gvhd và đề tài chính thức các kỳ

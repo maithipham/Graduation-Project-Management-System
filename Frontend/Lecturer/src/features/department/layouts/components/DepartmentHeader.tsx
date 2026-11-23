@@ -46,7 +46,10 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
   }, [])
 
   // Breadcrumb lấy từ cấu hình menu sidebar → thêm/đổi tên menu là breadcrumb tự cập nhật
-  const crumbs = getNavBreadcrumbs(departmentNavItems, location.pathname)
+  // Trang cá nhân không có trong menu sidebar → tự đặt nhãn
+  const crumbs = location.pathname.startsWith('/department/profile')
+    ? ['Thông tin cá nhân']
+    : getNavBreadcrumbs(departmentNavItems, location.pathname)
   const displayName = user?.name ?? ''
   const displayTitle = roleLabels.HEAD_OF_MAJOR
 
@@ -170,7 +173,7 @@ export const DepartmentHeader: React.FC<DepartmentHeaderProps> = ({
                   type="button"
                   onClick={() => {
                     setProfileOpen(false)
-                    navigate('/department')
+                    navigate('/department/profile')
                   }}
                   className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >

@@ -16,7 +16,7 @@ const students: StudentListItem[] = Array.from({ length: 15 }, (_, i) => ({
   topicName: i === 0 ? undefined : `Đề tài ${i}`,
   lecturerName: i === 0 ? undefined : 'ThS. Nguyễn Văn A',
   status: i === 0 ? 'STAGE_1_REGISTERING_ADVISOR' : 'STAGE_2_TOPIC_CONFIRMED',
-  statusLabel: i === 0 ? 'Đang đăng ký GVHD' : 'Đã chốt tên đề tài',
+  statusLabel: i === 0 ? 'Chưa đăng ký GVHD' : 'Đã chốt tên đề tài',
   accountStatus: true,
 }))
 
@@ -89,7 +89,7 @@ describe('StudentTable — nội dung dòng', () => {
 
     expect(within(first).getByText('(chưa đăng ký)')).toBeInTheDocument()
     expect(within(first).getByText('Chưa gán')).toBeInTheDocument()
-    expect(within(first).getByText('Đang đăng ký GVHD')).toBeInTheDocument()
+    expect(within(first).getByText('Chưa đăng ký GVHD')).toBeInTheDocument()
 
     expect(within(second).getByText('Đề tài 1')).toBeInTheDocument()
     expect(within(second).getByText('ThS. Nguyễn Văn A')).toBeInTheDocument()
