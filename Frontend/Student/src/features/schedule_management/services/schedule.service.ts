@@ -1,48 +1,36 @@
+import { API_ENDPOINTS, apiClient } from '@/shared/api'
+import type { ApiResponse } from '@/shared/types'
 import type { StudentScheduleItem } from '../types/schedule.types'
 
-export const STUDENT_SCHEDULE_DATA: StudentScheduleItem[] = [
-  {
-    ty: 'Bảo vệ đồ án',
-    c: 'Đồ án tốt nghiệp',
-    room: 'B.204',
-    s: '2027-01-12T08:00',
-    e: '2027-01-12T12:00',
-    p: [
-      ['Chủ tịch hội đồng', 'PGS.TS. Đỗ Hoàng Long'],
-      ['Thư ký hội đồng', 'TS. Vũ Đình Huy'],
-      ['Ủy viên phản biện', 'TS. Nguyễn Quốc Bảo'],
-      ['Ủy viên', 'TS. Trần Minh Khôi'],
-      ['Ủy viên', 'ThS. Võ Thu Hà'],
-    ],
-  },
-  {
-    ty: 'Phản biện',
-    c: 'Đồ án tốt nghiệp',
-    room: 'B.110',
-    s: '2027-01-08T14:00',
-    e: '2027-01-08T15:00',
-    p: [
-      ['Giảng viên phản biện 1', 'TS. Nguyễn Quốc Bảo'],
-      ['Giảng viên phản biện 2', 'ThS. Lê Thanh Tùng'],
-    ],
-  },
-]
-
-export function formatScheduleTime(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-export function formatScheduleDate(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`
-}
-
-
-
 export const scheduleService = {
-  getSchedules: (): StudentScheduleItem[] => [...STUDENT_SCHEDULE_DATA],
-  formatDate: formatScheduleDate,
-  formatTime: formatScheduleTime,
+  /** Lịch chung của tôi (`GET /student-schedule/my`): phản biện + bảo vệ, đã sắp theo thời gian. */
+  async getMySchedule(semesterId?: string): Promise<StudentScheduleItem[]> {
+    const res = await apiClient.get<ApiResponse<StudentScheduleItem[]>>(
+      API_ENDPOINTS.studentSchedule.my,
+      { params: semesterId ? { semesterId } : undefined },
+    )
+    return res.data.data ?? []
+  },
+}
+
+/** "2026-11-20" -> "20/11/2026" (đọc thẳng chuỗi, không đổi múi giờ). */
+export function formatScheduleDate(date: string | null): string {
+  if (!date) return '—'
+  const [y, m, d] = date.split('-').map(Number)
+  if (!y || !m || !d) return date
+  return `${d}/${m}/${y}`
+}
+
+/** Khung giờ "08:00 – 08:45"; chưa xếp lịch thì "—". */
+export function formatScheduleTimeRange(start: string | null, end: string | null): string {
+  if (!start || !end) return '—'
+  return `${start.slice(0, 5)} – ${end.slice(0, 5)}`
+}
+
+/** Thời điểm kết thúc (ms, giờ máy người dùng) để xác định lịch đã qua hay sắp tới. */
+export function scheduleEndMs(item: StudentScheduleItem): number | null {
+  if (!item.scheduled || !item.date || !item.endTime) return null
+  const [y, m, d] = item.date.split('-').map(Number)
+  const [hh, mm] = item.endTime.split(':').map(Number)
+  return new Date(y, m - 1, d, hh, mm).getTime()
 }

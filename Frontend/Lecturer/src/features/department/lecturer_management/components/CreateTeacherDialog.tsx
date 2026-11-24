@@ -96,21 +96,22 @@ export function CreateTeacherDialog({
     });
 
     const allTitles = academicTitles && academicTitles.length > 0 ? academicTitles : DEFAULT_ACADEMIC_TITLES;
-    const matchedTitle = allTitles.find(
-      (t) => t.abbreviation === values.academicTitle || String(t.id) === String(values.academicTitleId),
-    );
+    // Ưu tiên học hàm người dùng đang chọn trên ô select, chỉ dùng academicTitleId khi không khớp theo viết tắt
+    const matchedTitle =
+      allTitles.find((t) => t.abbreviation === values.academicTitle) ??
+      allTitles.find((t) => String(t.id) === String(values.academicTitleId));
 
     let majorId: string | number | null = null;
     let majorName: string | null = null;
 
     if (!isExternal) {
       const selectedMajorName = (activeMajor || values.major || '').trim();
-      const matchedMajor = majors?.find(
-        (m) =>
-          m.name.toLowerCase() === selectedMajorName.toLowerCase() ||
-          m.publicId === values.majorId ||
-          (m.code && m.code.toLowerCase() === selectedMajorName.toLowerCase()),
-      );
+      // Ưu tiên ngành người dùng đang chọn (theo tên / mã), chỉ dùng values.majorId khi không khớp được
+      const selectedKey = selectedMajorName.toLowerCase();
+      const matchedMajor =
+        majors?.find(
+          (m) => m.name.toLowerCase() === selectedKey || (m.code && m.code.toLowerCase() === selectedKey),
+        ) ?? majors?.find((m) => m.publicId === values.majorId);
       majorId = matchedMajor ? matchedMajor.publicId : (values.majorId ?? null);
       majorName = matchedMajor ? matchedMajor.name : (selectedMajorName || null);
     }

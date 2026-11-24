@@ -46,6 +46,8 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
   // Gọi API lấy thông tin chi tiết khoa và danh sách chuyên ngành
   const facultyApiId = faculty.backendId || String(faculty.id)
   const { data: facultyDetail } = useFacultyDetail(facultyApiId)
+  // Mô tả khoa lấy từ API chi tiết (API danh sách không trả mô tả)
+  const facultyDescription = facultyDetail?.description ?? ''
   const { data: apiMajorsData, isLoading: isLoadingMajors } = useFacultyMajors(facultyApiId)
 
   // Kết hợp: Ưu tiên dữ liệu từ backend DB (từ endpoint majors phân trang hoặc từ facultyDetail)
@@ -129,7 +131,9 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => onEditFaculty(faculty)}
+            // Chờ tải xong chi tiết để form điền đúng mô tả đang lưu, tránh ghi đè mô tả khi bấm Lưu
+            disabled={!facultyDetail}
+            onClick={() => onEditFaculty({ ...faculty, description: facultyDescription })}
             className="text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 gap-1.5 shrink-0 self-start sm:self-auto"
           >
             <Edit className="h-3.5 w-3.5 text-blue-600" />
@@ -170,7 +174,7 @@ export const FacultyDetailView: React.FC<FacultyDetailViewProps> = ({
                 Giới thiệu chi tiết về khoa
               </span>
               <p className="text-sm text-slate-700 leading-relaxed">
-                {faculty.description}
+                {facultyDescription || '—'}
               </p>
             </div>
           </div>

@@ -85,7 +85,7 @@ interface SupervisorWorkspaceViewProps {
   onApproveRegistrations: (registrationPublicIds: string[]) => void | Promise<void>
   onRejectRegistrations: (registrationPublicIds: string[]) => void | Promise<void>
   onChangeSupervisor: (studentId: string, newSupervisor: SupervisorLecturer) => void | Promise<void>
-  onChangeCoSupervisor: (studentId: string, coSupervisor: SupervisorLecturer | null) => void
+  onChangeCoSupervisor: (studentId: string, coSupervisor: SupervisorLecturer | null) => void | Promise<void>
   onToggleLock: (isLocked: boolean) => Promise<boolean | void> | void
 }
 
@@ -495,8 +495,13 @@ export function SupervisorWorkspaceView({
         return
       }
 
+      // Chờ BE xác nhận rồi mới cập nhật giao diện; lỗi đã được thông báo ở handler của trang
+      try {
+        await onChangeCoSupervisor(student.id, selectedLecturer)
+      } catch {
+        return
+      }
       markRecentStudents([student.id])
-      onChangeCoSupervisor(student.id, selectedLecturer)
       setLocalStudents((prev) => {
         const updated = prev.map((item) =>
           item.id === student.id
@@ -511,9 +516,7 @@ export function SupervisorWorkspaceView({
         const others = updated.filter((item) => item.id !== student.id)
         return [...touched, ...others]
       })
-      toast.success(
-        `Đã gán ${selectedLecturer.name} làm GVHD 2 cho sinh viên ${student.name} thành công!`,
-      )
+      // Thông báo thành công do handler của trang hiển thị sau khi BE trả về thành công
       setEditingTarget(null)
       setSelectedStudentIds(new Set())
       return
@@ -1398,9 +1401,14 @@ export function SupervisorWorkspaceView({
                                             message: `Gỡ ${s.supervisor2Name} khỏi vai trò GVHD 2 của sinh viên ${s.name}.`,
                                             confirmLabel: 'Gỡ bỏ',
                                             anchor: e.currentTarget.getBoundingClientRect(),
-                                            onConfirm: () => {
+                                            onConfirm: async () => {
+                                            // Chờ BE gỡ xong mới cập nhật giao diện
+                                            try {
+                                              await onChangeCoSupervisor(s.id, null)
+                                            } catch {
+                                              return
+                                            }
                                             markRecentStudents([s.id])
-                                            onChangeCoSupervisor(s.id, null)
                                             setLocalStudents((prev) => {
                                               const updated = prev.map((item) =>
                                                 item.id === s.id

@@ -73,4 +73,9 @@ export const API_ENDPOINTS = {
   advisor: {
     advisors: (semesterId: string) => `/semesters/${semesterId}/advisors`,
   },
+  // Lịch chung của sinh viên: lịch phản biện với từng GVPB + ca bảo vệ trước Hội đồng
+  studentSchedule: {
+    // GET ?semesterId=... : lịch của sinh viên đang đăng nhập (data rỗng = chưa có lịch)
+    my: '/student-schedule/my',
+  },
 } as const

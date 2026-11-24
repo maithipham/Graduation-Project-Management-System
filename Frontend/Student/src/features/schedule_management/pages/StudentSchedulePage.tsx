@@ -4,7 +4,7 @@ import { useScheduleManagement } from '../hooks/useScheduleManagement'
 import { useSemesterDeadlines } from '../hooks/useSemesterDeadlines'
 
 export default function StudentSchedulePage() {
-  const { schedules } = useScheduleManagement()
+  const schedule = useScheduleManagement()
   const { semester, milestones, percent, nowMs, isLoading, isError } =
     useSemesterDeadlines()
 
@@ -17,7 +17,12 @@ export default function StudentSchedulePage() {
         isLoading={isLoading}
         isError={isError}
       />
-      <ScheduleTable schedules={schedules} nowMs={nowMs} />
+      <ScheduleTable
+        schedules={schedule.schedules}
+        nowMs={nowMs}
+        isLoading={schedule.isLoading}
+        isError={schedule.isError}
+      />
     </div>
   )
 }

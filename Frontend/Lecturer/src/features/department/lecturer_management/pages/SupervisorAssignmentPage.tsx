@@ -415,6 +415,8 @@ export default function SupervisorAssignmentPage() {
       if (!(err instanceof ApiError)) {
         toast.error('Không thể cập nhật giảng viên đồng hướng dẫn')
       }
+      // Báo lỗi cho màn phân công để không cập nhật GVHD 2 trên giao diện khi BE từ chối
+      throw err
     }
   }
 
