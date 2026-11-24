@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/shared/components/feedback'
+import { ApiError } from '@/shared/types'
 import { commentingLecturerService } from '../services/commentingLecturer.service'
 import { useManagedMajor } from './useTeachers'
 import type {
@@ -226,9 +227,10 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
       setSelectedIds([])
       invalidateQueries()
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Phân công thất bại'
-      toast.error(msg)
+    onError: (err: unknown) => {
+      // Lỗi API (ApiError) đã được interceptor toast đúng message của BE → không toast lặp lại
+      if (err instanceof ApiError) return
+      toast.error(err instanceof Error && err.message ? err.message : 'Phân công thất bại')
     },
   })
 
@@ -263,9 +265,10 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
       setPreviewData(data)
       setIsPreviewOpen(true)
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Không thể tạo bản xem trước'
-      toast.error(msg)
+    onError: (err: unknown) => {
+      // Lỗi API (ApiError) đã được interceptor toast đúng message của BE → không toast lặp lại
+      if (err instanceof ApiError) return
+      toast.error(err instanceof Error && err.message ? err.message : 'Không thể tạo bản xem trước')
     },
   })
 
@@ -284,9 +287,10 @@ export function useCommentingAssignment({ semesterId }: UseCommentingAssignmentP
       setSelectedIds([])
       invalidateQueries()
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Lưu phân công thất bại'
-      toast.error(msg)
+    onError: (err: unknown) => {
+      // Lỗi API (ApiError) đã được interceptor toast đúng message của BE → không toast lặp lại
+      if (err instanceof ApiError) return
+      toast.error(err instanceof Error && err.message ? err.message : 'Lưu phân công thất bại')
     },
   })
 

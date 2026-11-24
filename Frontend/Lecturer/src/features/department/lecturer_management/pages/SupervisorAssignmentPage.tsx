@@ -281,13 +281,16 @@ export default function SupervisorAssignmentPage() {
       toast.success('Cập nhật chỉ tiêu thành công')
       queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
       queryClient.invalidateQueries({ queryKey: ['supervisors'] })
-    } catch {
+    } catch (err: unknown) {
       setQuotaOverrides((prev) => {
         const next = { ...prev }
         delete next[id]
         return next
       })
-      toast.error('Không thể cập nhật hạn mức giáo viên hướng dẫn')
+      // Lỗi từ BE (ApiError) đã được interceptor toast đúng lý do → chỉ báo chung khi lỗi không đến từ API
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể cập nhật hạn mức giáo viên hướng dẫn')
+      }
     }
   }
 

@@ -45,8 +45,8 @@ export const useDeadlines = (selectedSemesterId: string, selectedMajorId: string
       setData(res);
       // Xóa sạch các thay đổi tạm thời sau khi tải dữ liệu mới
       setEditedDeadlines(new Map());
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Không thể tải danh sách mốc thời hạn');
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error && err.message ? err.message : 'Không thể tải danh sách mốc thời hạn');
     } finally {
       setLoading(false);
     }
@@ -104,8 +104,8 @@ export const useDeadlines = (selectedSemesterId: string, selectedMajorId: string
 
       setSuccessMessage('Cập nhật kế hoạch mốc thời gian thành công!');
       await fetchDeadlines(); // Tải lại dữ liệu mới nhất từ server
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Lỗi khi cập nhật danh sách mốc thời hạn');
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error && err.message ? err.message : 'Lỗi khi cập nhật danh sách mốc thời hạn');
     } finally {
       setSaving(false);
     }
@@ -120,8 +120,8 @@ export const useDeadlines = (selectedSemesterId: string, selectedMajorId: string
       await deadlineService.initSemester({ semesterId: selectedSemesterId });
       setSuccessMessage('Khởi tạo bộ mốc thời hạn chuẩn thành công!');
       await fetchDeadlines();
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Lỗi khi khởi tạo bộ mốc thời hạn');
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error && err.message ? err.message : 'Lỗi khi khởi tạo bộ mốc thời hạn');
     } finally {
       setLoading(false);
     }
