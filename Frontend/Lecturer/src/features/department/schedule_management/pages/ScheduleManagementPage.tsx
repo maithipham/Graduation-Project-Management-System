@@ -13,6 +13,12 @@ import { useManagedMajor } from '@/features/department/lecturer_management/hooks
 // "2026-2027" → "2026–2027" (gạch nối dài en-dash chuẩn mockup)
 const formatAcademicYear = (year: string) => year.replace('-', '–');
 
+// "2026-08-15" → "15/08/2026"
+const formatSemesterDate = (date: string) => {
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : date;
+};
+
 // Style thống nhất với các màn hình khác trong phân hệ bộ môn
 const SCOPE_SELECT_CLASS =
   'h-9 rounded-lg border-slate-300 bg-white pl-3 pr-8 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-2 focus-visible:ring-blue-100 shadow-none';
@@ -98,7 +104,10 @@ export const ScheduleManagementPage: React.FC = () => {
     handleResetRow,
     handleOpenConfirm,
     handleExecuteSave,
-  } = useScheduleManagement(selectedSemesterId);
+  } = useScheduleManagement(selectedSemesterId, {
+    startDate: activeSemester?.startDate ?? null,
+    endDate: activeSemester?.endDate ?? null,
+  });
 
   return (
     <div className="space-y-3">
@@ -173,6 +182,14 @@ export const ScheduleManagementPage: React.FC = () => {
 
         <div className="text-xs text-slate-400 italic">
           * Trưởng bộ môn thiết lập thời hạn mở và kết thúc các mốc tiến độ đồ án
+          {activeSemester?.startDate && activeSemester?.endDate && (
+            <>
+              {' '}— các mốc phải nằm trong thời gian học kỳ:{' '}
+              <b className="not-italic text-slate-600">
+                {formatSemesterDate(activeSemester.startDate)} – {formatSemesterDate(activeSemester.endDate)}
+              </b>
+            </>
+          )}
         </div>
       </div>
 

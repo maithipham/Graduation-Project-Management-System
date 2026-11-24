@@ -1,4 +1,4 @@
-import type { CouncilMember, CouncilRole, DefenseCouncil } from '../types'
+import type { CouncilMember, CouncilRole, DefenseCouncil, FormationMilestoneState } from '../types'
 
 /** 5 vị trí cố định của hội đồng: 1 Chủ tịch, 1 Thư ký, 3 Ủy viên */
 export type MemberSlotKey = 'chair' | 'secretary' | 'm1' | 'm2' | 'm3'
@@ -80,6 +80,27 @@ export function formatDefenseDateRange(startStr?: string | null, endStr?: string
     return s === e ? s : `${s} - ${e}`
   }
   return s || e || 'Chưa xếp ngày'
+}
+
+/** Suy ra trạng thái mốc THANH_LAP_HOI_DONG từ ngày bắt đầu/kết thúc (giống cách BE kiểm tra) */
+export function resolveMilestoneState(
+  startDate?: string | null,
+  endDate?: string | null,
+  now: Date = new Date(),
+): FormationMilestoneState {
+  if (!startDate || !endDate) return 'NOT_CONFIGURED'
+  if (now < new Date(startDate)) return 'NOT_STARTED'
+  if (now > new Date(endDate)) return 'CLOSED'
+  return 'OPEN'
+}
+
+/** Thông báo hiển thị khi mốc không cho phép thao tác */
+export const MILESTONE_BLOCK_MESSAGE: Record<FormationMilestoneState, string> = {
+  LOADING: '',
+  OPEN: '',
+  NOT_CONFIGURED: 'Mốc "Thành lập hội đồng" chưa được thiết lập cho học kỳ này.',
+  NOT_STARTED: 'Chưa đến thời gian mở mốc "Thành lập hội đồng".',
+  CLOSED: 'Mốc "Thành lập hội đồng" đã đóng, không thể tạo hoặc chỉnh sửa hội đồng.',
 }
 
 export function generateCouncilCodes(

@@ -12,6 +12,7 @@ import {
 import { Button } from '@/shared/components/ui/button'
 import { Badge } from '@/shared/components/ui/badge'
 import { Input } from '@/shared/components/ui/input'
+import { ResizableSplit } from '@/shared/components/ui/resizable-split'
 import { cn } from '@/shared/utils/cn'
 import type { SemesterOption } from '@/features/department/student_management'
 import { AutoDistributeModal } from './AutoDistributeModal'
@@ -172,11 +173,20 @@ export function CommentingAssignmentWorkspaceView({
       {/* --------------------------------------------------------------------- */}
       {/* 2. MAIN 2-COLUMN SPLIT WORKSPACE                                      */}
       {/* --------------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
-        {/* =================================================================== */}
-        {/* CỘT TRÁI (7/12): DANH SÁCH SINH VIÊN / ĐỀ TÀI                       */}
-        {/* =================================================================== */}
-        <div className="lg:col-span-7 bg-white border border-gray-200 rounded-xl flex flex-col shadow-2xs overflow-hidden">
+      <ResizableSplit
+        className="flex-1 lg:items-start"
+        stackBelowLg
+        sizedPane="end"
+        defaultSize={480}
+        minSize={340}
+        maxSize={820}
+        minOtherSize={520}
+        storageKey="department.commenting-assignment"
+        startClassName="flex"
+        endClassName="flex"
+        start={
+        /* CỘT TRÁI: DANH SÁCH SINH VIÊN / ĐỀ TÀI */
+        <div className="flex-1 min-w-0 bg-white border border-gray-200 rounded-xl flex flex-col shadow-2xs overflow-hidden">
           {/* Header & Tabs */}
           <div className="p-4 border-b border-gray-200 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -396,11 +406,10 @@ export function CommentingAssignmentWorkspaceView({
             )}
           </div>
         </div>
-
-        {/* =================================================================== */}
-        {/* CỘT PHẢI (5/12): DANH SÁCH GIẢNG VIÊN - GIAO DIỆN CHUẨN ẢNH MẪU     */}
-        {/* =================================================================== */}
-        <div className="lg:col-span-5 flex flex-col space-y-2">
+        }
+        end={
+        /* CỘT PHẢI: DANH SÁCH GIẢNG VIÊN */
+        <div className="flex-1 min-w-0 flex flex-col space-y-2">
           {/* HÀNG 1: Ô tìm kiếm giảng viên & Nút Gán (X SV) */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -615,7 +624,8 @@ export function CommentingAssignmentWorkspaceView({
             * Giảng viên nhận xét không áp dụng hạn mức (unlimited quota). Cột "ĐANG NHẬN" thể hiện khối lượng công việc hiện tại.
           </p>
         </div>
-      </div>
+        }
+      />
 
       {/* --------------------------------------------------------------------- */}
       {/* 3. MODAL PREVIEW PHÂN CÔNG CHIA ĐỀU                                    */}

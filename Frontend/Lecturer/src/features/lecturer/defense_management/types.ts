@@ -184,6 +184,9 @@ export interface EvaluationSheetDetail {
   roundedTotalScore: number | null
   submittedAt: string | null
   updatedAt: string | null
+  // File phiếu chấm tóm tắt Rubric (.docx) BE tự lưu khi nộp phiếu; null khi chưa nộp
+  sheetFileUrl?: string | null
+  sheetFileName?: string | null
   groups: RubricGroup[]
 }
 
@@ -241,10 +244,29 @@ export interface DefenseSlot {
   defenseStartTime: string | null // ISO "yyyy-MM-ddTHH:mm:ss"
   defenseEndTime: string | null // ISO "yyyy-MM-ddTHH:mm:ss"
   room: string | null
+  // Ca bảo vệ chứa sinh viên (null khi chưa thuộc ca nào)
+  sessionPublicId?: string | null
   scheduledAt: string | null
   scheduledByName: string | null
   canSchedule: boolean
   canUnschedule: boolean
+}
+
+// Ca bảo vệ (tên tùy chỉnh) do Chủ tịch / Thư ký tạo, lưu ở BE
+export interface DefenseSession {
+  sessionPublicId: string
+  name: string
+  sessionDate: string // yyyy-MM-dd
+  startTime: string // HH:mm hoặc HH:mm:ss
+  endTime: string // HH:mm hoặc HH:mm:ss
+  studentCount: number
+}
+
+export interface DefenseSessionRequest {
+  name: string
+  sessionDate: string // yyyy-MM-dd
+  startTime: string // HH:mm
+  endTime: string // HH:mm
 }
 
 export interface CouncilDefenseSchedule {
@@ -262,6 +284,7 @@ export interface CouncilDefenseSchedule {
   canSchedule: boolean
   // Lý do không xếp được ca (null khi canSchedule = true)
   scheduleBlockedReason: ScheduleBlockedReason | null
+  sessions?: DefenseSession[]
   students: DefenseSlot[]
 }
 
@@ -270,6 +293,8 @@ export interface ScheduleDefenseSlotRequest {
   defenseStartTime: string // ISO "yyyy-MM-ddTHH:mm:ss"
   defenseEndTime: string // ISO "yyyy-MM-ddTHH:mm:ss"
   room?: string | null
+  // Ca bảo vệ chứa sinh viên; bỏ trống -> giữ nguyên ca hiện tại
+  sessionPublicId?: string | null
 }
 
 // Bảng mã lỗi Bước 13 (3138 - 3145)
@@ -282,6 +307,11 @@ export const DEFENSE_SCHEDULE_ERROR_MAP: Record<number, string> = {
   3143: 'Số thứ tự ca bảo vệ đã được dùng cho sinh viên khác trong Hội đồng',
   3144: 'Sinh viên chưa được xếp ca bảo vệ',
   3145: 'Chưa nhập phòng bảo vệ và Hội đồng chưa có địa điểm mặc định',
+  3186: 'Không tìm thấy ca bảo vệ',
+  3187: 'Giờ bắt đầu ca bảo vệ phải trước giờ kết thúc',
+  3188: 'Ca bảo vệ không thuộc Hội đồng của sinh viên',
+  3189: 'Không thể xóa ca bảo vệ đã có sinh viên được Hội đồng chấm điểm hoặc đã hoàn tất bảo vệ',
+  3190: 'Tên ca bảo vệ đã tồn tại trong Hội đồng',
 }
 
 // =========================================================================
@@ -518,43 +548,4 @@ export interface DefenseRevision {
 export interface DefenseRevisionReviewRequest {
   decision: 'APPROVED' | 'RETURNED'
   reviewNote: string | null
-}
-
-// =========================================================================
-// Legacy types (dùng cho lecturer_portal_storage & các bước sau chưa nối API)
-// =========================================================================
-export type DefenseReviewStatus = 'pending' | 'approved' | 'rejected'
-
-export interface DefenseCouncilStudentSlot {
-  order: number
-  name: string
-  mssv: string
-  timeSlot: string
-}
-
-export interface DefenseCouncilItem {
-  id: string
-  codeBadge: string
-  badgeVariant: 'blue' | 'purple'
-  title: string
-  sessionLabel: string
-  sessionVariant: 'amber' | 'slate'
-  timeRange: string
-  location: string
-  lecturerRole: string
-  committeeSummary: string
-  actionLabel: string
-  students: DefenseCouncilStudentSlot[]
-}
-
-export interface DefenseReviewItem {
-  id: string
-  mssv: string
-  name: string
-  topic: string
-  major: string
-  supervisorName: string
-  reportFileName: string
-  score: number | null
-  status: DefenseReviewStatus
 }

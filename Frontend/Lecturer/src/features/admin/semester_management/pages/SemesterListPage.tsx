@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { Card } from '@/shared/components/ui/card'
 import { Button } from '@/shared/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useSemesterStore } from '../store/semester.store'
 import {
   useSemesters,
   useUpdateSemester,
@@ -16,11 +15,6 @@ import type { Semester, SemesterFormValues } from '../types/semester.types'
 const PAGE_SIZE = 10
 
 export default function SemesterListPage() {
-  const {
-    semesters: localSemesters,
-    updateSemester,
-  } = useSemesterStore()
-
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -34,7 +28,7 @@ export default function SemesterListPage() {
   })
   const updateMutation = useUpdateSemester()
 
-  // Chuyển đổi dữ liệu từ Backend sang model hiển thị của UI (hoặc fallback store)
+  // Chuyển đổi dữ liệu từ Backend sang model hiển thị của UI 
   const displaySemesters: Semester[] = useMemo(() => {
     const rawList = Array.isArray(apiData)
       ? apiData
@@ -57,8 +51,8 @@ export default function SemesterListPage() {
               : 'ended',
       }))
     }
-    return localSemesters
-  }, [apiData, localSemesters])
+    return []
+  }, [apiData])
 
   // Filter list
   const filteredSemesters = useMemo(() => {
@@ -102,7 +96,6 @@ export default function SemesterListPage() {
         },
       })
     }
-    updateSemester(id, values)
   }
 
   return (

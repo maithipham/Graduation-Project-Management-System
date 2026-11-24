@@ -1,0 +1,9 @@
+# Cấu hình chứa email tài khoản test, không commit
+.env.e2e
+# Cookie đăng nhập theo role do global-setup tạo
+.auth/
+# Kết quả chạy Playwright
+node_modules/
+test-results/
+playwright-report/
+blob-report/

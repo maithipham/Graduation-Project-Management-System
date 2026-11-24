@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, Award, MapPin, Plus } from 'lucide-react'
+import { Eye, Award, MapPin, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import {
@@ -23,9 +23,20 @@ interface CouncilTableProps {
   isLoading?: boolean
   onViewDetail: (council: DefenseCouncil) => void
   onCreate: () => void
+  /** Xóa hội đồng (chỉ truyền khi mốc Thành lập hội đồng đang mở) */
+  onDelete?: (council: DefenseCouncil) => void
+  /** false khi mốc chưa mở / đã đóng: khóa ô nhập phòng, ẩn nút tạo và xóa */
+  canEdit?: boolean
 }
 
-export function CouncilTable({ councils, isLoading, onViewDetail, onCreate }: CouncilTableProps) {
+export function CouncilTable({
+  councils,
+  isLoading,
+  onViewDetail,
+  onCreate,
+  onDelete,
+  canEdit = true,
+}: CouncilTableProps) {
   const updateLocationMutation = useUpdateCouncilLocation()
   const [editingLocations, setEditingLocations] = useState<Record<string, string>>({})
 
@@ -75,15 +86,17 @@ export function CouncilTable({ councils, isLoading, onViewDetail, onCreate }: Co
                     Chưa có hội đồng nào phù hợp
                   </div>
                   <p className="text-[12.5px] text-slate-500 mt-1 mb-4">
-                    Hãy nhấn nút "Tạo hội đồng" để khởi tạo hội đồng bảo vệ mới cho bộ môn.
+                    {canEdit
+                      ? 'Hãy nhấn nút "Tạo hội đồng" để khởi tạo hội đồng bảo vệ mới cho bộ môn.'
+                      : 'Hiện chưa thể tạo hội đồng vì mốc "Thành lập hội đồng" không ở trạng thái mở.'}
                   </p>
-                  <Button
+                  {canEdit && <Button
                     type="button"
                     onClick={onCreate}
                     className="h-9 px-4 rounded-lg bg-[#1565C0] text-white text-[13px] font-semibold hover:bg-[#0D47A1] inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" /> Tạo hội đồng đầu tiên
-                  </Button>
+                  </Button>}
                 </TableCell>
               </TableRow>
             ) : (
@@ -130,6 +143,7 @@ export function CouncilTable({ councils, isLoading, onViewDetail, onCreate }: Co
                               [c.publicId]: e.target.value,
                             }))
                           }
+                          disabled={!canEdit}
                           onBlur={() => handleSaveLocation(c)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -173,6 +187,17 @@ export function CouncilTable({ councils, isLoading, onViewDetail, onCreate }: Co
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
+                        {canEdit && onDelete && (
+                          <button
+                            type="button"
+                            onClick={() => onDelete(c)}
+                            className="h-8 w-8 rounded-lg border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 inline-flex items-center justify-center transition cursor-pointer"
+                            title="Xóa hội đồng"
+                            aria-label={`Xóa ${c.name || c.code}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

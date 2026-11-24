@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Mail, SquarePen, UserRound } from 'lucide-react'
 import { Button, Skeleton } from '@/shared/components/ui'
 import { cn } from '@/shared/utils/cn'
-import { useLecturerPortalStore } from '@/features/lecturer/lecturer_portal_storage'
 import { useLecturerMyInfo } from '../hooks/useLecturerMyInfo'
 import { LecturerProfileModal } from './LecturerProfileModal'
 import { computeAvatar, formatDisplayName, splitFullName } from '../services/lecturerProfile.service'
@@ -89,8 +88,6 @@ interface LecturerProfileViewProps {
  */
 export function LecturerProfileView({ roleLabel }: LecturerProfileViewProps) {
   const { data: profile, isPending, isError, refetch, isRefetching } = useLecturerMyInfo()
-  // API không trả vai trò → giữ nguồn cũ (portal store)
-  const teacherTitle = useLecturerPortalStore((s) => s.teacher.title)
   const [isEditOpen, setIsEditOpen] = useState(false)
 
   if (isPending) return <ProfileSkeleton />
@@ -122,7 +119,7 @@ export function LecturerProfileView({ roleLabel }: LecturerProfileViewProps) {
               {formatDisplayName(profile.academicTitle, profile.name)}
             </h1>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-xs text-slate-400 font-medium">{roleLabel || teacherTitle || 'Giảng viên'}</span>
+              <span className="text-xs text-slate-400 font-medium">{roleLabel || 'Giảng viên'}</span>
             </div>
           </div>
         </div>

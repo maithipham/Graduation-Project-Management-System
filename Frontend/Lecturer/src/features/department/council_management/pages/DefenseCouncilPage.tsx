@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, ShieldAlert } from 'lucide-react'
+import { CalendarDays, Plus, ShieldAlert, Info } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { useMyInfo } from '@/features/auth'
 import { ApiError } from '@/shared/types'
@@ -7,7 +7,11 @@ import { useMajors } from '@/features/department/student_management'
 import { useSemesterScope } from '@/features/department/lecturer_management/hooks/useSemesterScope'
 import { useManagedMajor } from '@/features/department/lecturer_management/hooks/useTeachers'
 import { SemesterScopeFilter } from '@/features/department/lecturer_management/components/SemesterScopeFilter'
-import { useDefenseCouncils } from '../hooks/useDefenseCouncils'
+import { useDefenseCouncils, useFormationMilestone } from '../hooks/useDefenseCouncils'
+import { MILESTONE_BLOCK_MESSAGE } from '../utils/councilFormatters'
+import { EditDefenseDateDialog } from '../components/EditDefenseDateDialog'
+import { DeleteCouncilDialog } from '../components/DeleteCouncilDialog'
+import type { DefenseCouncil } from '../types'
 import { CouncilTable } from '../components/CouncilTable'
 import { CreateCouncilDialog } from '../components/CreateCouncilDialog'
 import { CouncilDetailDialog } from '../components/CouncilDetailDialog'
@@ -31,6 +35,8 @@ export default function DefenseCouncilPage() {
   const [selectedCouncilId, setSelectedCouncilId] = useState<string>('')
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false)
   const [detailCouncilId, setDetailCouncilId] = useState<string | null>(null)
+  const [editDateOpen, setEditDateOpen] = useState<boolean>(false)
+  const [councilToDelete, setCouncilToDelete] = useState<DefenseCouncil | null>(null)
 
   // Scope: Semester & Major
   const {
@@ -79,6 +85,11 @@ export default function DefenseCouncilPage() {
     (councilsError.status === 403 || councilsError.code === 2001)
 
   const councils = councilData?.councils || []
+
+  // Mốc THANH_LAP_HOI_DONG: chỉ cho tạo / sửa / xóa khi mốc đang mở
+  const milestone = useFormationMilestone(activeSemesterId, activeMajorId)
+  const canEdit = milestone.state === 'OPEN'
+  const blockMessage = MILESTONE_BLOCK_MESSAGE[milestone.state]
   const incompleteCount = councilData?.incompleteCouncilCount ?? 0
   const waitingStudentCount = councilData?.waitingStudentCount ?? 0
 
@@ -167,6 +178,13 @@ export default function DefenseCouncilPage() {
         </div>
       </div>
 
+      {blockMessage && (
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+          <Info className="w-4 h-4 shrink-0" />
+          <span>{blockMessage}</span>
+        </div>
+      )}
+
       {/* 3-TAB NAVIGATION BAR + NÚT TẠO HỘI ĐỒNG INLINE */}
       <div className="flex items-center justify-between gap-3 w-full flex-wrap md:flex-nowrap">
         <div
@@ -222,10 +240,24 @@ export default function DefenseCouncilPage() {
         </div>
 
         {/* Nút Tạo hội đồng: chỉ hiện ở tab Danh sách */}
+        {activeTab === 'list' && councils.length > 0 && (
+          <Button
+            type="button"
+            onClick={() => setEditDateOpen(true)}
+            disabled={!canEdit}
+            title={canEdit ? undefined : blockMessage}
+            className="h-10 px-4 rounded-xl bg-white text-slate-700 border border-slate-300 text-[13px] font-semibold hover:bg-slate-50 transition shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0"
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span>Sửa ngày bảo vệ chung</span>
+          </Button>
+        )}
         {activeTab === 'list' && (
           <Button
             type="button"
             onClick={() => setCreateDialogOpen(true)}
+            disabled={!canEdit}
+            title={canEdit ? undefined : blockMessage}
             className="h-10 px-4 rounded-xl bg-[#1565C0] text-white text-[13px] font-semibold hover:bg-[#0D47A1] transition shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -242,6 +274,8 @@ export default function DefenseCouncilPage() {
             isLoading={councilsLoading}
             onViewDetail={(c) => setDetailCouncilId(c.publicId)}
             onCreate={() => setCreateDialogOpen(true)}
+            onDelete={setCouncilToDelete}
+            canEdit={canEdit}
           />
         </section>
       )}
@@ -284,6 +318,22 @@ export default function DefenseCouncilPage() {
         academicYear={selectedYear}
         existingCouncilCount={councils.length}
         onSuccessAndGoToAssign={handleCreateSuccessAndAssign}
+      />
+
+      <EditDefenseDateDialog
+        open={editDateOpen}
+        onOpenChange={setEditDateOpen}
+        semesterId={activeSemesterId}
+        majorId={activeMajorId}
+        currentStart={councils[0]?.defenseStartTime}
+        currentEnd={councils[0]?.defenseEndTime}
+      />
+
+      <DeleteCouncilDialog
+        council={councilToDelete}
+        onOpenChange={(open) => {
+          if (!open) setCouncilToDelete(null)
+        }}
       />
 
       {/* MODAL: CHI TIẾT HỘI ĐỒNG */}

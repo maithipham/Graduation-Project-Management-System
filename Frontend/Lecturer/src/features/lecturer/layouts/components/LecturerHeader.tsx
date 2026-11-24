@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { RoleSwitcher, useLogout, useMyInfo } from '@/features/auth'
 import { NotificationBell } from '@/features/notification'
-import { useLecturerPortalStore } from '@/features/lecturer/lecturer_portal_storage'
+import { useLecturerCurrentSemester } from '@/features/lecturer/supervisor_registration'
 import { getNavBreadcrumbs } from '@/shared/utils'
 import { lecturerNavItems } from './lecturerNav.config'
 
@@ -45,10 +45,7 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
   const { data: user } = useMyInfo()
   const logout = useLogout()
 
-  const academicYear = useLecturerPortalStore((s) => s.academicYear)
-  const semester = useLecturerPortalStore((s) => s.semester)
-  const teacher = useLecturerPortalStore((s) => s.teacher)
-  const setAcademicFilter = useLecturerPortalStore((s) => s.setAcademicFilter)
+  const { data: currentSemester } = useLecturerCurrentSemester()
 
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -67,13 +64,8 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
 
   const currentTitle = getHeaderBreadcrumbTitle(location.pathname)
 
-  const isDefaultAccountName =
-    !user?.name ||
-    user.name.includes('@') ||
-    user.name.startsWith('mai pthc') ||
-    /^[a-z0-9_.-]+$/i.test(user.name)
 
-  const displayName = isDefaultAccountName ? (teacher.name || 'TS. Trần Mai Anh') : user.name
+  const displayName = user?.name || 'Giảng viên'
   const displayTitle = 'Giảng viên hướng dẫn'
   const initials = displayName
     .replace(/^(PGS\.TS\.|TS\.|ThS\.|GS\.TS\.)\s*/, '')
@@ -138,59 +130,12 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
           2. BÊN PHẢI: NĂM HỌC, HỌC KỲ, THÔNG BÁO & USER PROFILE
           ======================================================== */}
       <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-        {/* Bộ chọn Năm học & Học kỳ đồng bộ toàn cổng Giảng viên (chuẩn gv_ui header) */}
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="relative inline-flex items-center">
-            <select
-              id="headerYearSelect"
-              value={academicYear}
-              onChange={(e) => setAcademicFilter(e.target.value, semester)}
-              aria-label="Chọn năm học"
-              className="header-filter-select h-9 pl-3 pr-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-[12.5px] font-semibold text-slate-700 outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition appearance-none cursor-pointer"
-            >
-              <option value="2026-2027">2026-2027</option>
-              <option value="2025-2026">2025-2026</option>
-              <option value="2024-2025">2024-2025</option>
-            </select>
-            <svg
-              className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+        {/* Học kỳ hiện tại (lấy từ server) */}
+        {currentSemester && (
+          <div className="hidden sm:flex items-center h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-[12.5px] font-semibold text-slate-700">
+            {currentSemester.name}
           </div>
-
-          <div className="relative inline-flex items-center">
-            <select
-              id="headerSemesterSelect"
-              value={semester}
-              onChange={(e) => setAcademicFilter(academicYear, e.target.value)}
-              aria-label="Chọn học kỳ"
-              className="header-filter-select h-9 pl-3 pr-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-[12.5px] font-semibold text-slate-700 outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition appearance-none cursor-pointer"
-            >
-              <option value="HK1">Học kỳ 1</option>
-              <option value="HK2">Học kỳ 2</option>
-            </select>
-            <svg
-              className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </div>
-        </div>
+        )}
 
         {/* Nút chuyển portal Trưởng bộ môn ⇄ Giảng viên (chỉ hiện với trưởng bộ môn) */}
         <RoleSwitcher />
@@ -243,11 +188,7 @@ export const LecturerHeader: React.FC<LecturerHeaderProps> = ({
                     {displayName}
                   </div>
                   <div className="text-[11.5px] text-slate-500 truncate">
-                    {teacher.isExternal
-                      ? teacher.workplace || 'Giảng viên ngoài trường'
-                      : teacher.department
-                        ? `Bộ môn ${teacher.department}`
-                        : 'Trường Đại học Thủy lợi'}
+                    Trường Đại học Thủy lợi
                   </div>
                 </div>
               </div>

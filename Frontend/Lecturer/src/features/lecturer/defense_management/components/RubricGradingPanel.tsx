@@ -24,7 +24,9 @@ import {
   useExaminerEvaluation,
   useSaveExaminerEvaluation,
 } from '../hooks/useExaminerReview'
+import { examinerReviewService } from '../services/examinerReview.service'
 import { MeetingLocation } from './MeetingLocation'
+import { RubricSheetExportActions } from './RubricSheetExportActions'
 import type {
   ExaminerEvaluation,
   ExaminerEvaluationRequest,
@@ -543,8 +545,14 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
       )}
 
       {/* Footer Buttons */}
+      <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <RubricSheetExportActions
+          download={() => examinerReviewService.exportEvaluation(evaluation.examinerAssignmentPublicId)}
+          savedFileUrl={evaluation.sheet.sheetFileUrl}
+          savedFileName={evaluation.sheet.sheetFileName}
+        />
       {!isLocked && (
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3">
           {/* Trong buổi bảo vệ không lưu nháp: phiếu nháp sẽ không được tính điểm */}
           {!defenseOnly && (
             <Button
@@ -568,6 +576,7 @@ const RubricGradingForm: React.FC<RubricGradingFormProps> = ({
           </Button>
         </div>
       )}
+      </div>
 
       {/* Confirm Dialog when converting SUBMITTED to DRAFT */}
       <Dialog open={confirmDraftOpen} onOpenChange={setConfirmDraftOpen}>

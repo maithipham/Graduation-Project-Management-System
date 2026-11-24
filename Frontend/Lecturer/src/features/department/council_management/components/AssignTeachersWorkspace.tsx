@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Check, Plus, Search, SearchX, Users } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { ResizableSplit } from '@/shared/components/ui/resizable-split'
 import { toast } from '@/shared/components/feedback/toast.store'
 import type { CandidateTeacher, DefenseCouncil } from '../types'
 import { useCandidateTeachers, useUpdateCouncilMembers } from '../hooks/useDefenseCouncils'
@@ -360,9 +361,21 @@ export function AssignTeachersWorkspace({
   )
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-      {/* TRÁI: DANH SÁCH GIẢNG VIÊN */}
-      <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-190px)] min-h-[520px]">
+    <>
+    <ResizableSplit
+      className="lg:items-start"
+      stackBelowLg
+      sizedPane="end"
+      defaultSize={380}
+      minSize={300}
+      maxSize={760}
+      minOtherSize={520}
+      storageKey="department.assign-teachers"
+      startClassName="flex"
+      endClassName="flex"
+      start={
+      /* TRÁI: DANH SÁCH GIẢNG VIÊN */
+      <div className="flex-1 min-w-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-190px)] min-h-[520px]">
         <div className="p-3 border-b border-slate-200 bg-slate-50/70 shrink-0 space-y-2.5">
           <div className="grid grid-cols-2 bg-slate-200/60 p-1 rounded-xl gap-1">
             {subTabBtn('unassigned', 'Chưa gán HĐ', unassignedTeachers.length)}
@@ -566,9 +579,10 @@ export function AssignTeachersWorkspace({
           )}
         </div>
       </div>
-
-      {/* PHẢI: DANH SÁCH HỘI ĐỒNG */}
-      <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-190px)] min-h-[520px]">
+      }
+      end={
+      /* PHẢI: DANH SÁCH HỘI ĐỒNG */
+      <div className="flex-1 min-w-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-190px)] min-h-[520px]">
         <div className="p-3.5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2 shrink-0">
           <div className="text-[13.5px] font-bold text-slate-800 truncate">Danh sách hội đồng</div>
           {subTab === 'unassigned' && (
@@ -613,6 +627,8 @@ export function AssignTeachersWorkspace({
           })}
         </div>
       </div>
+      }
+    />
 
       {/* Drawer thay thế 1 thành viên */}
       {activeCouncil && replaceTarget && (
@@ -650,6 +666,6 @@ export function AssignTeachersWorkspace({
           })
         }}
       />
-    </div>
+    </>
   )
 }

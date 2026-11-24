@@ -20,145 +20,55 @@ interface CouncilItem {
   role: 'Chủ tịch' | 'Thư ký' | 'Ủy viên';
   roleKey: CouncilMemberRole;
   studentCount: number;
-  memberCount: number;
-  assignProgress: string;
-  isAssignDone: boolean;
-  gradingProgress: string;
+  statusLabel: string;
+  isPublished: boolean;
 }
 
-const MOCK_COUNCILS_LIST: CouncilItem[] = [
-  {
-    id: 'hd-1',
-    code: 'HĐ CNTT 01',
-    subTitle: 'Tiểu ban Công nghệ phần mềm & Trí tuệ nhân tạo',
-    date: '20/06/2026',
-    timeRange: '08:00 - 11:30',
-    room: 'Phòng Hội thảo 205 - Nhà T45',
-    role: 'Chủ tịch',
-    roleKey: 'CHAIRPERSON',
-    studentCount: 8,
-    memberCount: 5,
-    assignProgress: 'Còn 1 SV chưa gán',
-    isAssignDone: false,
-    gradingProgress: '1/8 SV',
-  },
-  {
-    id: 'hd-2',
-    code: 'HĐ CNTT 02',
-    subTitle: 'Tiểu ban Hệ thống thông tin & Khoa học dữ liệu',
-    date: '21/06/2026',
-    timeRange: '13:30 - 17:00',
-    room: 'Phòng Hội thảo 302 - Nhà T45',
-    role: 'Thư ký',
-    roleKey: 'SECRETARY',
-    studentCount: 6,
-    memberCount: 5,
-    assignProgress: 'Đã hoàn tất',
-    isAssignDone: true,
-    gradingProgress: '1/6 SV',
-  },
-  {
-    id: 'hd-3',
-    code: 'HĐ CNTT 03',
-    subTitle: 'Tiểu ban Mạng máy tính & An toàn thông tin',
-    date: '22/06/2026',
-    timeRange: '08:00 - 11:00',
-    room: 'Phòng Hội thảo 401 - Nhà T45',
-    role: 'Ủy viên',
-    roleKey: 'COUNCIL_MEMBER',
-    studentCount: 3,
-    memberCount: 5,
-    assignProgress: 'Đã hoàn tất',
-    isAssignDone: true,
-    gradingProgress: '0/3 SV',
-  },
-  {
-    id: 'hd-4',
-    code: 'HĐ CNTT 04',
-    subTitle: 'Tiểu ban Công nghệ phần mềm & Ứng dụng Di động',
-    date: '23/11/2026',
-    timeRange: '13:30 - 17:00',
-    room: 'Phòng 502 - Nhà T45',
-    role: 'Chủ tịch',
-    roleKey: 'CHAIRPERSON',
-    studentCount: 3,
-    memberCount: 5,
-    assignProgress: 'Đã hoàn tất',
-    isAssignDone: true,
-    gradingProgress: '0/3 SV',
-  },
-  {
-    id: 'hd-5',
-    code: 'HĐ CNTT 05',
-    subTitle: 'Tiểu ban Khoa học máy tính & Thị giác máy tính',
-    date: '24/06/2026',
-    timeRange: '08:00 - 11:30',
-    room: 'Phòng Lab AI 503 - Nhà C5',
-    role: 'Thư ký',
-    roleKey: 'SECRETARY',
-    studentCount: 5,
-    memberCount: 5,
-    assignProgress: 'Đã hoàn tất',
-    isAssignDone: true,
-    gradingProgress: '2/5 SV',
-  },
-  {
-    id: 'hd-6',
-    code: 'HĐ CNTT 06',
-    subTitle: 'Tiểu ban Mạng viễn thông & IoT ứng dụng',
-    date: '25/06/2026',
-    timeRange: '13:30 - 16:30',
-    room: 'Phòng Hội đồng 201 - Nhà A1',
-    role: 'Ủy viên',
-    roleKey: 'COUNCIL_MEMBER',
-    studentCount: 4,
-    memberCount: 5,
-    assignProgress: 'Đã hoàn tất',
-    isAssignDone: true,
-    gradingProgress: '0/4 SV',
-  },
-];
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Bản nháp',
+  PUBLISHED: 'Đã công bố',
+  COMPLETED: 'Đã kết thúc',
+  CANCELLED: 'Đã hủy',
+};
+
+function formatDate(iso: string | null): string {
+  if (!iso) return 'Chưa xếp ngày';
+  return iso.split('T')[0].split('-').reverse().join('/');
+}
+
+function formatTimeRange(start: string | null, end: string | null): string {
+  if (!start || !end) return 'Chưa xếp giờ';
+  return `${start.slice(11, 16)} - ${end.slice(11, 16)}`;
+}
 
 export const DefenseCouncilPage: React.FC = () => {
   const navigate = useNavigate();
   const currentSemesterQuery = useLecturerCurrentSemester();
   const semesterId = currentSemesterQuery.data?.publicId;
 
-  const { data: serverCouncils } = useMyCouncils(semesterId);
+  const { data: serverCouncils, isPending: councilsLoading } = useMyCouncils(semesterId);
 
   const [roleFilter, setRoleFilter] = useState<'all' | 'Chủ tịch' | 'Thư ký' | 'Ủy viên'>('all');
 
-  // Combined list preferring server councils if mapped
-  const councilList: CouncilItem[] = useMemo(() => {
-    if (serverCouncils && serverCouncils.length > 0) {
-      return serverCouncils.map((sc, idx) => {
-        const fallback = MOCK_COUNCILS_LIST[idx % MOCK_COUNCILS_LIST.length];
-        const roleLabel =
-          sc.myRole === 'CHAIRPERSON'
-            ? 'Chủ tịch'
-            : sc.myRole === 'SECRETARY'
-              ? 'Thư ký'
-              : 'Ủy viên';
-
-        return {
-          id: sc.councilPublicId,
-          code: sc.code,
-          subTitle: sc.name || fallback.subTitle,
-          date: sc.defenseStartTime ? sc.defenseStartTime.split('T')[0].split('-').reverse().join('/') : fallback.date,
-          timeRange: fallback.timeRange,
-          room: sc.location || fallback.room,
-          role: roleLabel,
-          roleKey: sc.myRole,
-          studentCount: sc.studentCount || fallback.studentCount,
-          memberCount: 5,
-          assignProgress: fallback.assignProgress,
-          isAssignDone: fallback.isAssignDone,
-          gradingProgress: fallback.gradingProgress,
-        };
-      });
-    }
-    return MOCK_COUNCILS_LIST;
-  }, [serverCouncils]);
+  // Danh sách hội đồng lấy hoàn toàn từ server
+  const councilList: CouncilItem[] = useMemo(
+    () =>
+      (serverCouncils ?? []).map((sc) => ({
+        id: sc.councilPublicId,
+        code: sc.code,
+        subTitle: sc.name,
+        date: formatDate(sc.defenseStartTime),
+        timeRange: formatTimeRange(sc.defenseStartTime, sc.defenseEndTime),
+        room: sc.location || 'Chưa xếp phòng',
+        role:
+          sc.myRole === 'CHAIRPERSON' ? 'Chủ tịch' : sc.myRole === 'SECRETARY' ? 'Thư ký' : 'Ủy viên',
+        roleKey: sc.myRole,
+        studentCount: sc.studentCount,
+        statusLabel: STATUS_LABEL[sc.status] ?? sc.status,
+        isPublished: sc.status === 'PUBLISHED',
+      })),
+    [serverCouncils],
+  );
 
   const countAll = councilList.length;
   const countChair = councilList.filter((c) => c.role === 'Chủ tịch').length;
@@ -277,11 +187,18 @@ export const DefenseCouncilPage: React.FC = () => {
                 <th className="py-3 px-4 min-w-[220px]">Thời gian & Địa điểm</th>
                 <th className="py-3 px-4 min-w-[120px] text-center">Vai trò</th>
                 <th className="py-3 px-4 min-w-[120px]">Quy mô</th>
-                <th className="py-3 px-4 min-w-[200px]">Tiến độ chuẩn bị</th>
+                <th className="py-3 px-4 min-w-[140px]">Trạng thái</th>
                 <th className="py-3 px-4 min-w-[110px] text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {filteredCouncils.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-10 px-4 text-center text-slate-500 text-[12.5px]">
+                    {councilsLoading ? 'Đang tải danh sách hội đồng...' : 'Bạn chưa được phân công vào hội đồng nào.'}
+                  </td>
+                </tr>
+              )}
               {filteredCouncils.map((c, idx) => (
                 <tr key={c.id} className="hover:bg-slate-50/70 transition">
                   {/* STT */}
@@ -327,21 +244,19 @@ export const DefenseCouncilPage: React.FC = () => {
                   {/* Quy mô */}
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-slate-900">{c.studentCount} sinh viên</div>
-                    <div className="text-[11px] text-slate-500">{c.memberCount} thành viên</div>
                   </td>
 
-                  {/* Tiến độ chuẩn bị */}
+                  {/* Trạng thái */}
                   <td className="py-3.5 px-4">
-                    <div className="text-[11px]">
-                      <span>Phân công: </span>
-                      <span className={c.isAssignDone ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
-                        {c.assignProgress}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      <span>Chấm bảo vệ của bạn: </span>
-                      <b className="text-slate-700">{c.gradingProgress}</b>
-                    </div>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                        c.isPublished
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {c.statusLabel}
+                    </span>
                   </td>
 
                   {/* Thao tác */}
