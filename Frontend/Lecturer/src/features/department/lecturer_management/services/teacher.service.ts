@@ -179,7 +179,8 @@ export const teacherService = {
   // GET /teacher/managed-major — Lấy ngành mà TBM phụ trách quản lý
   async getManagedMajor(): Promise<MajorOption | null> {
     const res = await apiClient.get<ApiResponse<MajorOption | null>>('/teacher/managed-major')
-    return res.data.data
+    // BE bỏ hẳn field data khi null (NON_NULL) → đổi về null, vì React Query coi undefined là lỗi
+    return res.data.data ?? null
   },
 
   // PUT /teacher/{id} — cập nhật thông tin giảng viên

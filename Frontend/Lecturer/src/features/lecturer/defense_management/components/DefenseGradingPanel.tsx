@@ -574,8 +574,8 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ board, item, evaluation
                 <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
                 <span>
                   Điểm bạn chấm (<b>{total.toFixed(1)}</b>) lệch <b>{deviation.toFixed(1)} điểm</b> so với{' '}
-                  {reference.title.toLowerCase()} (<b>{reference.avg.toFixed(1)}</b>). Khi đủ 5/5 phiếu, điểm lệch từ 1,5
-                  trở lên sẽ bị loại khỏi điểm trung bình (QĐ 1305 – Điều 9). Hãy kiểm tra lại trước khi gửi.
+                  {reference.title.toLowerCase()} (<b>{reference.avg.toFixed(1)}</b>). Điểm lệch từ 1,5 trở lên chỉ bị
+                  cảnh báo và vẫn được tính vào điểm trung bình (QĐ 1305 – Điều 9). Hãy kiểm tra lại trước khi gửi.
                 </span>
               </div>
             )}
