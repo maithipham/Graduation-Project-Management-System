@@ -38,7 +38,7 @@ function renderApp(path: string, user?: UserInfo) {
             <Route element={<ProtectedRoute allowedRoles={['HEAD_OF_MAJOR']} />}>
               <Route path="/department" element={<p>Trang bộ môn</p>} />
             </Route>
-            <Route element={<ProtectedRoute allowedRoles={['SUPERVISOR']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'LECTURER']} />}>
               <Route path="/lecturer" element={<p>Trang giảng viên</p>} />
             </Route>
           </Route>
@@ -66,6 +66,16 @@ describe('RequireAuth + ProtectedRoute', () => {
 
   it('trưởng bộ môn vẫn vào được /lecturer (URL quyết định portal)', async () => {
     renderApp('/lecturer', { name: 'An', roles: ['HEAD_OF_MAJOR', 'SUPERVISOR'] })
+    expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
+  })
+
+  it('role LECTURER vào được /lecturer', async () => {
+    renderApp('/lecturer', { name: 'An', roles: ['LECTURER'] })
+    expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
+  })
+
+  it('role LECTURER mở /admin → bị đưa về /lecturer', async () => {
+    renderApp('/admin', { name: 'An', roles: ['LECTURER'] })
     expect(await screen.findByText('Trang giảng viên')).toBeInTheDocument()
   })
 

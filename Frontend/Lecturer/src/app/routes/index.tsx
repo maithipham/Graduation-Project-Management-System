@@ -31,7 +31,10 @@ const routes: RouteObject[] = [
         element: <ProtectedRoute allowedRoles={['HEAD_OF_MAJOR', 'ADMIN']} />,
         children: [departmentRoutes],
       },
-      { element: <ProtectedRoute allowedRoles={['SUPERVISOR']} />, children: [lecturerRoutes] },
+      {
+        element: <ProtectedRoute allowedRoles={['SUPERVISOR', 'LECTURER']} />,
+        children: [lecturerRoutes],
+      },
     ],
   },
   {
