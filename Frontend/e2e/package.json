@@ -16,5 +16,8 @@
     "dotenv": "^18.0.10",
     "mysql2": "^3.24.6",
     "typescript": "^7.0.2"
+  },
+  "directories": {
+    "test": "tests"
   }
 }

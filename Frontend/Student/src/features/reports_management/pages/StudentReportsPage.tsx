@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/shared/components/ui'
 import { cn, formatDate } from '@/shared/utils'
+import { DefenseRevisionSection } from '../components/DefenseRevisionSection'
 import { SubmitReportModal } from '../components/SubmitReportModal'
 import { useMyFinalReport, useSubmitFinalReport } from '../hooks/useReportsManagement'
 import { extractReportFileName, isSafeReportFileUrl } from '../services/reports.service'
@@ -120,6 +121,9 @@ export default function StudentReportsPage() {
 
   return (
     <div className="w-full max-w-full space-y-5">
+      {/* 0. Nộp lại báo cáo sau bảo vệ (chỉ hiện khi Hội đồng yêu cầu chỉnh sửa) */}
+      <DefenseRevisionSection />
+
       {/* 1. Khối thông tin đề tài, thời hạn nộp & nút Nộp báo cáo Final */}
       <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs">
         {isPending ? (

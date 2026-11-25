@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Select } from '@/shared/components/ui';
-import { useScheduleManagement } from '../hooks/useScheduleManagement';
+import { toIsoDay, useScheduleManagement } from '../hooks/useScheduleManagement';
 import { ScheduleTable } from '../components/ScheduleTable';
 import { ConfirmSaveModal } from '../components/ConfirmSaveModal';
 import {
@@ -13,10 +13,12 @@ import { useManagedMajor } from '@/features/department/lecturer_management/hooks
 // "2026-2027" → "2026–2027" (gạch nối dài en-dash chuẩn mockup)
 const formatAcademicYear = (year: string) => year.replace('-', '–');
 
-// "2026-08-15" → "15/08/2026"
+// "2026-08-15" hoặc "15-08-2026" (định dạng BE trả cho học kỳ) → "15/08/2026"
 const formatSemesterDate = (date: string) => {
-  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : date;
+  const iso = toIsoDay(date);
+  if (!iso) return date;
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 };
 
 // Style thống nhất với các màn hình khác trong phân hệ bộ môn

@@ -6,6 +6,8 @@ import {
   formatDefenseDateRange,
   ROLE_CONFIG,
 } from '@/features/department/council_management/utils/councilFormatters'
+import { resolveCouncilMajorId } from '@/features/department/council_management/utils/councilMajor'
+import { teacherService } from '@/features/department/lecturer_management/services/teacher.service'
 
 describe('Defense Council Unit Tests', () => {
   describe('councilFormatters', () => {
@@ -34,6 +36,41 @@ describe('Defense Council Unit Tests', () => {
       expect(ROLE_CONFIG.CHAIRPERSON.label).toBe('Chủ tịch')
       expect(ROLE_CONFIG.SECRETARY.label).toBe('Thư ký')
       expect(ROLE_CONFIG.COUNCIL_MEMBER.label).toBe('Ủy viên')
+    })
+  })
+
+  describe('resolveCouncilMajorId', () => {
+    const majors = [{ publicId: 'anm' }, { publicId: 'ktpm' }]
+    const base = { majors, pickedMajorId: '', isAdmin: false }
+
+    it('chưa tải xong ngành phụ trách: không lấy tạm ngành đầu danh sách (lỗi 3018 lần đầu vào trang)', () => {
+      expect(resolveCouncilMajorId({ ...base, managedMajor: undefined })).toBe('')
+      expect(resolveCouncilMajorId({ ...base, managedMajor: undefined, isAdmin: true })).toBe('')
+    })
+
+    it('Trưởng bộ môn: luôn dùng ngành phụ trách, kể cả khi chọn ngành khác', () => {
+      const managedMajor = { publicId: 'ktpm' }
+      expect(resolveCouncilMajorId({ ...base, managedMajor })).toBe('ktpm')
+      expect(resolveCouncilMajorId({ ...base, managedMajor, pickedMajorId: 'anm' })).toBe('ktpm')
+    })
+
+    it('Không phải ADMIN và không phụ trách ngành nào: không có ngành', () => {
+      expect(resolveCouncilMajorId({ ...base, managedMajor: null })).toBe('')
+    })
+
+    it('ADMIN: mặc định ngành đầu danh sách, được chọn ngành khác', () => {
+      const admin = { ...base, managedMajor: null, isAdmin: true }
+      expect(resolveCouncilMajorId(admin)).toBe('anm')
+      expect(resolveCouncilMajorId({ ...admin, pickedMajorId: 'ktpm' })).toBe('ktpm')
+      expect(resolveCouncilMajorId({ ...admin, majors: undefined })).toBe('')
+    })
+
+    it('getManagedMajor: BE không trả field data thì trả null, không trả undefined', async () => {
+      const spy = vi
+        .spyOn(apiClient, 'get')
+        .mockResolvedValueOnce({ data: { code: 1000, message: 'ok' } })
+      await expect(teacherService.getManagedMajor()).resolves.toBeNull()
+      spy.mockRestore()
     })
   })
 

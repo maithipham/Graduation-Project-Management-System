@@ -281,13 +281,16 @@ export default function SupervisorAssignmentPage() {
       toast.success('Cập nhật chỉ tiêu thành công')
       queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
       queryClient.invalidateQueries({ queryKey: ['supervisors'] })
-    } catch {
+    } catch (err: unknown) {
       setQuotaOverrides((prev) => {
         const next = { ...prev }
         delete next[id]
         return next
       })
-      toast.error('Không thể cập nhật hạn mức giáo viên hướng dẫn')
+      // Lỗi từ BE (ApiError) đã được interceptor toast đúng lý do → chỉ báo chung khi lỗi không đến từ API
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể cập nhật hạn mức giáo viên hướng dẫn')
+      }
     }
   }
 
@@ -333,10 +336,11 @@ export default function SupervisorAssignmentPage() {
         queryClient.invalidateQueries({ queryKey: ['supervisor-students'] }),
       ])
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không thể phân công sinh viên cho giảng viên'
-      toast.error(msg)
+      // Lỗi từ BE (ApiError) đã được interceptor toast đúng lý do (vd. chưa tạo lịch, danh sách đã khóa)
+      // → chỉ hiện thông báo chung khi lỗi không đến từ API, tránh đè lên lý do thật
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể phân công sinh viên cho giảng viên')
+      }
       throw err
     }
   }
@@ -351,10 +355,9 @@ export default function SupervisorAssignmentPage() {
         queryClient.invalidateQueries({ queryKey: ['supervisor-students'] }),
       ])
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không thể phê duyệt đơn phân công'
-      toast.error(msg)
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể phê duyệt đơn phân công')
+      }
       throw err
     }
   }
@@ -369,10 +372,9 @@ export default function SupervisorAssignmentPage() {
         queryClient.invalidateQueries({ queryKey: ['supervisor-students'] }),
       ])
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không thể từ chối đơn phân công'
-      toast.error(msg)
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể từ chối đơn phân công')
+      }
       throw err
     }
   }
@@ -388,10 +390,9 @@ export default function SupervisorAssignmentPage() {
         queryClient.invalidateQueries({ queryKey: ['supervisor-students'] }),
       ])
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không thể thay đổi giảng viên hướng dẫn'
-      toast.error(msg)
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể thay đổi giảng viên hướng dẫn')
+      }
       throw err
     }
   }
@@ -411,10 +412,11 @@ export default function SupervisorAssignmentPage() {
       queryClient.invalidateQueries({ queryKey: ['advisor-workspace'] })
       queryClient.invalidateQueries({ queryKey: ['supervisors'] })
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Không thể cập nhật giảng viên đồng hướng dẫn'
-      toast.error(msg)
+      if (!(err instanceof ApiError)) {
+        toast.error('Không thể cập nhật giảng viên đồng hướng dẫn')
+      }
+      // Báo lỗi cho màn phân công để không cập nhật GVHD 2 trên giao diện khi BE từ chối
+      throw err
     }
   }
 
@@ -469,11 +471,12 @@ export default function SupervisorAssignmentPage() {
         await queryClient.invalidateQueries({ queryKey: ['supervisors'] })
         return true
       } catch (err: unknown) {
-        const msg =
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          (err as Error)?.message ||
-          (nextLockState ? 'Chốt danh sách GVHD thất bại' : 'Không thể thay đổi trạng thái khóa danh sách phân công')
-        toast.error(msg)
+        if (!(err instanceof ApiError)) {
+          toast.error(
+            (err as Error)?.message ||
+            (nextLockState ? 'Chốt danh sách GVHD thất bại' : 'Không thể thay đổi trạng thái khóa danh sách phân công'),
+          )
+        }
         return false
       }
     }

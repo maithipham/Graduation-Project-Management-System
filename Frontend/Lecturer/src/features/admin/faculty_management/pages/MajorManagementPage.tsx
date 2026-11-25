@@ -50,7 +50,8 @@ export default function MajorManagementPage() {
         backendId: f.id,
         code: f.code,
         name: f.name,
-        description: `Khoa ${f.name}`,
+        // API danh sách không trả mô tả; mô tả thật lấy từ GET /faculty/{id} ở màn chi tiết
+        description: '',
         status: f.statusCode === 'ACTIVE' ? 'active' : 'inactive',
         majors: [],
         totalMajors: f.totalMajors,

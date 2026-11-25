@@ -39,6 +39,18 @@ export function getTodayDateString(): string {
 }
 
 // "2026-08-15" / "2026-08-15T08:00" → "15/08/2026"
+/**
+ * Chuẩn hóa ngày về yyyy-MM-dd để so sánh theo chuỗi.
+ * Nhận cả "01-08-2026" (định dạng dd-MM-yyyy BE trả cho học kỳ) lẫn "2026-08-01" / "2026-08-01T08:00".
+ */
+export function toIsoDay(val: string | null | undefined): string | undefined {
+  if (!val) return undefined;
+  const dmy = val.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  const ymd = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return ymd ? `${ymd[1]}-${ymd[2]}-${ymd[3]}` : undefined;
+}
+
 const toDisplayDay = (val: string) => {
   const m = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : val;
@@ -187,8 +199,9 @@ export const useScheduleManagement = (
     }
 
     // 2b. Mốc phải nằm trong khoảng ngày của học kỳ (so theo ngày, giống BE)
-    const semStart = semesterRange?.startDate?.slice(0, 10);
-    const semEnd = semesterRange?.endDate?.slice(0, 10);
+    // BE trả ngày học kỳ dạng dd-MM-yyyy → đổi về yyyy-MM-dd mới so sánh chuỗi được với ngày của mốc
+    const semStart = toIsoDay(semesterRange?.startDate);
+    const semEnd = toIsoDay(semesterRange?.endDate);
     const startDay = rawStart.slice(0, 10);
     const endDay = rawEnd.slice(0, 10);
     if ((semStart && startDay < semStart) || (semEnd && endDay > semEnd)) {

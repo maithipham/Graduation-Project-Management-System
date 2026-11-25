@@ -9,6 +9,7 @@ import { useManagedMajor } from '@/features/department/lecturer_management/hooks
 import { SemesterScopeFilter } from '@/features/department/lecturer_management/components/SemesterScopeFilter'
 import { useDefenseCouncils, useFormationMilestone } from '../hooks/useDefenseCouncils'
 import { MILESTONE_BLOCK_MESSAGE } from '../utils/councilFormatters'
+import { resolveCouncilMajorId } from '../utils/councilMajor'
 import { EditDefenseDateDialog } from '../components/EditDefenseDateDialog'
 import { DeleteCouncilDialog } from '../components/DeleteCouncilDialog'
 import type { DefenseCouncil } from '../types'
@@ -49,29 +50,31 @@ export default function DefenseCouncilPage() {
     onSemesterChange,
   } = useSemesterScope({ defaultToCurrent: true, allowAll: false })
 
-  const { data: managedMajor } = useManagedMajor()
+  const { data: managedMajor, isError: managedMajorError } = useManagedMajor()
   const { data: majors, isPending: majorsLoading } = useMajors()
 
-  const [selectedMajorId, setSelectedMajorId] = useState<string>('')
+  const isAdmin = user?.roles?.includes('ADMIN') ?? false
+  const [pickedMajorId, setPickedMajorId] = useState<string>('')
 
-  useEffect(() => {
-    if (managedMajor?.publicId) {
-      setSelectedMajorId(managedMajor.publicId)
-    } else if (majors && majors.length > 0 && !selectedMajorId) {
-      setSelectedMajorId(majors[0].publicId)
-    }
-  }, [managedMajor, majors, selectedMajorId])
+  // '' khi chưa biết ngành phụ trách → chưa gọi API hội đồng
+  const activeMajorId = resolveCouncilMajorId({ managedMajor, majors, pickedMajorId, isAdmin })
+
+  const majorErrorMessage =
+    managedMajorError && !managedMajor
+      ? 'Không tải được ngành phụ trách. Vui lòng tải lại trang.'
+      : user && managedMajor === null && !isAdmin
+        ? 'Tài khoản của bạn chưa được phân công phụ trách ngành nào.'
+        : null
 
   const currentMajor =
-    majors?.find((m) => m.publicId === selectedMajorId) || managedMajor
+    majors?.find((m) => m.publicId === activeMajorId) || managedMajor
   const currentMajorCode = (currentMajor?.code || currentMajor?.name || 'KTPM')
     .replace(/[^A-Za-z0-9]/g, '')
     .toUpperCase()
     .slice(0, 5)
 
-  // Use selected IDs (publicId UUID) for queries
+  // Use selected ID (publicId UUID) for queries
   const activeSemesterId = selectedSemesterId || ''
-  const activeMajorId = selectedMajorId || managedMajor?.publicId || ''
 
   // Query Councils
   const {
@@ -139,6 +142,13 @@ export default function DefenseCouncilPage() {
         </div>
       )}
 
+      {majorErrorMessage && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
+          <span>{majorErrorMessage}</span>
+        </div>
+      )}
+
       {/* HEADER / TOOLBAR: BỘ LỌC NĂM HỌC, HỌC KỲ, BỘ MÔN */}
       <div className="flex items-center justify-between gap-3 flex-wrap bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
         <div className="flex items-center gap-3 flex-wrap">
@@ -156,23 +166,26 @@ export default function DefenseCouncilPage() {
           {/* Major Filter */}
           <div className="flex items-center gap-1.5">
             <select
-              value={selectedMajorId}
-              onChange={(e) => setSelectedMajorId(e.target.value)}
+              value={activeMajorId}
+              onChange={(e) => setPickedMajorId(e.target.value)}
               aria-label="Chọn bộ môn"
-              className="h-9 px-3 pr-8 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-2xs cursor-pointer"
-              disabled={majorsLoading}
+              className="h-9 px-3 pr-8 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 transition shadow-2xs cursor-pointer disabled:cursor-not-allowed"
+              // Trưởng bộ môn chỉ thao tác trên ngành mình phụ trách → không cho đổi
+              disabled={majorsLoading || !isAdmin || Boolean(managedMajor)}
             >
-              {majors && majors.length > 0 ? (
-                majors.map((m) => (
-                  <option key={m.publicId} value={m.publicId}>
-                    {m.name}
-                  </option>
-                ))
-              ) : (
-                <option value={managedMajor?.publicId || '1'}>
-                  {managedMajor?.name || 'Kỹ thuật phần mềm (KTPM)'}
+              {!activeMajorId && (
+                <option value="">
+                  {majorErrorMessage ? 'Chưa có ngành' : 'Đang tải ngành...'}
                 </option>
               )}
+              {managedMajor && !majors?.some((m) => m.publicId === managedMajor.publicId) && (
+                <option value={managedMajor.publicId}>{managedMajor.name}</option>
+              )}
+              {majors?.map((m) => (
+                <option key={m.publicId} value={m.publicId}>
+                  {m.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -271,7 +284,7 @@ export default function DefenseCouncilPage() {
         <section className="space-y-4">
           <CouncilTable
             councils={councils}
-            isLoading={councilsLoading}
+            isLoading={councilsLoading && !majorErrorMessage}
             onViewDetail={(c) => setDetailCouncilId(c.publicId)}
             onCreate={() => setCreateDialogOpen(true)}
             onDelete={setCouncilToDelete}

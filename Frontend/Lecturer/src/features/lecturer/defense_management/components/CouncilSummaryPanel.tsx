@@ -175,8 +175,8 @@ export const CouncilSummaryPanel: React.FC<CouncilSummaryPanelProps> = ({
             )}
           </div>
           <p className="text-[11.5px] text-slate-500 mt-0.5">
-            Điểm GVHD, 2 GVPB và 5 thành viên Hội đồng. Điểm gạch đỏ là điểm không hợp lệ (lệch ≥ 1,5) bị loại khỏi điểm
-            trung bình (rê chuột để xem độ lệch).
+            Điểm GVHD, 2 GVPB và 5 thành viên Hội đồng. Điểm đánh dấu cam là điểm lệch từ 1,5 trở lên, chỉ cảnh báo và
+            vẫn được tính vào điểm trung bình (rê chuột để xem độ lệch).
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -193,7 +193,7 @@ export const CouncilSummaryPanel: React.FC<CouncilSummaryPanelProps> = ({
               type="button"
               disabled={eligible.length === 0 || isBulkRunning}
               onClick={() => setConfirmTarget(eligible)}
-              title="Hoàn tất bảo vệ cho mọi sinh viên đã đủ 5/5 phiếu, đủ điểm và biên bản đã nộp"
+              title="Hoàn tất bảo vệ cho mọi sinh viên có tối thiểu 3 phiếu Hội đồng, đủ điểm HD/PB và biên bản đã nộp"
               className="h-9 px-4 rounded-xl text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-xs bg-[#1565C0] hover:bg-[#0D47A1] disabled:bg-slate-300 disabled:cursor-not-allowed"
             >
               <Lock className="w-4 h-4" />
@@ -332,7 +332,7 @@ export const CouncilSummaryPanel: React.FC<CouncilSummaryPanelProps> = ({
                           title={
                             canComplete(it)
                               ? 'Hoàn tất bảo vệ cho sinh viên này'
-                              : 'Cần đủ 5/5 phiếu Hội đồng, đủ điểm HD/PB, không có nhóm điểm bị loại hết và biên bản đã nộp'
+                              : 'Cần tối thiểu 3 phiếu Hội đồng, đủ điểm HD/PB và biên bản đã nộp'
                           }
                           className="h-7 px-2.5 rounded-lg bg-[#1565C0] hover:bg-[#0D47A1] text-white text-[11px] font-bold cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
                         >

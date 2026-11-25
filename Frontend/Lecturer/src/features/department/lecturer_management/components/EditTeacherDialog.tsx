@@ -144,21 +144,24 @@ export function EditTeacherDialog({
     })
 
     const allTitles = academicTitles && academicTitles.length > 0 ? academicTitles : DEFAULT_ACADEMIC_TITLES
-    const matchedTitle = allTitles.find(
-      (t) => t.abbreviation === values.academicTitle || String(t.id) === String(values.academicTitleId),
-    )
+    // Ưu tiên học hàm người dùng đang chọn trên ô select; academicTitleId là giá trị cũ lúc mở popup,
+    // chỉ dùng khi không khớp được theo viết tắt (nếu ưu tiên id cũ thì đổi học hàm sẽ không có tác dụng)
+    const matchedTitle =
+      allTitles.find((t) => t.abbreviation === values.academicTitle) ??
+      allTitles.find((t) => String(t.id) === String(values.academicTitleId))
 
     let majorId: string | number | null = null
     let majorName: string | null = null
 
     if (!isExternal) {
       const selectedMajorName = (effectiveLockedMajor || values.major || '').trim()
-      const matchedMajor = majors?.find(
-        (m) =>
-          m.name.toLowerCase() === selectedMajorName.toLowerCase() ||
-          m.publicId === values.majorId ||
-          (m.code && m.code.toLowerCase() === selectedMajorName.toLowerCase()),
-      )
+      // Ưu tiên ngành người dùng đang chọn (theo tên / mã); values.majorId là ngành cũ lúc mở popup,
+      // chỉ dùng khi không khớp được (nếu ưu tiên id cũ thì đổi ngành sẽ không có tác dụng)
+      const selectedKey = selectedMajorName.toLowerCase()
+      const matchedMajor =
+        majors?.find(
+          (m) => m.name.toLowerCase() === selectedKey || (m.code && m.code.toLowerCase() === selectedKey),
+        ) ?? majors?.find((m) => m.publicId === values.majorId)
       majorId = matchedMajor ? matchedMajor.publicId : (values.majorId ?? null)
       majorName = matchedMajor ? matchedMajor.name : (selectedMajorName || null)
     }
